@@ -1,0 +1,29 @@
+cmake_minimum_required(VERSION 3.16)
+project(separating_hyperplanes)
+set_property(GLOBAL PROPERTY separating_hyperplanes_ADDED "ON")
+
+set(CMAKE_CXX_STANDARD 17)
+
+# add local library
+get_property(is_math_ADDED GLOBAL PROPERTY math_ADDED)
+if(NOT is_math_ADDED)
+    add_subdirectory(../math ${CMAKE_CURRENT_BINARY_DIR}/math)
+endif()
+
+get_property(is_qpcpp_ADDED GLOBAL PROPERTY qpcpp_ADDED)
+if(NOT is_qpcpp_ADDED)
+    add_subdirectory(../qpcpp ${CMAKE_CURRENT_BINARY_DIR}/qpcpp)
+endif()
+
+# add libraries
+add_library(separating_hyperplanes_SVM SHARED src/SVM.cpp)
+target_include_directories(separating_hyperplanes_SVM PUBLIC include)
+target_link_libraries(separating_hyperplanes_SVM PUBLIC
+        math_Types
+        qpcpp_Problem
+        qpcpp_solvers_CPLEX)
+
+add_library(separating_hyperplanes_Voronoi SHARED src/Voronoi.cpp)
+target_include_directories(separating_hyperplanes_Voronoi PUBLIC include)
+target_link_libraries(separating_hyperplanes_Voronoi PUBLIC
+        math_Types)
