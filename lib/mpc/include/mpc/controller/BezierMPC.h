@@ -9,6 +9,8 @@
 #include <separating_hyperplanes/Voronoi.h>
 #include <qpcpp/Problem.h>
 #include <qpcpp/solvers/CPLEX.h>
+#include <math/Helpers.h>
+#include <math/collision_shapes/CollisionShape.h>
 #include <cmath>
 
 namespace mpc {
@@ -30,8 +32,12 @@ namespace mpc {
         using Matrix = math::Matrix<T>;
         using Hyperplane = math::Hyperplane<T, DIM>;
         using VectorDIM = math::VectorDIM<T, DIM>;
+        using AlignedBox = math::AlignedBox<T, DIM>;
+        using CollisionShape = math::CollisionShape<T, DIM>;
 
-        BezierMPC(Params &p, std::shared_ptr<DoubleIntegrator> model_ptr, uint64_t bezier_continuity_upto_degree);
+        BezierMPC(Params &p, std::shared_ptr<DoubleIntegrator> model_ptr,
+                  uint64_t bezier_continuity_upto_degree,
+                  std::shared_ptr<const CollisionShape> collision_shape_ptr);
         ~BezierMPC()=default;
 
         bool optimize(SingleParameterPiecewiseCurve &result_curve,
@@ -52,6 +58,7 @@ namespace mpc {
         // the derivative degree that the resulting trajectory must be
         // continuous upto.
         uint64_t bezier_continuity_upto_degree_;
+        std::shared_ptr<const CollisionShape> collision_shape_ptr_;
     };
 
 } // mpc

@@ -4,6 +4,7 @@
 
 #include <model/DoubleIntegratorXYYaw.h>
 #include <mpc/controller/BezierMPC.h>
+#include <math/collision_shapes/AlignedBoxCollisionShape.h>
 #include <nlohmann/json.hpp>
 
 int main() {
@@ -22,6 +23,8 @@ int main() {
     using VectorDIM = math::VectorDIM<double, DIM>;
     using Vector = math::Vector<double>;
     using Matrix = math::Matrix<double>;
+    using AlignedBox = math::AlignedBox<double, DIM>;
+    using AlignedBoxCollisionShape = math::AlignedBoxCollisionShape<double, DIM>;
     // load experiment config
     std::string experiment_config_filename = "../../../config/config.json";
     std::fstream experiment_config_fc(experiment_config_filename.c_str(), std::ios_base::in);
@@ -50,6 +53,15 @@ int main() {
     VectorDIM a_max = {experiment_config_json["mpc_params"]["physical_limits"]["a_max"][0],
                        experiment_config_json["mpc_params"]["physical_limits"]["a_max"][1],
                        experiment_config_json["mpc_params"]["physical_limits"]["a_max"][2]};
+
+    VectorDIM aligned_box_collision_vec;
+    aligned_box_collision_vec <<
+    experiment_config_json["robot_params"]["collision_shape"]["aligned_box"][0],
+    experiment_config_json["robot_params"]["collision_shape"]["aligned_box"][1],
+    experiment_config_json["robot_params"]["collision_shape"]["aligned_box"][2];
+    AlignedBox robot_bbox_at_zero = {-aligned_box_collision_vec, aligned_box_collision_vec};
+    std::shared_ptr<const AlignedBoxCollisionShape> aligned_box_collision_shape_ptr =
+            std::make_shared<const AlignedBoxCollisionShape>(robot_bbox_at_zero);
 
     PiecewiseBezierParams piecewise_bezier_params = {num_pieces, num_control_points, piece_max_parameter};
     MPCParams mpc_params = {h, Ts, k_hor, {w_pos_err, w_u_eff, spd_f}, {p_min, p_max, a_min, a_max}};
@@ -91,20 +103,9 @@ int main() {
         target_positions.push_back(target_pos);
     }
 
-//    Vector x0(6);
-//    x0 << init_state.pos_, init_state.vel_;
-//    VectorDIM target_pos = {0.5,0.5,0};
-
     SingleParameterPiecewiseCurve traj;
     int loop_idx = 0;
     while (loop_idx < 200) {
-//        if (loop_idx < 15) {
-//            target_pos = {0.5,0.5,0};
-//        } else if (loop_idx >= 15 && loop_idx < 30){
-//            target_pos = {1.0,0,0};
-//        } else {
-//            target_pos = {0,0,0};
-//        }
         for (int robot_idx = 0; robot_idx < num_robots; ++robot_idx) {
             std::vector<VectorDIM> other_robot_positions;
             for (int j = 0; j < num_robots; ++j) {
@@ -113,7 +114,7 @@ int main() {
                 }
                 other_robot_positions.push_back(init_states.at(j).pos_);
             }
-            BezierMPC bezier_mpc(bezier_mpc_params, pred_model_ptr, bezier_continuity_upto_degree);
+            BezierMPC bezier_mpc(bezier_mpc_params, pred_model_ptr, bezier_continuity_upto_degree, aligned_box_collision_shape_ptr);
             bool success = bezier_mpc.optimize(traj, init_states.at(robot_idx), other_robot_positions, target_positions.at(robot_idx));
             Vector U = bezier_mpc.generatorDerivativeControlInputs(2);
             std::cout << "curve eval: " << traj.eval(1.5, 0) << "\n";
@@ -151,16 +152,10 @@ int main() {
         loop_idx += 1;
     }
 
-
-    // test
     // write states to json
     std::cout << "writing to file " << JSON_FILENAME << ".\n";
     std::ofstream o(JSON_FILENAME, std::ofstream::trunc);
     o << std::setw(4) << states << std::endl;
-//    std::cout << "curve eval: " << traj.eval(1.5, 0) << "\n";
-//    std::cout << "curve max parameter: " << traj.max_parameter() << "\n";
-////    std::cout << "control_inputs: " << U << "\n";
-
 
     return 0;
 }

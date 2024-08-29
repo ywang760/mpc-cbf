@@ -6,9 +6,12 @@
 
 namespace mpc {
     template <typename T, unsigned int DIM>
-    BezierMPC<T, DIM>::BezierMPC(Params &p, std::shared_ptr<DoubleIntegrator> model_ptr, uint64_t bezier_continuity_upto_degree)
+    BezierMPC<T, DIM>::BezierMPC(Params &p, std::shared_ptr<DoubleIntegrator> model_ptr,
+                                 uint64_t bezier_continuity_upto_degree,
+                                 std::shared_ptr<const CollisionShape> collision_shape_ptr)
     : model_ptr_(model_ptr),
-    bezier_continuity_upto_degree_(bezier_continuity_upto_degree) {
+    bezier_continuity_upto_degree_(bezier_continuity_upto_degree),
+    collision_shape_ptr_(collision_shape_ptr) {
         // Initiate the qp_generator
         std::unique_ptr<PiecewiseBezierMPCQPOperation> piecewise_bezier_qp_operation =
                 std::make_unique<PiecewiseBezierMPCQPOperation>(p, model_ptr);
@@ -60,10 +63,18 @@ namespace mpc {
         }
 
         // add the collision avoidance constraints
+        AlignedBox robot_bbox_at_zero = collision_shape_ptr_->boundingBox(VectorDIM::Zero());
         for (size_t i = 0; i < other_robot_positions.size(); ++i) {
             const VectorDIM& other_robot_pos = other_robot_positions.at(i);
-            Hyperplane hyperplane = separating_hyperplanes::voronoi<T, DIM>(current_pos, other_robot_pos);
-            qp_generator_.addHyperplaneConstraintForPiece(0, hyperplane); // add the collision avoidance constraint on the first segment
+
+            // TODO this is model specific, here the last dimension is orientation data
+            VectorDIM current_xy = current_pos; current_xy(DIM-1) = 0;
+            VectorDIM other_robot_xy = other_robot_pos; other_robot_xy(DIM-1) = 0;
+
+            Hyperplane hyperplane = separating_hyperplanes::voronoi<T, DIM>(current_xy, other_robot_xy);
+            // shifted hyperplane
+            Hyperplane shifted_hyperplane = math::shiftHyperplane<T, DIM>(hyperplane, robot_bbox_at_zero);
+            qp_generator_.addHyperplaneConstraintForPiece(0, shifted_hyperplane); // add the collision avoidance constraint on the first segment
         }
 
         std::cout << "error after constraints\n";

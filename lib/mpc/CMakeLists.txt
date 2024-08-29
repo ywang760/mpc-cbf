@@ -52,5 +52,6 @@ add_executable(mpc_examples_BezierMPCXYYaw_example examples/BezierMPCXYYaw_examp
 target_include_directories(mpc_examples_BezierMPCXYYaw_example PUBLIC include ../../third_party/json/single_include)
 target_link_libraries(mpc_examples_BezierMPCXYYaw_example PUBLIC
         mpc_controller_BezierMPC
-        model_DoubleIntegratorXYYaw)
+        model_DoubleIntegratorXYYaw
+        math_collision_shapes_AlignedBoxCollisionShape)
 

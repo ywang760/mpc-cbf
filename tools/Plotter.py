@@ -64,9 +64,6 @@ def animation2D_XYYaw(traj, dt, pred_curve, Trailing=True, PredCurve=True, save_
         if ts % 100 == 0:
             print("Animating frame {0}/{1}".format(ts, total_frame))
 
-        # if ts % 10 == 0:
-        #     pred_index = int(ts//10)
-
         p.set_data(x[:, ts], y[:, ts])
         for i in range(n_agent):
             vel_line[i].set_data([x[i][ts], dir_len * x_v[i][ts] + x[i][ts]],

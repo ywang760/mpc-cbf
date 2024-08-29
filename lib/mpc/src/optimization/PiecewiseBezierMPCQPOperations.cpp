@@ -77,7 +77,7 @@ namespace mpc {
         Vector x0 = Vector::Zero(2*DIM);
         x0 << current_state.pos_, current_state.vel_; // [6,1]
         Matrix linear_term_coef = (A0_.pos_ * x0).transpose() * Q_pe;
-        linear_term_coef += -1.0 * target.replicate(k_hor_, 1).transpose() * Q_pe;
+        linear_term_coef += -1.0 * target.replicate(k_hor_, 1).transpose() * Q_pe; // TODO for some reason, I have to use -1 here. Need to figure it out.
         linear_term = (linear_term_coef * Phi_pred).transpose();
 
         return CostAddition(quadratic_term, linear_term, 0);
