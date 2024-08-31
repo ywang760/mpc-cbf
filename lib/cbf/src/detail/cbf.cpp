@@ -1,5 +1,5 @@
 #include <vector>
-#include "cbf/cbf.h"
+#include <cbf/detail/cbf.h>
 
 
 namespace cbf
