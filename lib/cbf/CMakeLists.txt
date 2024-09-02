@@ -5,6 +5,11 @@ set_property(GLOBAL PROPERTY cbf_ADDED "ON")
 set(CMAKE_CXX_STANDARD 17)
 
 # add local library
+get_property(is_model_ADDED GLOBAL PROPERTY model_ADDED)
+if(NOT is_model_ADDED)
+    add_subdirectory(../model ${CMAKE_CURRENT_BINARY_DIR}/model)
+endif()
+
 get_property(is_qpcpp_ADDED GLOBAL PROPERTY qpcpp_ADDED)
 if(NOT is_qpcpp_ADDED)
     add_subdirectory(../qpcpp ${CMAKE_CURRENT_BINARY_DIR}/qpcpp)
@@ -42,5 +47,11 @@ target_link_libraries(cbf_test PUBLIC ginac cln)
 add_executable(test_class tests/test_class.cpp)
 target_include_directories(test_class PUBLIC include)
 target_link_libraries(test_class PUBLIC FovCBF ginac cln)
+
+add_executable(cbf_examples_CBFControl_example examples/CBFControl_example.cpp)
+target_include_directories(cbf_examples_CBFControl_example PUBLIC include ../../third_party/json/single_include)
+target_link_libraries(cbf_examples_CBFControl_example PUBLIC
+        model_DoubleIntegratorXYYaw
+        cbf_controller_CBFControl)
 
 

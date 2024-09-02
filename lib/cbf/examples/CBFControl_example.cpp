@@ -23,6 +23,7 @@ math::VectorDIM<double, DIM> criticallyDampedSpringControl(const State& current_
 int main() {
     using FovCBF = cbf::FovCBF;
     using DoubleIntegratorXYYaw = model::DoubleIntegratorXYYaw<double>;
+    using CBFControl = cbf::CBFControl<double, DIM>;
     using json = nlohmann::json;
 
     using Vector = math::Vector<double>;
@@ -81,11 +82,17 @@ int main() {
 
             // compute the desired control
             const VectorDIM& target_pos = target_positions.at(robot_idx);
-            const VectorDIM& current_pos = init_states.at(robot_idx).pos_;
+            Vector& current_state = current_states.at(robot_idx);
+            Vector the_other_robot_2d_pos(2);
+            the_other_robot_2d_pos << the_other_robot_position(0), the_other_robot_position(1);
+
             VectorDIM desired_u = criticallyDampedSpringControl(init_states.at(robot_idx), target_pos, 1.);
+            // cbf control
+            CBFControl cbf_control(fov_cbf);
+            VectorDIM cbf_u;
+            cbf_control.optimize(cbf_u, desired_u, current_state, the_other_robot_2d_pos);
 
-
-            State next_init_state = pred_model_ptr->applyInput(init_states.at(robot_idx), desired_u);
+            State next_init_state = pred_model_ptr->applyInput(init_states.at(robot_idx), cbf_u);
             init_states.at(robot_idx) = next_init_state;
 
             current_states.at(robot_idx)(0) = init_states.at(robot_idx).pos_(0);

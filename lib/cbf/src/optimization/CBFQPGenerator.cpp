@@ -131,6 +131,6 @@ namespace cbf {
     }
 
     template class CBFQPGenerator<double, 3U>;
-    template class CBFQPGenerator<float, 3U>;
+//    template class CBFQPGenerator<float, 3U>;
 
 } // cbf
