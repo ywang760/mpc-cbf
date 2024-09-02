@@ -40,5 +40,5 @@ namespace cbf {
     }
 
     template class CBFControl<double, 3U>;
-    template class CBFControl<float, 3U>;
+//    template class CBFControl<float, 3U>;
 } // cbf

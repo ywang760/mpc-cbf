@@ -20,6 +20,11 @@
         "num_control_points": 4,
         "piece_max_parameter": 0.5
     },
+    "fov_cbf_params": {
+        "beta": 120,
+        "Ds": 0.17,
+        "Rs": 10
+    },
     "tasks": {
         "so": [
             [-1.1, 1, 0],
