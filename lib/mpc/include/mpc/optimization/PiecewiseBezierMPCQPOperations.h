@@ -42,7 +42,7 @@ namespace mpc {
     template <typename T, unsigned int DIM>
     class PiecewiseBezierMPCQPOperation {
     public:
-        using QPOperation = splines::QPOperations<T>;
+        using QPOperation = qpcpp::QPOperations<T>;
         using BezierQPOperations = splines::BezierQPOperations<T, DIM>;
         using CostAddition = typename QPOperation::CostAddition;
         using LinearConstraint = typename QPOperation::LinearConstraint;

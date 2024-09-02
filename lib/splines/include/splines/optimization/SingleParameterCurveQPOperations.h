@@ -5,7 +5,7 @@
 #ifndef SPLINES_SINGLEPARAMETERCURVEQPOPERATIONS_H
 #define SPLINES_SINGLEPARAMETERCURVEQPOPERATIONS_H
 
-#include <splines/optimization/QPOperations.h>
+#include <qpcpp/QPOperations.h>
 #include <splines/curves/SingleParameterCurve.h>
 
 namespace splines {
@@ -22,9 +22,9 @@ namespace splines {
         using AlignedBox = math::AlignedBox<T, DIM>;
         using Hyperplane = math::Hyperplane<T, DIM>;
         using SingleParameterCurve = splines::SingleParameterCurve<T, DIM>;
-        using CostAddition = typename splines::QPOperations<T>::CostAddition;
-        using LinearConstraint = typename splines::QPOperations<T>::LinearConstraint;
-        using DecisionVariableBounds = typename splines::QPOperations<T>::DecisionVariableBounds;
+        using CostAddition = typename qpcpp::QPOperations<T>::CostAddition;
+        using LinearConstraint = typename qpcpp::QPOperations<T>::LinearConstraint;
+        using DecisionVariableBounds = typename qpcpp::QPOperations<T>::DecisionVariableBounds;
 
         virtual ~SingleParameterCurveQPOperations() = default;
 

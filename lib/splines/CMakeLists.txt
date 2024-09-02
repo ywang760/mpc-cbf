@@ -55,15 +55,10 @@ target_link_libraries(splines_curves_Helpers PUBLIC
         math_Types)
 
 # optimization/SingleParameterCurveQPOperations
-add_library(splines_optimization_QPOperations SHARED src/optimization/QPOperations.cpp)
-target_include_directories(splines_optimization_QPOperations PUBLIC include)
-target_link_libraries(splines_optimization_QPOperations PUBLIC
-        math_Types)
-
 add_library(splines_optimization_SingleParameterCurveQPOperations SHARED src/optimization/SingleParameterCurveQPOperations.cpp)
 target_include_directories(splines_optimization_SingleParameterCurveQPOperations PUBLIC include)
 target_link_libraries(splines_optimization_SingleParameterCurveQPOperations PUBLIC
-        splines_optimization_QPOperations)
+        qpcpp_QPOperations)
 
 # optimization/BezierQPOperations
 add_library(splines_optimization_BezierQPOperations SHARED src/optimization/BezierQPOperations.cpp)

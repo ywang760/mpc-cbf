@@ -5,13 +5,34 @@ set_property(GLOBAL PROPERTY cbf_ADDED "ON")
 set(CMAKE_CXX_STANDARD 17)
 
 # add local library
-
+get_property(is_qpcpp_ADDED GLOBAL PROPERTY qpcpp_ADDED)
+if(NOT is_qpcpp_ADDED)
+    add_subdirectory(../qpcpp ${CMAKE_CURRENT_BINARY_DIR}/qpcpp)
+endif()
 
 # add libraries
-add_library(FovCBF SHARED src/cbf.cpp)
+add_library(FovCBF SHARED src/detail/cbf.cpp)
 target_include_directories(FovCBF PUBLIC include)
 target_link_libraries(FovCBF PUBLIC ginac cln)
 
+add_library(cbf_optimization_CBFQPOperations SHARED src/optimization/CBFQPOperations.cpp)
+target_include_directories(cbf_optimization_CBFQPOperations PUBLIC include)
+target_link_libraries(cbf_optimization_CBFQPOperations PUBLIC
+        qpcpp_QPOperations
+        FovCBF)
+
+add_library(cbf_optimization_CBFQPGenerator SHARED src/optimization/CBFQPGenerator.cpp)
+target_include_directories(cbf_optimization_CBFQPGenerator PUBLIC include)
+target_link_libraries(cbf_optimization_CBFQPGenerator PUBLIC
+        cbf_optimization_CBFQPOperations
+        qpcpp_Problem
+        math_Helpers)
+
+add_library(cbf_controller_CBFControl SHARED src/controller/CBFControl.cpp)
+target_include_directories(cbf_controller_CBFControl PUBLIC include)
+target_link_libraries(cbf_controller_CBFControl PUBLIC
+        cbf_optimization_CBFQPGenerator
+        qpcpp_solvers_CPLEX)
 
 # add examples
 add_executable(cbf_test tests/cbf_test.cpp)

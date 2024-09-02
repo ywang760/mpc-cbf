@@ -15,7 +15,16 @@ def load_states(json_filename):
     data = json.load(f)
     return data
 
-def animation2D_XYYaw(traj, dt, pred_curve, Trailing=True, PredCurve=True, save_name= "./test.mp4"):
+def fov_xy(pos, radian, fov_beta, fov_range, num_points=100):
+    pos_x = pos[0]
+    pos_y = pos[1]
+    angles = np.linspace(-fov_beta/2 + radian, fov_beta/2 + radian, num_points)
+    # Calculate the points on the edges of the FOV
+    x = fov_range * np.cos(angles) + pos_x
+    y = fov_range * np.sin(angles) + pos_y
+    return x,y
+
+def animation2D_XYYaw(traj, dt, pred_curve, fov_beta, fov_range, Trailing=True, PredCurve=True, save_name= "./test.mp4"):
     # animation settings
     n_agent, total_frame, _ = traj.shape
     trailing_buf_size = 100
@@ -49,6 +58,12 @@ def animation2D_XYYaw(traj, dt, pred_curve, Trailing=True, PredCurve=True, save_
                                [y[i][0], dir_len * y_v[i][0] + y[i][0]],
                                c='dodgerblue', alpha=0.6)
 
+    fov = []
+    for i in range(n_agent):
+        pos = [x[i, 0], y[i, 0]]
+        fov_x, fov_y = fov_xy(pos, yaw[i, 0], fov_beta, fov_range)
+        fov.append(ax.fill(np.concatenate(([pos[0]], fov_x, [pos[0]])), np.concatenate(([pos[1]], fov_y, [pos[1]])), color='lightblue', alpha=0.5))
+
     if Trailing:
         trail = [Line2D([x[0][0]], [y[0][0]]) for i in range(n_agent)]
         for i in range(n_agent):
@@ -69,12 +84,18 @@ def animation2D_XYYaw(traj, dt, pred_curve, Trailing=True, PredCurve=True, save_
             vel_line[i].set_data([x[i][ts], dir_len * x_v[i][ts] + x[i][ts]],
                                  [y[i][ts], dir_len * y_v[i][ts] + y[i][ts]])
 
+        for i in range(n_agent):
+            pos = [x[i, ts], y[i, ts]]
+            fov_x, fov_y = fov_xy(pos, yaw[i, ts], fov_beta, fov_range)
+            fov[i][0].set_xy(np.column_stack((np.concatenate(([pos[0]], fov_x, [pos[0]])),
+                                              np.concatenate(([pos[1]], fov_y, [pos[1]])))))
+
         trail_offset = trailing_buf_size if ts > trailing_buf_size else ts
         if Trailing:
             for i in range(n_agent):
                 trail[i].set_data(x[i, ts - trail_offset:ts], y[i, ts - trail_offset:ts])
 
-        pred_index = int(ts//10)
+        pred_index = int(ts//1)  # TODO change this according to the control sampling
         if PredCurve:
             for i in range(n_agent):
                 pred[i].set_data(pred_curve[i, pred_index, :, 0], pred_curve[i, pred_index, :, 1])
@@ -82,7 +103,7 @@ def animation2D_XYYaw(traj, dt, pred_curve, Trailing=True, PredCurve=True, save_
         return p,
 
     # call the animator.  blit=True means only re-draw the parts that have changed.
-    anim = animation.FuncAnimation(fig, animate, frames=total_frame, interval=dt*1e+3, blit=True)
+    anim = animation.FuncAnimation(fig, animate, frames=total_frame, interval=dt*1e+3, blit=False)
     anim.save(save_name, writer=animation.FFMpegWriter(fps=1/dt))
     return anim
 
@@ -116,10 +137,16 @@ def plot2D_XYYaw(traj, obs_time=None, save_name="./test.jpg"):
 
 
 if __name__ == "__main__":
+    # mpc settings
     num_robots = len(load_states("XYYawStates.json")["robots"])
     traj = np.array([load_states("XYYawStates.json")["robots"][str(_)]["states"] for _ in range(num_robots)])  # [n_robot, ts, dim]
     dt = load_states("XYYawStates.json")["dt"]
     pred_curve = np.array([load_states("XYYawStates.json")["robots"][str(_)]["pred_curve"] for _ in range(num_robots)])
+
+    # FoV settings
+    FoV_beta = 120 * np.pi/180
+    FoV_range = 1
+
     # plot2D_XYYaw(traj)
-    animation2D_XYYaw(traj, dt, pred_curve)
+    animation2D_XYYaw(traj, dt, pred_curve, FoV_beta, FoV_range)
     print()
