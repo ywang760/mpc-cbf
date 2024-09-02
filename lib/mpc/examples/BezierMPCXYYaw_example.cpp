@@ -47,12 +47,14 @@ int main() {
     p_max << experiment_config_json["mpc_params"]["physical_limits"]["p_max"][0],
              experiment_config_json["mpc_params"]["physical_limits"]["p_max"][1];
 
-    VectorDIM a_min = {experiment_config_json["mpc_params"]["physical_limits"]["a_min"][0],
-                       experiment_config_json["mpc_params"]["physical_limits"]["a_min"][1],
-                       experiment_config_json["mpc_params"]["physical_limits"]["a_min"][2]};
-    VectorDIM a_max = {experiment_config_json["mpc_params"]["physical_limits"]["a_max"][0],
-                       experiment_config_json["mpc_params"]["physical_limits"]["a_max"][1],
-                       experiment_config_json["mpc_params"]["physical_limits"]["a_max"][2]};
+    VectorDIM a_min;
+    a_min << experiment_config_json["mpc_params"]["physical_limits"]["a_min"][0],
+            experiment_config_json["mpc_params"]["physical_limits"]["a_min"][1],
+            experiment_config_json["mpc_params"]["physical_limits"]["a_min"][2];
+    VectorDIM a_max;
+    a_max << experiment_config_json["mpc_params"]["physical_limits"]["a_max"][0],
+            experiment_config_json["mpc_params"]["physical_limits"]["a_max"][1],
+            experiment_config_json["mpc_params"]["physical_limits"]["a_max"][2];
 
     VectorDIM aligned_box_collision_vec;
     aligned_box_collision_vec <<
