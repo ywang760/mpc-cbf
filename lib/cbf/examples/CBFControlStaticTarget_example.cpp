@@ -48,20 +48,16 @@ int main() {
     std::string experiment_config_filename = "../../../config/config.json";
     std::fstream experiment_config_fc(experiment_config_filename.c_str(), std::ios_base::in);
     json experiment_config_json = json::parse(experiment_config_fc);
-    double h = experiment_config_json["mpc_params"]["h"];
+    double h = 0.1;
 
-    double fov_beta = double(experiment_config_json["fov_cbf_params"]["beta"]) * M_PI / 180.0;
-    double fov_Ds = experiment_config_json["fov_cbf_params"]["Ds"];
-    double fov_Rs = experiment_config_json["fov_cbf_params"]["Rs"];
+    double fov_beta = 120.0 * M_PI / 180.0;
+    double fov_Ds = 3.0;
+    double fov_Rs = 8.0;
 
     VectorDIM a_min;
-    a_min << experiment_config_json["mpc_params"]["physical_limits"]["a_min"][0],
-            experiment_config_json["mpc_params"]["physical_limits"]["a_min"][1],
-            experiment_config_json["mpc_params"]["physical_limits"]["a_min"][2];
+    a_min << -5,-5,-5;
     VectorDIM a_max;
-    a_max << experiment_config_json["mpc_params"]["physical_limits"]["a_max"][0],
-            experiment_config_json["mpc_params"]["physical_limits"]["a_max"][1],
-            experiment_config_json["mpc_params"]["physical_limits"]["a_max"][2];
+    a_max << 5,5,5;
     double VMAX = 1.;
     // json for record
     std::string JSON_FILENAME = "../../../tools/CBFXYYawStates.json";
@@ -79,10 +75,10 @@ int main() {
     size_t num_robots = experiment_config_json["tasks"]["so"].size();
     json so_json = experiment_config_json["tasks"]["so"];
     json sf_json = experiment_config_json["tasks"]["sf"];
-    for (size_t i = 0; i < num_robots; ++i) {
+    for (size_t i = 0; i < 1; ++i) {
         // load init states
         State init_state;
-        init_state.pos_ << so_json[i][0], so_json[i][1], so_json[i][2];
+        init_state.pos_ << -1,-1,0.785398;
         init_state.vel_ << VectorDIM::Zero();
         init_states.push_back(init_state);
         Vector current_state(6);
@@ -94,33 +90,41 @@ int main() {
         target_positions.push_back(target_pos);
     }
 
+    VectorDIM target_pos;
+    target_pos << 4, 2.5, 0.0;
     // control loop
     int loop_idx = 0;
-    while (loop_idx < 200) {
+    while (loop_idx < 2000) {
         for (int robot_idx = 0; robot_idx < num_robots; ++robot_idx) {
-            VectorDIM the_other_robot_position;
-            if (robot_idx == 0) {
-                the_other_robot_position = init_states.at(1).pos_;
-            } else {
-                the_other_robot_position = init_states.at(0).pos_;
-            }
-
-            // compute the desired control
-            const VectorDIM& target_pos = target_positions.at(robot_idx);
             Vector& current_state = current_states.at(robot_idx);
-            Vector the_other_robot_2d_pos(2);
-            the_other_robot_2d_pos << the_other_robot_position(0), the_other_robot_position(1);
+            Vector target(2);
+            target << target_pos(0), target_pos(1);
 
-            VectorDIM desired_u_wf = criticallyDampedSpringControl(init_states.at(robot_idx), target_pos, 1.);
-            VectorDIM desired_u_bf = rotateControlInputToBodyFrame(desired_u_wf, current_state(2));
-            std::cout << "desired_u_bf: " << desired_u_bf.transpose() << "\n";
-
+            VectorDIM desired_u_bf;
+            desired_u_bf << 0.2, 0.0, 0.0;
             // cbf control
             CBFControl cbf_control(fov_cbf);
             VectorDIM cbf_u_bf;
-            cbf_control.optimize(cbf_u_bf, desired_u_wf, current_state, the_other_robot_2d_pos, a_min, a_max);
-            VectorDIM cbf_u_wf = rotateControlInputToWorldFrame(cbf_u_bf, current_state(2));
-            State next_init_state = pred_model_ptr->applyInput(init_states.at(robot_idx), cbf_u_bf);
+
+            bool qp_success = cbf_control.optimize(cbf_u_bf, desired_u_bf, current_state, target, a_min, a_max);
+            VectorDIM cbf_u_wf;
+            if (!qp_success) {
+                std::cout << "qp fail at: " << loop_idx << "\n";
+                cbf_u_wf = rotateControlInputToWorldFrame(desired_u_bf, current_state(2));
+            } else {
+                std::cout << "cbf_u: " << cbf_u_bf.transpose() << "\n";
+                cbf_u_wf = rotateControlInputToWorldFrame(cbf_u_bf, current_state(2));
+            }
+
+            State next_init_state;
+//            = pred_model_ptr->applyInput(init_states.at(robot_idx), cbf_u_wf);
+            next_init_state.vel_ << std::max<double>(-VMAX, std::min<double>(init_states.at(robot_idx).vel_(0) + cbf_u_wf(0) * h, VMAX)),
+                    std::max<double>(-VMAX, std::min<double>(init_states.at(robot_idx).vel_(1) + cbf_u_wf(1) * h, VMAX)),
+                    std::max<double>(-VMAX, std::min<double>(init_states.at(robot_idx).vel_(2) + cbf_u_wf(2) * h, VMAX));
+            next_init_state.pos_ << init_states.at(robot_idx).pos_(0) + std::max<double>(-VMAX, std::min<double>(init_states.at(robot_idx).vel_(0) * h, VMAX)) + (1./2.) * pow(h, 2) * cbf_u_wf(0),
+                    init_states.at(robot_idx).pos_(1) + std::max<double>(-VMAX, std::min<double>(init_states.at(robot_idx).vel_(1) * h, VMAX)) + (1./2.) * pow(h, 2) * cbf_u_wf(1),
+                    init_states.at(robot_idx).pos_(2) + std::max<double>(-VMAX, std::min<double>(init_states.at(robot_idx).vel_(2) * h, VMAX)) + (1./2.) * pow(h, 2) * cbf_u_wf(2);
+
             init_states.at(robot_idx) = next_init_state;
 
             current_states.at(robot_idx)(0) = init_states.at(robot_idx).pos_(0);
