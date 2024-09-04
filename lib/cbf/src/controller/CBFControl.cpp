@@ -15,14 +15,17 @@ namespace cbf {
     bool CBFControl<T, DIM>::optimize(VectorDIM& cbf_u,
                                       const VectorDIM &desired_u,
                                       const Vector &state,
-                                      const Vector &target_state) {
+                                      const Vector &target_state,
+                                      const VectorDIM& u_min,
+                                      const VectorDIM& u_max) {
         // add cost
         qp_generator_.addDesiredControlCost(desired_u);
         // add constraints
         qp_generator_.addSafetyConstraint(state, target_state);
         qp_generator_.addLeftBorderConstraint(state, target_state);
         qp_generator_.addRightBorderConstraint(state, target_state);
-        qp_generator_.addRangeConstraint(state, target_state);
+//        qp_generator_.addRangeConstraint(state, target_state);
+        qp_generator_.addControlBoundConstraint(u_min, u_max);
 
         // solve QP
         Problem &problem = qp_generator_.problem();

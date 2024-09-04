@@ -69,7 +69,6 @@ namespace cbf
     
     std::pair<GiNaC::matrix, GiNaC::ex> FovCBF::initSafetyCBF()
     {
-        GiNaC::matrix Ac1 = {{2*px - 2*xt, 2*py - 2*yt, 0}};
         GiNaC::ex norm2 = GiNaC::pow(x_target[0]-state[0], 2) + GiNaC::pow(x_target[1]-state[1], 2);
         GiNaC::ex b1 = norm2 - GiNaC::pow(Ds, 2);
 
@@ -88,18 +87,26 @@ namespace cbf
         }
         
         GiNaC::matrix grad2_b1 = GiNaC::matrix(STATE_VARS, 1);
-        grad2_b1(0, 0) = GiNaC::diff(grad_b1, px); 
-        grad2_b1(1, 0) = GiNaC::diff(grad_b1, py); 
-        grad2_b1(2, 0) = GiNaC::diff(grad_b1, th); 
-        grad2_b1(3, 0) = GiNaC::diff(grad_b1, vx); 
-        grad2_b1(4, 0) = GiNaC::diff(grad_b1, vy); 
-        grad2_b1(5, 0) = GiNaC::diff(grad_b1, w);
+        grad2_b1(0, 0) = GiNaC::diff(lfb1, px);
+        grad2_b1(1, 0) = GiNaC::diff(lfb1, py);
+        grad2_b1(2, 0) = GiNaC::diff(lfb1, th);
+        grad2_b1(3, 0) = GiNaC::diff(lfb1, vx);
+        grad2_b1(4, 0) = GiNaC::diff(lfb1, vy);
+        grad2_b1(5, 0) = GiNaC::diff(lfb1, w);
         GiNaC::ex lf2b1 = 0.0;
         for (int i = 0; i < STATE_VARS; i++)
         {
             lf2b1 = lf2b1 + grad2_b1(i, 0) * f(i, 0);
         }
 
+        GiNaC::matrix Ac1 =  GiNaC::matrix(1, CONTROL_VARS);
+        for (int j = 0; j < CONTROL_VARS; j++) {
+            GiNaC::ex Ac1j = 0.0;
+            for (int i = 0; i < STATE_VARS; i++) {
+                Ac1j += grad2_b1(i, 0) * g(i, j);
+            }
+            Ac1(0, j) = Ac1j;
+        }
         
         GiNaC::ex B1 = lf2b1;
         GiNaC::ex B2 = 2 * b1 * lfb1;
@@ -135,19 +142,27 @@ namespace cbf
         }
 
         GiNaC::matrix grad2_b2 = GiNaC::matrix(STATE_VARS, 1);
-        grad2_b2(0, 0) = GiNaC::diff(grad_b2, px); 
-        grad2_b2(1, 0) = GiNaC::diff(grad_b2, py); 
-        grad2_b2(2, 0) = GiNaC::diff(grad_b2, th); 
-        grad2_b2(3, 0) = GiNaC::diff(grad_b2, vx); 
-        grad2_b2(4, 0) = GiNaC::diff(grad_b2, vy); 
-        grad2_b2(5, 0) = GiNaC::diff(grad_b2, w);
+        grad2_b2(0, 0) = GiNaC::diff(lfb2, px);
+        grad2_b2(1, 0) = GiNaC::diff(lfb2, py);
+        grad2_b2(2, 0) = GiNaC::diff(lfb2, th);
+        grad2_b2(3, 0) = GiNaC::diff(lfb2, vx);
+        grad2_b2(4, 0) = GiNaC::diff(lfb2, vy);
+        grad2_b2(5, 0) = GiNaC::diff(lfb2, w);
         GiNaC::ex lf2b2 = 0.0;
         for (int i = 0; i < STATE_VARS; i++)
         {
             lf2b2 = lf2b2 + grad2_b2(i, 0) * f(i, 0);
         }
 
-        GiNaC::matrix Ac2 = {{GiNaC::tan(fov/2), 1, -xt_rel(1,0)*GiNaC::tan(fov/2)+xt_rel(0,0)}};
+        GiNaC::matrix Ac2 =  GiNaC::matrix(1, CONTROL_VARS);
+        for (int j = 0; j < CONTROL_VARS; j++) {
+            GiNaC::ex Ac2j = 0.0;
+            for (int i = 0; i < STATE_VARS; i++) {
+                Ac2j += grad2_b2(i, 0) * g(i, j);
+            }
+            Ac2(0, j) = Ac2j;
+        }
+
         GiNaC::ex B12 = lf2b2;
         GiNaC::ex B22 = 2 * b2 * lfb2;
         GiNaC::ex B32 = GiNaC::pow(lfb2, 2);
@@ -181,19 +196,27 @@ namespace cbf
         }
 
         GiNaC::matrix grad2_b3 = GiNaC::matrix(STATE_VARS, 1);
-        grad2_b3(0, 0) = GiNaC::diff(grad_b3, px); 
-        grad2_b3(1, 0) = GiNaC::diff(grad_b3, py); 
-        grad2_b3(2, 0) = GiNaC::diff(grad_b3, th); 
-        grad2_b3(3, 0) = GiNaC::diff(grad_b3, vx); 
-        grad2_b3(4, 0) = GiNaC::diff(grad_b3, vy); 
-        grad2_b3(5, 0) = GiNaC::diff(grad_b3, w);
+        grad2_b3(0, 0) = GiNaC::diff(lfb3, px);
+        grad2_b3(1, 0) = GiNaC::diff(lfb3, py);
+        grad2_b3(2, 0) = GiNaC::diff(lfb3, th);
+        grad2_b3(3, 0) = GiNaC::diff(lfb3, vx);
+        grad2_b3(4, 0) = GiNaC::diff(lfb3, vy);
+        grad2_b3(5, 0) = GiNaC::diff(lfb3, w);
         GiNaC::ex lf2b3 = 0.0;
         for (int i = 0; i < STATE_VARS; i++)
         {
             lf2b3 = lf2b3 + grad2_b3(i, 0) * f(i, 0);
         }
 
-        GiNaC::matrix Ac3 = {{GiNaC::tan(fov/2), 1, -xt_rel(1,0)*GiNaC::tan(fov/2)-xt_rel(0,0)}};
+        GiNaC::matrix Ac3 =  GiNaC::matrix(1, CONTROL_VARS);
+        for (int j = 0; j < CONTROL_VARS; j++) {
+            GiNaC::ex Ac3j = 0.0;
+            for (int i = 0; i < STATE_VARS; i++) {
+                Ac3j += grad2_b3(i, 0) * g(i, j);
+            }
+            Ac3(0, j) = Ac3j;
+        }
+
         GiNaC::ex B13 = lf2b3;
         GiNaC::ex B23 = 2 * b3 * lfb3;
         GiNaC::ex B33 = GiNaC::pow(lfb3, 2);
@@ -226,19 +249,27 @@ namespace cbf
         }
         
         GiNaC::matrix grad2_b4 = GiNaC::matrix(STATE_VARS, 1);
-        grad2_b4(0, 0) = GiNaC::diff(grad_b4, px); 
-        grad2_b4(1, 0) = GiNaC::diff(grad_b4, py); 
-        grad2_b4(2, 0) = GiNaC::diff(grad_b4, th); 
-        grad2_b4(3, 0) = GiNaC::diff(grad_b4, vx); 
-        grad2_b4(4, 0) = GiNaC::diff(grad_b4, vy); 
-        grad2_b4(5, 0) = GiNaC::diff(grad_b4, w);
+        grad2_b4(0, 0) = GiNaC::diff(lfb4, px);
+        grad2_b4(1, 0) = GiNaC::diff(lfb4, py);
+        grad2_b4(2, 0) = GiNaC::diff(lfb4, th);
+        grad2_b4(3, 0) = GiNaC::diff(lfb4, vx);
+        grad2_b4(4, 0) = GiNaC::diff(lfb4, vy);
+        grad2_b4(5, 0) = GiNaC::diff(lfb4, w);
         GiNaC::ex lf2b4 = 0.0;
         for (int i = 0; i < STATE_VARS; i++)
         {
             lf2b4 = lf2b4 + grad2_b4(i, 0) * f(i, 0);
         }
 
-        GiNaC::matrix Ac4 = {{-2*px + 2*xt, -2*py + 2*yt, 0}};
+        GiNaC::matrix Ac4 =  GiNaC::matrix(1, CONTROL_VARS);
+        for (int j = 0; j < CONTROL_VARS; j++) {
+            GiNaC::ex Ac4j = 0.0;
+            for (int i = 0; i < STATE_VARS; i++) {
+                Ac4j += grad2_b4(i, 0) * g(i, j);
+            }
+            Ac4(0, j) = Ac4j;
+        }
+
         GiNaC::ex B14 = lf2b4;
         GiNaC::ex B24 = 2 * b4 * lfb4;
         GiNaC::ex B34 = GiNaC::pow(lfb4, 2);
