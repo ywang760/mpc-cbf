@@ -7,6 +7,7 @@
 #include <cbf/controller/CBFControl.h>
 #include <nlohmann/json.hpp>
 #include <fstream>
+#include <cmath>
 
 constexpr unsigned int DIM = 3U;
 using State = model::State<double, DIM>;
@@ -18,6 +19,22 @@ math::VectorDIM<double, DIM> criticallyDampedSpringControl(const State& current_
     VectorDIM Fd;
     Fd = -current_state.vel_ * 2 * sqrt(spring_constant);
     return Fs + Fd;
+}
+
+math::VectorDIM<double, DIM> rotateControlInputToBodyFrame(const VectorDIM& control_wf, double radian) {
+    math::Matrix<double> R(3,3);
+    R << cos(radian), sin(radian), 0,
+         -sin(radian), cos(radian), 0,
+         0, 0, 1;
+    return R * control_wf;
+}
+
+math::VectorDIM<double, DIM> rotateControlInputToWorldFrame(const VectorDIM& control_bf, double radian) {
+    math::Matrix<double> R(3,3);
+    R << cos(radian), sin(radian), 0,
+         -sin(radian), cos(radian), 0,
+         0, 0, 1;
+    return R.transpose() * control_bf;
 }
 
 int main() {
@@ -33,7 +50,7 @@ int main() {
     json experiment_config_json = json::parse(experiment_config_fc);
     double h = experiment_config_json["mpc_params"]["h"];
 
-    double fov_beta = experiment_config_json["fov_cbf_params"]["beta"];
+    double fov_beta = double(experiment_config_json["fov_cbf_params"]["beta"]) * M_PI / 180.0;
     double fov_Ds = experiment_config_json["fov_cbf_params"]["Ds"];
     double fov_Rs = experiment_config_json["fov_cbf_params"]["Rs"];
 
