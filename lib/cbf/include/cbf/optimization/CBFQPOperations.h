@@ -14,6 +14,7 @@ namespace cbf {
     public:
         using CostAddition = typename qpcpp::QPOperations<T>::CostAddition;
         using LinearConstraint = typename qpcpp::QPOperations<T>::LinearConstraint;
+        using DecisionVariableBounds = typename qpcpp::QPOperations<T>::DecisionVariableBounds;
         using VectorDIM = math::VectorDIM<T, DIM>;
         using Vector = math::Vector<T>;
         using Matrix = math::Matrix<T>;
@@ -26,6 +27,7 @@ namespace cbf {
         LinearConstraint leftBorderConstraint(const Vector& state, const Vector& target_state);
         LinearConstraint rightBorderConstraint(const Vector& state, const Vector& target_state);
         LinearConstraint rangeConstraint(const Vector& state, const Vector& target_state);
+        DecisionVariableBounds controlBoundConstraint(const VectorDIM& u_min, const VectorDIM& u_max);
 
     private:
         std::shared_ptr<FovCBF> cbf_;
