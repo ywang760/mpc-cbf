@@ -24,7 +24,7 @@ namespace cbf {
         qp_generator_.addSafetyConstraint(state, target_state);
         qp_generator_.addLeftBorderConstraint(state, target_state);
         qp_generator_.addRightBorderConstraint(state, target_state);
-//        qp_generator_.addRangeConstraint(state, target_state);
+        qp_generator_.addRangeConstraint(state, target_state);
         qp_generator_.addControlBoundConstraint(u_min, u_max);
 
         // solve QP

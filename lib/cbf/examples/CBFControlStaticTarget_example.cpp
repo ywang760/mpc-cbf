@@ -100,30 +100,19 @@ int main() {
             Vector target(2);
             target << target_pos(0), target_pos(1);
 
-            VectorDIM desired_u_bf;
-            desired_u_bf << 0.2, 0.0, 0.0;
+            VectorDIM desired_u;
+            desired_u << 0.2, 0.0, 0.0;
             // cbf control
             CBFControl cbf_control(fov_cbf);
-            VectorDIM cbf_u_bf;
+            VectorDIM cbf_u;
 
-            bool qp_success = cbf_control.optimize(cbf_u_bf, desired_u_bf, current_state, target, a_min, a_max);
+            bool qp_success = cbf_control.optimize(cbf_u, desired_u, current_state, target, a_min, a_max);
             VectorDIM cbf_u_wf;
             if (!qp_success) {
                 std::cout << "qp fail at: " << loop_idx << "\n";
-                cbf_u_wf = rotateControlInputToWorldFrame(desired_u_bf, current_state(2));
-            } else {
-                std::cout << "cbf_u: " << cbf_u_bf.transpose() << "\n";
-                cbf_u_wf = rotateControlInputToWorldFrame(cbf_u_bf, current_state(2));
             }
 
-            State next_init_state;
-//            = pred_model_ptr->applyInput(init_states.at(robot_idx), cbf_u_wf);
-            next_init_state.vel_ << std::max<double>(-VMAX, std::min<double>(init_states.at(robot_idx).vel_(0) + cbf_u_wf(0) * h, VMAX)),
-                    std::max<double>(-VMAX, std::min<double>(init_states.at(robot_idx).vel_(1) + cbf_u_wf(1) * h, VMAX)),
-                    std::max<double>(-VMAX, std::min<double>(init_states.at(robot_idx).vel_(2) + cbf_u_wf(2) * h, VMAX));
-            next_init_state.pos_ << init_states.at(robot_idx).pos_(0) + std::max<double>(-VMAX, std::min<double>(init_states.at(robot_idx).vel_(0) * h, VMAX)) + (1./2.) * pow(h, 2) * cbf_u_wf(0),
-                    init_states.at(robot_idx).pos_(1) + std::max<double>(-VMAX, std::min<double>(init_states.at(robot_idx).vel_(1) * h, VMAX)) + (1./2.) * pow(h, 2) * cbf_u_wf(1),
-                    init_states.at(robot_idx).pos_(2) + std::max<double>(-VMAX, std::min<double>(init_states.at(robot_idx).vel_(2) * h, VMAX)) + (1./2.) * pow(h, 2) * cbf_u_wf(2);
+            State next_init_state = pred_model_ptr->applyInput(init_states.at(robot_idx), cbf_u);
 
             init_states.at(robot_idx) = next_init_state;
 

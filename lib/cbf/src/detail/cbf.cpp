@@ -9,6 +9,7 @@ namespace cbf
     {
         STATE_VARS = 6;
         CONTROL_VARS = 3;
+        gamma = 0.1;
 
         // GiNaC::symbol px("px"), py("py"), th("th"), vx("vx"), vy("vy"), w("w"), xt("xt"), yt("yt"); //, Ds("Ds"), fov("fov"), Rs("Rs");
 
@@ -69,7 +70,12 @@ namespace cbf
     
     std::pair<GiNaC::matrix, GiNaC::ex> FovCBF::initSafetyCBF()
     {
-        GiNaC::ex norm2 = GiNaC::pow(x_target[0]-state[0], 2) + GiNaC::pow(x_target[1]-state[1], 2);
+        GiNaC::matrix d2 = x_target.sub(GiNaC::matrix{{px}, {py}});
+        GiNaC::matrix R = {{GiNaC::cos(th), GiNaC::sin(th)},
+                           {-GiNaC::sin(th), GiNaC::cos(th)}};
+        GiNaC::matrix xt_rel = R.mul(d2);
+        GiNaC::ex norm2 = GiNaC::pow(xt_rel(0,0), 2) + GiNaC::pow(xt_rel(1,0), 2);
+
         GiNaC::ex b1 = norm2 - GiNaC::pow(Ds, 2);
 
         GiNaC::matrix grad_b1 = GiNaC::matrix(STATE_VARS, 1);
@@ -107,12 +113,20 @@ namespace cbf
             }
             Ac1(0, j) = Ac1j;
         }
-        
+
+//        // linear alpha function
+//        GiNaC::ex B1 = lf2b1;
+//        GiNaC::ex B2 = gamma * lfb1;
+//        GiNaC::ex B3 = gamma * lfb1;
+//        GiNaC::ex B4 = 0;
+//        GiNaC::ex B5 = gamma * gamma * b1;
+
+//        // cubic alpha function
         GiNaC::ex B1 = lf2b1;
-        GiNaC::ex B2 = 2 * b1 * lfb1;
-        GiNaC::ex B3 = GiNaC::pow(lfb1, 2);
-        GiNaC::ex B4 = 2 * GiNaC::pow(b1, 2) * lfb1;
-        GiNaC::ex B5 = GiNaC::pow(b1, 4);
+        GiNaC::ex B2 = gamma * 3 * GiNaC::pow(b1, 2) * lfb1;
+        GiNaC::ex B3 = gamma * GiNaC::pow(lfb1 + gamma*GiNaC::pow(b1, 3), 3);
+        GiNaC::ex B4 = 0;
+        GiNaC::ex B5 = 0;
 
         GiNaC::ex Bc1 = B1 + B2 + B3 + B4 + B5;
         
@@ -163,11 +177,19 @@ namespace cbf
             Ac2(0, j) = Ac2j;
         }
 
+//        // linear alpha function
+//        GiNaC::ex B12 = lf2b2;
+//        GiNaC::ex B22 = gamma * lfb2;
+//        GiNaC::ex B32 = gamma * lfb2;
+//        GiNaC::ex B42 = 0;
+//        GiNaC::ex B52 = gamma * gamma * b2;
+
+        // cubic alpha function
         GiNaC::ex B12 = lf2b2;
-        GiNaC::ex B22 = 2 * b2 * lfb2;
-        GiNaC::ex B32 = GiNaC::pow(lfb2, 2);
-        GiNaC::ex B42 = 2 * GiNaC::pow(b2, 2) * lfb2;
-        GiNaC::ex B52 = GiNaC::pow(b2, 4);
+        GiNaC::ex B22 = gamma * 3 * GiNaC::pow(b2, 2) * lfb2;
+        GiNaC::ex B32 = gamma * GiNaC::pow(lfb2 + gamma*GiNaC::pow(b2, 3), 3);
+        GiNaC::ex B42 = 0;
+        GiNaC::ex B52 = 0;
 
         GiNaC::ex Bc2 = B12 + B22 + B32 + B42 + B52;
         
@@ -217,11 +239,19 @@ namespace cbf
             Ac3(0, j) = Ac3j;
         }
 
+//        // linear alpha function
+//        GiNaC::ex B13 = lf2b3;
+//        GiNaC::ex B23 = gamma * lfb3;
+//        GiNaC::ex B33 = gamma * lfb3;
+//        GiNaC::ex B43 = 0;
+//        GiNaC::ex B53 = gamma * gamma * b3;
+
+        // cubic alpha function
         GiNaC::ex B13 = lf2b3;
-        GiNaC::ex B23 = 2 * b3 * lfb3;
-        GiNaC::ex B33 = GiNaC::pow(lfb3, 2);
-        GiNaC::ex B43 = 2 * GiNaC::pow(b3, 2) * lfb3;
-        GiNaC::ex B53 = GiNaC::pow(b3, 4);
+        GiNaC::ex B23 = gamma * 3 * GiNaC::pow(b3, 2) * lfb3;
+        GiNaC::ex B33 = gamma * GiNaC::pow(lfb3 + gamma*GiNaC::pow(b3, 3), 3);
+        GiNaC::ex B43 = 0;
+        GiNaC::ex B53 = 0;
 
         GiNaC::ex Bc3 = B13 + B23 + B33 + B43 + B53;
 
@@ -230,8 +260,12 @@ namespace cbf
 
     std::pair<GiNaC::matrix, GiNaC::ex> FovCBF::initRangeCBF()
     {
-        GiNaC::ex norm2 = GiNaC::pow(x_target[0]-state[0], 2) + GiNaC::pow(x_target[1]-state[1], 2);
-        GiNaC::ex b1 = norm2 - GiNaC::pow(Ds, 2);
+        GiNaC::matrix d2 = x_target.sub(GiNaC::matrix{{px}, {py}});
+        GiNaC::matrix R = {{GiNaC::cos(th), GiNaC::sin(th)},
+                           {-GiNaC::sin(th), GiNaC::cos(th)}};
+        GiNaC::matrix xt_rel = R.mul(d2);
+        GiNaC::ex norm2 = GiNaC::pow(xt_rel(0,0), 2) + GiNaC::pow(xt_rel(1,0), 2);
+
         GiNaC::ex b4 = -norm2 + GiNaC::pow(Rs, 2);
 
         GiNaC::matrix grad_b4 = GiNaC::matrix(STATE_VARS, 1);
@@ -270,11 +304,19 @@ namespace cbf
             Ac4(0, j) = Ac4j;
         }
 
+//        // linear alpha function
+//        GiNaC::ex B14 = lf2b4;
+//        GiNaC::ex B24 = gamma * lfb4;
+//        GiNaC::ex B34 = gamma * lfb4;
+//        GiNaC::ex B44 = 0;
+//        GiNaC::ex B54 = gamma * gamma * b4;
+
+        // cubic alpha function
         GiNaC::ex B14 = lf2b4;
-        GiNaC::ex B24 = 2 * b4 * lfb4;
-        GiNaC::ex B34 = GiNaC::pow(lfb4, 2);
-        GiNaC::ex B44 = 2 * GiNaC::pow(b4, 2) * lfb4;
-        GiNaC::ex B54 = GiNaC::pow(b4, 4);
+        GiNaC::ex B24 = gamma * 3 * GiNaC::pow(b4, 2) * lfb4;
+        GiNaC::ex B34 = gamma * GiNaC::pow(lfb4 + gamma*GiNaC::pow(b4, 3), 3);
+        GiNaC::ex B44 = 0;
+        GiNaC::ex B54 = 0;
 
         GiNaC::ex Bc4 = B14 + B24 + B34 + B44 + B54;
 

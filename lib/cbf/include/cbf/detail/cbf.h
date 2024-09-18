@@ -19,6 +19,7 @@ namespace cbf
             double Rs;           // Max dist
             int STATE_VARS;
             int CONTROL_VARS;
+            double gamma;
 
             GiNaC::symbol px, py, th, vx, vy, w, xt, yt;
             

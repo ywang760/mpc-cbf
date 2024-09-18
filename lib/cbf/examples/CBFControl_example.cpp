@@ -54,7 +54,15 @@ int main() {
     double fov_Ds = experiment_config_json["fov_cbf_params"]["Ds"];
     double fov_Rs = experiment_config_json["fov_cbf_params"]["Rs"];
 
-
+    VectorDIM a_min;
+    a_min << experiment_config_json["mpc_params"]["physical_limits"]["a_min"][0],
+            experiment_config_json["mpc_params"]["physical_limits"]["a_min"][1],
+            experiment_config_json["mpc_params"]["physical_limits"]["a_min"][2];
+    VectorDIM a_max;
+    a_max << experiment_config_json["mpc_params"]["physical_limits"]["a_max"][0],
+            experiment_config_json["mpc_params"]["physical_limits"]["a_max"][1],
+            experiment_config_json["mpc_params"]["physical_limits"]["a_max"][2];
+    double VMAX = 1.;
     // json for record
     std::string JSON_FILENAME = "../../../tools/CBFXYYawStates.json";
     json states;
@@ -88,7 +96,7 @@ int main() {
 
     // control loop
     int loop_idx = 0;
-    while (loop_idx < 200) {
+    while (loop_idx < 400) {
         for (int robot_idx = 0; robot_idx < num_robots; ++robot_idx) {
             VectorDIM the_other_robot_position;
             if (robot_idx == 0) {
@@ -107,8 +115,7 @@ int main() {
             // cbf control
             CBFControl cbf_control(fov_cbf);
             VectorDIM cbf_u;
-            cbf_control.optimize(cbf_u, desired_u, current_state, the_other_robot_2d_pos);
-
+            cbf_control.optimize(cbf_u, desired_u, current_state, the_other_robot_2d_pos, a_min, a_max);
             State next_init_state = pred_model_ptr->applyInput(init_states.at(robot_idx), cbf_u);
             init_states.at(robot_idx) = next_init_state;
 

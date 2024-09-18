@@ -5,10 +5,12 @@ import PyQt5
 from PyQt5 import *
 from PyQt5 import QtCore, QtSvg, QtWidgets, QtGui
 import matplotlib
+
 matplotlib.use("Qt5Agg")
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 from matplotlib import animation, rc, rcParams
+import matplotlib.patches as patches
 
 def load_states(json_filename):
     f = open(json_filename)
@@ -24,7 +26,7 @@ def fov_xy(pos, radian, fov_beta, fov_range, num_points=100):
     y = fov_range * np.sin(angles) + pos_y
     return x,y
 
-def animation2D_XYYaw(traj, dt, pred_curve, fov_beta, fov_range, Trailing=True, PredCurve=True, save_name= "./test.mp4"):
+def animation2D_XYYaw(traj, dt, pred_curve=None, fov_beta=None, fov_range=None, Trailing=True, PredCurve=True, save_name= "./test.mp4"):
     # animation settings
     n_agent, total_frame, _ = traj.shape
     trailing_buf_size = 100
@@ -49,7 +51,15 @@ def animation2D_XYYaw(traj, dt, pred_curve, fov_beta, fov_range, Trailing=True, 
     ax.set_xlim([x_min, x_max])
     ax.set_ylim([y_min, y_max])
 
+    # Set equal aspect ratio
+    ax.set_aspect('equal')
+
     # plot the init frame
+    # Add the point at [3, 3], Add a static circle at [4, 2.5] with radius 3.0
+    # ax.plot(4, 2.5, marker='o', color='red', markersize=8)
+    # circle = patches.Circle((4, 2.5), 3.0, edgecolor='red', facecolor='none', linestyle='--', linewidth=2)
+    # ax.add_patch(circle)
+
     p, = ax.plot(x[0], y[0], c='dodgerblue', marker='o', markersize=5, linestyle='None', alpha=0.6)
     vel_line = [Line2D([x[0][0], dir_len * x_v[0][0] + x[0][0]],
                        [y[0][0], dir_len * y_v[0][0] + y[0][0]]) for _ in range(n_agent)]
@@ -137,16 +147,20 @@ def plot2D_XYYaw(traj, obs_time=None, save_name="./test.jpg"):
 
 
 if __name__ == "__main__":
+    enable_pred_curve = False
+
+    states_data = load_states("CBFXYYawStates.json")
     # mpc settings
-    num_robots = len(load_states("XYYawStates.json")["robots"])
-    traj = np.array([load_states("XYYawStates.json")["robots"][str(_)]["states"] for _ in range(num_robots)])  # [n_robot, ts, dim]
-    dt = load_states("XYYawStates.json")["dt"]
-    pred_curve = np.array([load_states("XYYawStates.json")["robots"][str(_)]["pred_curve"] for _ in range(num_robots)])
+    num_robots = len(states_data["robots"])
+    traj = np.array([states_data["robots"][str(_)]["states"] for _ in range(num_robots)])  # [n_robot, ts, dim]
+    dt = states_data["dt"]
+    if "pred_curve" in states_data["robots"][str(0)].keys():
+        pred_curve = np.array([load_states("XYYawStates.json")["robots"][str(_)]["pred_curve"] for _ in range(num_robots)])
+        enable_pred_curve = True
 
     # FoV settings
-    FoV_beta = 120 * np.pi/180
-    FoV_range = 1
+    config_data = load_states("../config/config.json")
+    FoV_beta = config_data["fov_cbf_params"]["beta"] * np.pi/180
+    FoV_range = config_data["fov_cbf_params"]["Rs"]
 
-    # plot2D_XYYaw(traj)
-    animation2D_XYYaw(traj, dt, pred_curve, FoV_beta, FoV_range)
-    print()
+    animation2D_XYYaw(traj, dt, None, FoV_beta, FoV_range, PredCurve=enable_pred_curve)
