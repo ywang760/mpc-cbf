@@ -24,7 +24,9 @@ namespace cbf {
 
         CBFControl(std::shared_ptr<FovCBF> cbf);
         ~CBFControl()=default;
-        bool optimize(VectorDIM &cbf_u, const VectorDIM &desired_u, const Vector &state, const Vector &target_state);
+        bool optimize(VectorDIM &cbf_u, const VectorDIM &desired_u,
+                      const Vector &state, const Vector &target_state,
+                      const VectorDIM& u_min, const VectorDIM& u_max);
 
     private:
         CBFQPGenerator qp_generator_;

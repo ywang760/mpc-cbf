@@ -59,6 +59,12 @@ namespace cbf {
     }
 
     template <typename T, unsigned int DIM>
+    void CBFQPGenerator<T, DIM>::addControlBoundConstraint(const VectorDIM &u_min, const VectorDIM &u_max) {
+        DecisionVariableBounds decision_variable_bounds = cbf_operations_ptr_->controlBoundConstraint(u_min, u_max);
+        addDecisionVariableBoundsForControlInput(decision_variable_bounds);
+    }
+
+    template <typename T, unsigned int DIM>
     void
     CBFQPGenerator<T, DIM>::addCostAdditionForControlInput(const CostAddition &cost_addition) {
         constexpr T epsilon = std::numeric_limits<T>::epsilon() * T(100.0);
@@ -116,6 +122,33 @@ namespace cbf {
              ++decision_variable_idx) {
             const qpcpp::Variable<T>* var_ptr = variables_.at(decision_variable_idx);
             qpcpp_linear_constraint->setCoefficient(var_ptr, linear_constraint.coefficients()(decision_variable_idx));
+        }
+    }
+
+    template <typename T, unsigned int DIM>
+    void
+    CBFQPGenerator<T, DIM>::addDecisionVariableBoundsForControlInput(const DecisionVariableBounds& decision_variable_bounds) {
+        size_t num_decision_variables = variables_.size();
+        if (num_decision_variables != decision_variable_bounds.lower_bounds().rows() ||
+            num_decision_variables != decision_variable_bounds.upper_bounds().rows()) {
+            throw std::invalid_argument("CBFQPGenerator::"
+                                        "addDecisionVariableBoundsForControlInput:"
+                                        " number of decision variables of the controlInput does not match the "
+                                        "DecisionVariablesBounds structure");
+        }
+        for (int decision_variable_idx = 0;
+             decision_variable_idx < DIM;
+             ++decision_variable_idx) {
+            qpcpp::Variable<T>* var_ptr =
+                    variables_.at(decision_variable_idx);
+
+            var_ptr->set_min(std::max(
+                    var_ptr->min(),
+                    decision_variable_bounds.lower_bounds()(decision_variable_idx)));
+
+            var_ptr->set_max(std::min(
+                    var_ptr->max(),
+                    decision_variable_bounds.upper_bounds()(decision_variable_idx)));
         }
     }
 

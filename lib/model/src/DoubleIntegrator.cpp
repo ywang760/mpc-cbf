@@ -59,7 +59,7 @@ namespace model {
         assert(A_.cols() == x_t0.rows());
         assert(B_.cols() == u.rows());
         Vector x_t1 = A_ * x_t0 + B_ * u;
-        State new_state = {x_t1.segment(0, DIM), x_t1.segment(DIM, 2*DIM)};
+        State new_state = {x_t1.segment(0, DIM), x_t1.segment(DIM, DIM)};
         return new_state;
     }
 
