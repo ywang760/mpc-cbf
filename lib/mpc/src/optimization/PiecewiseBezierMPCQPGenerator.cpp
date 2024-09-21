@@ -7,7 +7,7 @@
 namespace mpc {
     template <typename T, unsigned int DIM>
     void PiecewiseBezierMPCQPGenerator<T, DIM>::addPiecewise(
-            std::unique_ptr<PiecewiseBezierMPCQPOperation> &&piecewise_operations_ptr) {
+            std::unique_ptr<PiecewiseBezierMPCQPOperations> &&piecewise_operations_ptr) {
         piecewise_operations_ptr_ = std::move(piecewise_operations_ptr);
 
         const std::vector<std::unique_ptr<BezierQPOperations>> &all_piece_operations_ptrs =
@@ -38,7 +38,7 @@ namespace mpc {
     }
 
     template <typename T, unsigned int DIM>
-    const std::unique_ptr<typename PiecewiseBezierMPCQPGenerator<T, DIM>::PiecewiseBezierMPCQPOperation> &
+    const std::unique_ptr<typename PiecewiseBezierMPCQPGenerator<T, DIM>::PiecewiseBezierMPCQPOperations> &
     PiecewiseBezierMPCQPGenerator<T, DIM>::piecewise_operations_ptr() const {
         return piecewise_operations_ptr_;
     }
@@ -91,8 +91,8 @@ namespace mpc {
     }
 
     template <typename T, unsigned int DIM>
-    void PiecewiseBezierMPCQPGenerator<T, DIM>::addPositionErrorPenaltyCost(const State &current_state, const VectorDIM &target) {
-        const CostAddition cost_addition = piecewise_operations_ptr_->positionErrorPenaltyCost(current_state, target);
+    void PiecewiseBezierMPCQPGenerator<T, DIM>::addPositionErrorPenaltyCost(const State &current_state, const Vector &ref_positions) {
+        const CostAddition cost_addition = piecewise_operations_ptr_->positionErrorPenaltyCost(current_state, ref_positions);
         addCostAdditionForPiecewise(cost_addition);
     }
 
@@ -186,6 +186,25 @@ namespace mpc {
 
         for (const LinearConstraint& linear_constraint : linear_constraints) {
             addLinearConstraintForPiece(piece_idx, linear_constraint);
+        }
+
+    }
+
+    template <typename T, unsigned int DIM>
+    void
+    PiecewiseBezierMPCQPGenerator<T, DIM>::addHyperplaneConstraintAt(
+            T parameter, const Hyperplane& hyperplane, T epsilon) {
+        const PieceIndexAndParameter& piece_idx_and_parameter =
+                piecewise_operations_ptr_->getPieceIndexAndParameter(parameter);
+
+
+        const std::vector<LinearConstraint>& linear_constraints =
+                piecewise_operations_ptr_->piece_operations_ptrs().at(piece_idx_and_parameter.piece_idx())
+                ->hyperplaneConstraintAt(piece_idx_and_parameter.parameter(),
+                                         hyperplane, epsilon);
+
+        for (const LinearConstraint& linear_constraint : linear_constraints) {
+            addLinearConstraintForPiece(piece_idx_and_parameter.piece_idx(), linear_constraint);
         }
 
     }

@@ -18,12 +18,12 @@ namespace mpc {
     template <typename T, unsigned int DIM>
     class BezierMPC {
     public:
-        using Params = typename mpc::PiecewiseBezierMPCQPOperation<T, DIM>::Params;
+        using Params = typename mpc::PiecewiseBezierMPCQPOperations<T, DIM>::Params;
         using State = model::State<T, DIM>;
         using DoubleIntegrator = model::DoubleIntegrator<T, DIM>;
         using StatePropagator = model::StatePropagator<T>;
         using SingleParameterPiecewiseCurve = splines::SingleParameterPiecewiseCurve<T, DIM>;
-        using PiecewiseBezierMPCQPOperation = mpc::PiecewiseBezierMPCQPOperation<T, DIM>;
+        using PiecewiseBezierMPCQPOperations = mpc::PiecewiseBezierMPCQPOperations<T, DIM>;
         using PiecewiseBezierMPCQPGenerator = mpc::PiecewiseBezierMPCQPGenerator<T, DIM>;
         using Problem = qpcpp::Problem<T>;
         using CPLEXSolver = qpcpp::CPLEXSolver<T>;
@@ -42,7 +42,7 @@ namespace mpc {
 
         bool optimize(SingleParameterPiecewiseCurve &result_curve,
                       const State &current_state, const std::vector<VectorDIM>& other_robot_positions,
-                      const VectorDIM &target);
+                      const Vector &ref_positions);
 
         Vector generatorDerivativeControlInputs(uint64_t derivative_degree);
 

@@ -13,8 +13,8 @@ namespace mpc {
     bezier_continuity_upto_degree_(bezier_continuity_upto_degree),
     collision_shape_ptr_(collision_shape_ptr) {
         // Initiate the qp_generator
-        std::unique_ptr<PiecewiseBezierMPCQPOperation> piecewise_bezier_qp_operation =
-                std::make_unique<PiecewiseBezierMPCQPOperation>(p, model_ptr);
+        std::unique_ptr<PiecewiseBezierMPCQPOperations> piecewise_bezier_qp_operation =
+                std::make_unique<PiecewiseBezierMPCQPOperations>(p, model_ptr);
         qp_generator_.addPiecewise(std::move(piecewise_bezier_qp_operation));
 
         // load mpc tuning params
@@ -37,17 +37,16 @@ namespace mpc {
     template <typename T, unsigned int DIM>
     bool BezierMPC<T, DIM>::optimize(SingleParameterPiecewiseCurve &result_curve,
                                      const State &current_state, const std::vector<VectorDIM>& other_robot_positions,
-                                     const VectorDIM &target) {
+                                     const Vector &ref_positions) {
 
         size_t num_pieces = qp_generator_.numPieces();
 
         // add the position error cost
-        qp_generator_.addPositionErrorPenaltyCost(current_state, target);
+        qp_generator_.addPositionErrorPenaltyCost(current_state, ref_positions);
         // minimize the control effort for the curve up to specified degree
         for (size_t d = 1; d <= bezier_continuity_upto_degree_; ++d) {
             qp_generator_.addIntegratedSquaredDerivativeCost(d, mpc_tuning_.w_u_eff_); // TODO pass in this weight from params
         }
-        std::cout << "error after cost\n";
 
         // add the current state constraints
         VectorDIM current_pos = current_state.pos_;
@@ -77,7 +76,6 @@ namespace mpc {
             qp_generator_.addHyperplaneConstraintForPiece(0, shifted_hyperplane); // add the collision avoidance constraint on the first segment
         }
 
-        std::cout << "error after constraints\n";
 
         // solve QP
         Problem &problem = qp_generator_.problem();
