@@ -78,6 +78,9 @@ namespace mpc {
         // adds given cost_addition for piecewise to the generated qp.
         void addCostAdditionForPiecewise(const CostAddition& cost_addition);
 
+        // adds given linear_constraint for piecewise to the generated qp.
+        void addLinearConstraintForPiecewise(const LinearConstraint& linear_constraint);
+
         // adds given cost_addition for a piece to the generated qp.
         void addCostAdditionForPiece(std::size_t piece_idx,
                                      const CostAddition& cost_addition);

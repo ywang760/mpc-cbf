@@ -247,6 +247,32 @@ namespace mpc {
     }
 
     template <typename T, unsigned int DIM>
+    void PiecewiseBezierMPCQPGenerator<T, DIM>::addLinearConstraintForPiecewise(
+            const LinearConstraint &linear_constraint) {
+        size_t num_decision_variables = variables_.size();
+
+        // linear constraint structure error.
+        if (num_decision_variables != linear_constraint.coefficients().cols()) {
+            throw std::runtime_error("PiecewiseBezierMPCQPGenerator::"
+                                     "addLinearConstraintForPiecewise:"
+                                     " number of decision variables of the piecewise does not match the "
+                                     "LinearConstraint structure");
+        }
+
+        // initialize linear constraint with lower bound and upper bound
+        qpcpp::LinearConstraint<T>* qpcpp_linear_constraint = problem_.addLinearConstraint(
+                linear_constraint.lower_bound(),
+                linear_constraint.upper_bound());
+        // set coefficients for this linear constraint
+        for (std::size_t decision_variable_idx = 0;
+             decision_variable_idx < num_decision_variables;
+             ++decision_variable_idx) {
+            const qpcpp::Variable<T>* var_ptr = variables_.at(decision_variable_idx);
+            qpcpp_linear_constraint->setCoefficient(var_ptr, linear_constraint.coefficients()(decision_variable_idx));
+        }
+    }
+
+    template <typename T, unsigned int DIM>
     void PiecewiseBezierMPCQPGenerator<T, DIM>::addCostAdditionForPiece(std::size_t piece_idx,
                                                                         const CostAddition &cost_addition) {
         constexpr T epsilon = std::numeric_limits<T>::epsilon() * T(100.0);
@@ -297,7 +323,7 @@ namespace mpc {
 
         // linear constraint structure error.
         if (num_decision_variables != linear_constraint.coefficients().cols()) {
-            throw std::runtime_error("SingleParameterPiecewiseCurveQPGenerator::"
+            throw std::runtime_error("PiecewiseBezierMPCQPGenerator::"
                                      "addLinearConstraintForPiece:"
                                      " number of decision variables of the piece does not match the "
                                      "LinearConstraint structure");
