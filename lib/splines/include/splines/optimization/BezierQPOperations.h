@@ -80,6 +80,9 @@ namespace splines {
         virtual std::vector<LinearConstraint> hyperplaneConstraintAll(
                 const Hyperplane& hyperplane, T epsilon) const override;
 
+        virtual std::vector<LinearConstraint>
+        hyperplaneConstraintAt(T parameter, const Hyperplane& hyperplane, T epsilon) const override;
+
     private:
         std::size_t num_control_points_;
         T max_parameter_;

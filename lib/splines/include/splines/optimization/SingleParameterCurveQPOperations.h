@@ -94,6 +94,12 @@ namespace splines {
         virtual std::vector<LinearConstraint> hyperplaneConstraintAll(
                 const Hyperplane& hyperplane, T epsilon) const = 0;
 
+        // given hyperplane hp(x) = a_1x_1+a_2x_2+...+a_nx_n + d = 0
+        // such that n=(a_1, ..., a_n) is the normal,
+        // returns set of constraints that enforces hp(f(parameter)) <= 0
+        virtual std::vector<LinearConstraint>
+        hyperplaneConstraintAt(T parameter, const Hyperplane& hyperplane, T epsilon) const = 0;
+
     };
 
 } // splines

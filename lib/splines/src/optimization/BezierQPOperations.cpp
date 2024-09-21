@@ -273,6 +273,34 @@ namespace splines {
     }
 
     template <typename T, unsigned int DIM>
+    std::vector<typename BezierQPOperations<T, DIM>::LinearConstraint>
+    BezierQPOperations<T, DIM>::hyperplaneConstraintAt(
+            T parameter, const Hyperplane& hyperplane, T epsilon) const {
+
+        std::vector<LinearConstraint> linear_constraints;
+
+        if (num_control_points_ == 0) {
+            return linear_constraints;
+        }
+
+        Row basis = bernsteinBasis(
+                /*degree=*/num_control_points_ - 1, max_parameter_, parameter,
+                /*derivative_degree=*/0);
+
+        Row coefficients(numDecisionVariables());
+        coefficients.setZero();
+        for (unsigned int dimension_idx = 0; dimension_idx < DIM; ++dimension_idx) {
+            coefficients.block(0, dimension_idx * num_control_points_, 1,
+                               num_control_points_) =
+                    basis * hyperplane.normal()(dimension_idx);
+        }
+        linear_constraints.push_back(
+                LinearConstraint(coefficients, std::numeric_limits<T>::lowest(),
+                                 -hyperplane.offset()  - epsilon));
+        return linear_constraints;
+    }
+
+    template <typename T, unsigned int DIM>
     void BezierQPOperations<T, DIM>::set_max_parameter(T new_max_parameter) {
         if (new_max_parameter < 0) {
             throw std::invalid_argument("BezierQPOperations::set_max_parameter: "
