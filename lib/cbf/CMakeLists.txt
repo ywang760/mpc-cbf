@@ -16,15 +16,15 @@ if(NOT is_qpcpp_ADDED)
 endif()
 
 # add libraries
-add_library(FovCBF SHARED src/detail/cbf.cpp)
-target_include_directories(FovCBF PUBLIC include)
-target_link_libraries(FovCBF PUBLIC ginac cln)
+add_library(cbf_detail_FovCBF SHARED src/detail/cbf.cpp)
+target_include_directories(cbf_detail_FovCBF PUBLIC include)
+target_link_libraries(cbf_detail_FovCBF PUBLIC ginac cln)
 
 add_library(cbf_optimization_CBFQPOperations SHARED src/optimization/CBFQPOperations.cpp)
 target_include_directories(cbf_optimization_CBFQPOperations PUBLIC include)
 target_link_libraries(cbf_optimization_CBFQPOperations PUBLIC
         qpcpp_QPOperations
-        FovCBF)
+        cbf_detail_FovCBF)
 
 add_library(cbf_optimization_CBFQPGenerator SHARED src/optimization/CBFQPGenerator.cpp)
 target_include_directories(cbf_optimization_CBFQPGenerator PUBLIC include)
@@ -46,7 +46,7 @@ target_link_libraries(cbf_test PUBLIC ginac cln)
 
 add_executable(test_class tests/test_class.cpp)
 target_include_directories(test_class PUBLIC include)
-target_link_libraries(test_class PUBLIC FovCBF ginac cln)
+target_link_libraries(test_class PUBLIC cbf_detail_FovCBF ginac cln)
 
 add_executable(cbf_examples_CBFControl_example examples/CBFControl_example.cpp)
 target_include_directories(cbf_examples_CBFControl_example PUBLIC include ../../third_party/json/single_include)

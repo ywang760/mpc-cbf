@@ -1,39 +1,44 @@
 //
-// Created by lishuo on 8/24/24.
+// Created by lishuo on 9/21/24.
 //
 
+#include <mpc_cbf/optimization/PiecewiseBezierMPCCBFQPGenerator.h>
 #include <model/DoubleIntegratorXYYaw.h>
-#include <mpc/controller/BezierMPC.h>
+#include <mpc_cbf/controller/BezierMPCCBF.h>
 #include <math/collision_shapes/AlignedBoxCollisionShape.h>
 #include <nlohmann/json.hpp>
+#include <fstream>
 
 int main() {
     constexpr unsigned int DIM = 3U;
-    using BezierMPC = mpc::BezierMPC<double, DIM>;
+    using FovCBF = cbf::FovCBF;
     using DoubleIntegratorXYYaw = model::DoubleIntegratorXYYaw<double>;
+    using BezierMPCCBF = mpc_cbf::BezierMPCCBF<double, DIM>;
     using State = model::State<double, DIM>;
     using StatePropagator = model::StatePropagator<double>;
-    using json = nlohmann::json;
-
-    using PiecewiseBezierParams = mpc::PiecewiseBezierParams<double, DIM>;
-    using MPCParams = mpc::MPCParams<double>;
-    using BezierMPCParams = BezierMPC::Params;
-
-    using SingleParameterPiecewiseCurve = splines::SingleParameterPiecewiseCurve<double, DIM>;
     using VectorDIM = math::VectorDIM<double, DIM>;
     using Vector = math::Vector<double>;
     using Matrix = math::Matrix<double>;
     using AlignedBox = math::AlignedBox<double, DIM>;
     using AlignedBoxCollisionShape = math::AlignedBoxCollisionShape<double, DIM>;
+
+    using PiecewiseBezierParams = mpc::PiecewiseBezierParams<double, DIM>;
+    using MPCParams = mpc::MPCParams<double>;
+    using FoVCBFParams = cbf::FoVCBFParams<double>;
+    using BezierMPCCBFParams = mpc_cbf::PiecewiseBezierMPCCBFQPOperations<double, DIM>::Params;
+    using SingleParameterPiecewiseCurve = splines::SingleParameterPiecewiseCurve<double, DIM>;
+
+    using json = nlohmann::json;
+
     // load experiment config
     std::string experiment_config_filename = "../../../config/config.json";
     std::fstream experiment_config_fc(experiment_config_filename.c_str(), std::ios_base::in);
     json experiment_config_json = json::parse(experiment_config_fc);
-
+    // piecewise bezier params
     size_t num_pieces = experiment_config_json["bezier_params"]["num_pieces"];
     size_t num_control_points = experiment_config_json["bezier_params"]["num_control_points"];
     double piece_max_parameter = experiment_config_json["bezier_params"]["piece_max_parameter"];
-
+    // mpc params
     double h = experiment_config_json["mpc_params"]["h"];
     double Ts = experiment_config_json["mpc_params"]["Ts"];
     int k_hor = experiment_config_json["mpc_params"]["k_hor"];
@@ -42,10 +47,14 @@ int main() {
     int spd_f = experiment_config_json["mpc_params"]["mpc_tuning"]["spd_f"];
     Vector p_min = Vector::Zero(2);
     p_min << experiment_config_json["mpc_params"]["physical_limits"]["p_min"][0],
-             experiment_config_json["mpc_params"]["physical_limits"]["p_min"][1];
+            experiment_config_json["mpc_params"]["physical_limits"]["p_min"][1];
     Vector p_max = Vector::Zero(2);
     p_max << experiment_config_json["mpc_params"]["physical_limits"]["p_max"][0],
-             experiment_config_json["mpc_params"]["physical_limits"]["p_max"][1];
+            experiment_config_json["mpc_params"]["physical_limits"]["p_max"][1];
+    // fov cbf params
+    double fov_beta = double(experiment_config_json["fov_cbf_params"]["beta"]) * M_PI / 180.0;
+    double fov_Ds = experiment_config_json["fov_cbf_params"]["Ds"];
+    double fov_Rs = experiment_config_json["fov_cbf_params"]["Rs"];
 
     VectorDIM a_min;
     a_min << experiment_config_json["mpc_params"]["physical_limits"]["a_min"][0],
@@ -64,23 +73,25 @@ int main() {
     AlignedBox robot_bbox_at_zero = {-aligned_box_collision_vec, aligned_box_collision_vec};
     std::shared_ptr<const AlignedBoxCollisionShape> aligned_box_collision_shape_ptr =
             std::make_shared<const AlignedBoxCollisionShape>(robot_bbox_at_zero);
-
+    // create params
     PiecewiseBezierParams piecewise_bezier_params = {num_pieces, num_control_points, piece_max_parameter};
     MPCParams mpc_params = {h, Ts, k_hor, {w_pos_err, w_u_eff, spd_f}, {p_min, p_max, a_min, a_max}};
+    FoVCBFParams fov_cbf_params = {fov_beta, fov_Ds, fov_Rs};
 
-    std::string JSON_FILENAME = "../../../tools/XYYawStates.json";
+    // json for record
+    std::string JSON_FILENAME = "../../../tools/CBFXYYawStates.json";
     json states;
-    states["dt"] = Ts;
-
+    states["dt"] = h;
     // init model
     std::shared_ptr<DoubleIntegratorXYYaw> pred_model_ptr = std::make_shared<DoubleIntegratorXYYaw>(h);
     std::shared_ptr<DoubleIntegratorXYYaw> exe_model_ptr = std::make_shared<DoubleIntegratorXYYaw>(Ts);
     StatePropagator exe_A0 = exe_model_ptr->get_A0(int(h/Ts));
     StatePropagator exe_Lambda = exe_model_ptr->get_lambda(int(h/Ts));
-    // init MPC
+    // init cbf
+    std::shared_ptr<FovCBF> fov_cbf = std::make_unique<FovCBF>(fov_beta, fov_Ds, fov_Rs);
+    // init bezier mpc-cbf
     uint64_t bezier_continuity_upto_degree = 4;
-    BezierMPCParams bezier_mpc_params = {piecewise_bezier_params, mpc_params};
-//    BezierMPC bezier_mpc(bezier_mpc_params, pred_model_ptr, bezier_continuity_upto_degree);
+    BezierMPCCBFParams bezier_mpc_cbf_params = {piecewise_bezier_params, mpc_params, fov_cbf_params};
 
     // main loop
     // load the tasks
@@ -106,8 +117,10 @@ int main() {
     }
 
     SingleParameterPiecewiseCurve traj;
+    double sim_runtime = 20;
+    double sim_t = 0;
     int loop_idx = 0;
-    while (loop_idx < 200) {
+    while (sim_t < sim_runtime) {
         for (int robot_idx = 0; robot_idx < num_robots; ++robot_idx) {
             std::vector<VectorDIM> other_robot_positions;
             for (int j = 0; j < num_robots; ++j) {
@@ -116,14 +129,16 @@ int main() {
                 }
                 other_robot_positions.push_back(init_states.at(j).pos_);
             }
+            BezierMPCCBF bezier_mpc_cbf(bezier_mpc_cbf_params, pred_model_ptr, fov_cbf, bezier_continuity_upto_degree, aligned_box_collision_shape_ptr);
 
             Vector ref_positions(DIM*k_hor);
             // static target reference
             ref_positions = target_positions.at(robot_idx).replicate(k_hor, 1);
 
-            BezierMPC bezier_mpc(bezier_mpc_params, pred_model_ptr, bezier_continuity_upto_degree, aligned_box_collision_shape_ptr);
-            bool success = bezier_mpc.optimize(traj, init_states.at(robot_idx), other_robot_positions, ref_positions);
-            Vector U = bezier_mpc.generatorDerivativeControlInputs(2);
+//            std::cout << "ref_positions shape: (" << ref_positions.rows() << ", " << ref_positions.cols() << ")\n";
+//            std::cout << "ref_positions: " << ref_positions.transpose() << "\n";
+            bool success = bezier_mpc_cbf.optimize(traj, init_states.at(robot_idx), other_robot_positions, ref_positions);
+            Vector U = bezier_mpc_cbf.generatorDerivativeControlInputs(2);
 //            std::cout << "curve eval: " << traj.eval(1.5, 0) << "\n";
 
             // log down the optimized curve prediction
@@ -156,6 +171,7 @@ int main() {
             init_states.at(robot_idx).vel_(1) = current_states.at(robot_idx)(4);
             init_states.at(robot_idx).vel_(2) = current_states.at(robot_idx)(5);
         }
+        sim_t += h;
         loop_idx += 1;
     }
 
@@ -163,7 +179,5 @@ int main() {
     std::cout << "writing to file " << JSON_FILENAME << ".\n";
     std::ofstream o(JSON_FILENAME, std::ofstream::trunc);
     o << std::setw(4) << states << std::endl;
-
     return 0;
 }
-

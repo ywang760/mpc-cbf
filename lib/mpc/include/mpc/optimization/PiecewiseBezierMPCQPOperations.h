@@ -71,7 +71,7 @@ namespace mpc {
         T max_parameter() const;
         const std::vector<std::unique_ptr<BezierQPOperations>>& piece_operations_ptrs() const;
         const std::vector<T>& cumulative_max_parameters() const;
-
+        const Matrix &U_basis();
 
         Matrix evalSamplingBasisMatrix(Vector &h_samples, uint64_t derivative_degree);
 

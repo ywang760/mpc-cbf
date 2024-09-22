@@ -130,6 +130,10 @@ namespace mpc {
     }
 
     template <typename T, unsigned int DIM>
+    const typename PiecewiseBezierMPCQPOperations<T, DIM>::Matrix &
+    PiecewiseBezierMPCQPOperations<T, DIM>::U_basis() {return U_basis_;}
+
+    template <typename T, unsigned int DIM>
     void PiecewiseBezierMPCQPOperations<T, DIM>::addPiece(
             std::unique_ptr<BezierQPOperations> &&piece_operations_ptr) {
         // augment the cumulative max parameters
