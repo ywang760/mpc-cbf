@@ -34,10 +34,23 @@ target_link_libraries(mpc_cbf_controller_BezierMPCCBF PUBLIC
         mpc_cbf_optimization_PiecewiseBezierMPCCBFQPGenerator
         qpcpp_solvers_CPLEX)
 
+add_library(mpc_cbf_controller_BezierIMPCCBF SHARED src/controller/BezierIMPCCBF.cpp)
+target_include_directories(mpc_cbf_controller_BezierIMPCCBF PUBLIC include)
+target_link_libraries(mpc_cbf_controller_BezierIMPCCBF PUBLIC
+        mpc_cbf_optimization_PiecewiseBezierMPCCBFQPGenerator
+        qpcpp_solvers_CPLEX)
+
 # add examples
 add_executable(mpc_cbf_examples_BezierMPCCBFXYYaw_example examples/BezierMPCCBFXYYaw_example.cpp)
 target_include_directories(mpc_cbf_examples_BezierMPCCBFXYYaw_example PUBLIC include ../../third_party/json/single_include)
 target_link_libraries(mpc_cbf_examples_BezierMPCCBFXYYaw_example PUBLIC
         mpc_cbf_controller_BezierMPCCBF
+        model_DoubleIntegratorXYYaw
+        math_collision_shapes_AlignedBoxCollisionShape)
+
+add_executable(mpc_cbf_examples_BezierIMPCCBFXYYaw_example examples/BezierIMPCCBFXYYaw_example.cpp)
+target_include_directories(mpc_cbf_examples_BezierIMPCCBFXYYaw_example PUBLIC include ../../third_party/json/single_include)
+target_link_libraries(mpc_cbf_examples_BezierIMPCCBFXYYaw_example PUBLIC
+        mpc_cbf_controller_BezierIMPCCBF
         model_DoubleIntegratorXYYaw
         math_collision_shapes_AlignedBoxCollisionShape)

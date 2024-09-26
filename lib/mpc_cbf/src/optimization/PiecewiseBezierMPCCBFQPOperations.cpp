@@ -47,7 +47,7 @@ namespace mpc_cbf {
     }
 
     template <typename T, unsigned int DIM>
-    typename PiecewiseBezierMPCCBFQPOperations<T, DIM>::LinearConstraint
+    std::vector<typename PiecewiseBezierMPCCBFQPOperations<T, DIM>::LinearConstraint>
     PiecewiseBezierMPCCBFQPOperations<T, DIM>::fovLBConstraint(const State &current_state,
                                                                const Vector &other_pos) {
         Vector state(2*DIM);
@@ -59,11 +59,20 @@ namespace mpc_cbf {
         Vector A0 = Vector::Zero(DIM*k_hor_); // [3K, 1]
         A0.segment(0, DIM) = a;
         Row A_control_pts = -1.0 * A0.transpose() * U_basis_; // [1, num_piece*dim*num_control_pts]
-        return LinearConstraint(A_control_pts, std::numeric_limits<T>::lowest(), b);
+
+        std::vector<LinearConstraint> linear_constraints;
+        linear_constraints.push_back(LinearConstraint(A_control_pts, std::numeric_limits<T>::lowest(), b));
+
+        Vector A1 = Vector::Zero(DIM*k_hor_); // [3K, 1]
+        A1.segment(DIM, DIM) = a;
+        Row A1_control_pts = -1.0 * A1.transpose() * U_basis_; // [1, num_piece*dim*num_control_pts]
+//        linear_constraints.push_back(LinearConstraint(A1_control_pts, std::numeric_limits<T>::lowest(), b));
+
+        return linear_constraints;
     }
 
     template <typename T, unsigned int DIM>
-    typename PiecewiseBezierMPCCBFQPOperations<T, DIM>::LinearConstraint
+    std::vector<typename PiecewiseBezierMPCCBFQPOperations<T, DIM>::LinearConstraint>
     PiecewiseBezierMPCCBFQPOperations<T, DIM>::fovRBConstraint(const State &current_state,
                                                                const Vector &other_pos) {
         Vector state(2*DIM);
@@ -75,7 +84,61 @@ namespace mpc_cbf {
         Vector A0 = Vector::Zero(DIM*k_hor_); // [3K, 1]
         A0.segment(0, DIM) = a;
         Row A_control_pts = -1.0 * A0.transpose() * U_basis_; // [1, num_piece*dim*num_control_pts]
-        return LinearConstraint(A_control_pts, std::numeric_limits<T>::lowest(), b);
+        std::vector<LinearConstraint> linear_constraints;
+
+        linear_constraints.push_back(LinearConstraint(A_control_pts, std::numeric_limits<T>::lowest(), b));
+
+        Vector A1 = Vector::Zero(DIM*k_hor_); // [3K, 1]
+        A1.segment(DIM, DIM) = a;
+        Row A1_control_pts = -1.0 * A1.transpose() * U_basis_; // [1, num_piece*dim*num_control_pts]
+//        linear_constraints.push_back(LinearConstraint(A1_control_pts, std::numeric_limits<T>::lowest(), b));
+
+        return linear_constraints;
+    }
+
+    template <typename T, unsigned int DIM>
+    std::vector<typename PiecewiseBezierMPCCBFQPOperations<T, DIM>::LinearConstraint>
+    PiecewiseBezierMPCCBFQPOperations<T, DIM>::predFovLBConstraints(const std::vector<State> &pred_states,
+                                                                    const Vector &other_pos) {
+//        assert(pred_states.size() == k_hor_);
+        std::vector<LinearConstraint> linear_constraints;
+        for (size_t k = 0; k < pred_states.size(); ++k) {
+            const State& pred_state = pred_states.at(k);
+            Vector state(2*DIM);
+            state << pred_state.pos_, pred_state.vel_;
+            // cbf constraint A,b
+//            std::cout << "state: " << state << "\n";
+            Vector ak = fov_cbf_ptr_->getLBConstraints(state, other_pos);
+            T bk = fov_cbf_ptr_->getLBBound(state, other_pos);
+
+            Vector Ak = Vector::Zero(DIM*k_hor_); // [3K, 1]
+            Ak.segment(k*DIM, DIM) = ak;
+            Row Ak_control_pts = -1.0 * Ak.transpose() * U_basis_; // [1, num_piece*dim*num_control_pts]
+            linear_constraints.push_back(LinearConstraint(Ak_control_pts, std::numeric_limits<T>::lowest(), bk));
+        }
+        return linear_constraints;
+    }
+
+    template <typename T, unsigned int DIM>
+    std::vector<typename PiecewiseBezierMPCCBFQPOperations<T, DIM>::LinearConstraint>
+    PiecewiseBezierMPCCBFQPOperations<T, DIM>::predFovRBConstraints(const std::vector<State> &pred_states,
+                                                                    const Vector &other_pos) {
+//        assert(pred_states.size() == k_hor_);
+        std::vector<LinearConstraint> linear_constraints;
+        for (size_t k = 0; k < pred_states.size(); ++k) {
+            const State& pred_state = pred_states.at(k);
+            Vector state(2*DIM);
+            state << pred_state.pos_, pred_state.vel_;
+            // cbf constraint A,b
+            Vector ak = fov_cbf_ptr_->getRBConstraints(state, other_pos);
+            T bk = fov_cbf_ptr_->getRBBound(state, other_pos);
+
+            Vector Ak = Vector::Zero(DIM*k_hor_); // [3K, 1]
+            Ak.segment(k*DIM, DIM) = ak;
+            Row Ak_control_pts = -1.0 * Ak.transpose() * U_basis_; // [1, num_piece*dim*num_control_pts]
+            linear_constraints.push_back(LinearConstraint(Ak_control_pts, std::numeric_limits<T>::lowest(), bk));
+        }
+        return linear_constraints;
     }
 
     template class PiecewiseBezierMPCCBFQPOperations<double, 3U>;

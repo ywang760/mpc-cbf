@@ -27,6 +27,11 @@ namespace mpc_cbf {
         void addSafetyCBFConstraint(const State& current_state, const Vector& other_pos);
         void addFovLBConstraint(const State& current_state, const Vector& other_pos);
         void addFovRBConstraint(const State& current_state, const Vector& other_pos);
+
+//        void addPredSafetyCBFConstraints(const std::vector<State>& pred_states, const Vector& other_pos);
+        void addPredFovLBConstraints(const std::vector<State>& pred_states, const Vector& other_pos);
+        void addPredFovRBConstraints(const std::vector<State>& pred_states, const Vector& other_pos);
+
     private:
         std::shared_ptr<PiecewiseBezierMPCQPGenerator> piecewise_mpc_qp_generator_ptr_ = std::make_shared<PiecewiseBezierMPCQPGenerator>();
         std::unique_ptr<PiecewiseBezierMPCCBFQPOperations> piecewise_mpc_cbf_operations_ptr_;

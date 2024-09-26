@@ -21,7 +21,7 @@ namespace mpc_cbf {
 
         T h = p.mpc_params.h_;
         T Ts = p.mpc_params.Ts_;
-        assert(Ts < h);
+        assert(Ts <= h);
         assert((h - (int)(h/Ts) * Ts) == 0);
         // control sequence U control point coefficient
         int u_interp = int(h / Ts);

@@ -31,15 +31,37 @@ namespace mpc_cbf {
     template <typename T, unsigned int DIM>
     void PiecewiseBezierMPCCBFQPGenerator<T, DIM>::addFovLBConstraint(const State &current_state,
                                                                       const Vector &other_pos) {
-        LinearConstraint linear_constraint = piecewise_mpc_cbf_operations_ptr_->fovLBConstraint(current_state, other_pos);
-        piecewise_mpc_qp_generator_ptr_->addLinearConstraintForPiecewise(linear_constraint);
+        std::vector<LinearConstraint> linear_constraints = piecewise_mpc_cbf_operations_ptr_->fovLBConstraint(current_state, other_pos);
+        for (size_t i = 0; i < linear_constraints.size(); ++i) {
+            piecewise_mpc_qp_generator_ptr_->addLinearConstraintForPiecewise(linear_constraints.at(i));
+        }
     }
 
     template <typename T, unsigned int DIM>
     void PiecewiseBezierMPCCBFQPGenerator<T, DIM>::addFovRBConstraint(const State &current_state,
                                                                       const Vector &other_pos) {
-        LinearConstraint linear_constraint = piecewise_mpc_cbf_operations_ptr_->fovRBConstraint(current_state, other_pos);
-        piecewise_mpc_qp_generator_ptr_->addLinearConstraintForPiecewise(linear_constraint);
+        std::vector<LinearConstraint> linear_constraints = piecewise_mpc_cbf_operations_ptr_->fovRBConstraint(current_state, other_pos);
+        for (size_t i = 0; i < linear_constraints.size(); ++i) {
+            piecewise_mpc_qp_generator_ptr_->addLinearConstraintForPiecewise(linear_constraints.at(i));
+        }
+    }
+
+    template <typename T, unsigned int DIM>
+    void PiecewiseBezierMPCCBFQPGenerator<T, DIM>::addPredFovLBConstraints(const std::vector<State> &pred_states,
+                                                                           const Vector &other_pos) {
+        std::vector<LinearConstraint> linear_constraints = piecewise_mpc_cbf_operations_ptr_->predFovLBConstraints(pred_states, other_pos);
+        for (size_t i = 0; i < linear_constraints.size(); ++i) {
+            piecewise_mpc_qp_generator_ptr_->addLinearConstraintForPiecewise(linear_constraints.at(i));
+        }
+    }
+
+    template <typename T, unsigned int DIM>
+    void PiecewiseBezierMPCCBFQPGenerator<T, DIM>::addPredFovRBConstraints(const std::vector<State> &pred_states,
+                                                                           const Vector &other_pos) {
+        std::vector<LinearConstraint> linear_constraints = piecewise_mpc_cbf_operations_ptr_->predFovRBConstraints(pred_states, other_pos);
+        for (size_t i = 0; i < linear_constraints.size(); ++i) {
+            piecewise_mpc_qp_generator_ptr_->addLinearConstraintForPiecewise(linear_constraints.at(i));
+        }
     }
 
     template class PiecewiseBezierMPCCBFQPGenerator<double, 3U>;

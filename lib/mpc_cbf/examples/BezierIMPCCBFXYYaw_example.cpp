@@ -4,7 +4,7 @@
 
 #include <mpc_cbf/optimization/PiecewiseBezierMPCCBFQPGenerator.h>
 #include <model/DoubleIntegratorXYYaw.h>
-#include <mpc_cbf/controller/BezierMPCCBF.h>
+#include <mpc_cbf/controller/BezierIMPCCBF.h>
 #include <math/collision_shapes/AlignedBoxCollisionShape.h>
 #include <nlohmann/json.hpp>
 #include <fstream>
@@ -13,7 +13,7 @@ int main() {
     constexpr unsigned int DIM = 3U;
     using FovCBF = cbf::FovCBF;
     using DoubleIntegratorXYYaw = model::DoubleIntegratorXYYaw<double>;
-    using BezierMPCCBF = mpc_cbf::BezierMPCCBF<double, DIM>;
+    using BezierIMPCCBF = mpc_cbf::BezierIMPCCBF<double, DIM>;
     using State = model::State<double, DIM>;
     using StatePropagator = model::StatePropagator<double>;
     using VectorDIM = math::VectorDIM<double, DIM>;
@@ -67,9 +67,9 @@ int main() {
 
     VectorDIM aligned_box_collision_vec;
     aligned_box_collision_vec <<
-    experiment_config_json["robot_params"]["collision_shape"]["aligned_box"][0],
-    experiment_config_json["robot_params"]["collision_shape"]["aligned_box"][1],
-    experiment_config_json["robot_params"]["collision_shape"]["aligned_box"][2];
+                              experiment_config_json["robot_params"]["collision_shape"]["aligned_box"][0],
+            experiment_config_json["robot_params"]["collision_shape"]["aligned_box"][1],
+            experiment_config_json["robot_params"]["collision_shape"]["aligned_box"][2];
     AlignedBox robot_bbox_at_zero = {-aligned_box_collision_vec, aligned_box_collision_vec};
     std::shared_ptr<const AlignedBoxCollisionShape> aligned_box_collision_shape_ptr =
             std::make_shared<const AlignedBoxCollisionShape>(robot_bbox_at_zero);
@@ -92,7 +92,8 @@ int main() {
     std::shared_ptr<FovCBF> fov_cbf = std::make_unique<FovCBF>(fov_beta, fov_Ds, fov_Rs);
     // init bezier mpc-cbf
     uint64_t bezier_continuity_upto_degree = 4;
-    BezierMPCCBFParams bezier_mpc_cbf_params = {piecewise_bezier_params, mpc_params, fov_cbf_params};
+    int impc_iter = 4;
+    BezierMPCCBFParams bezier_impc_cbf_params = {piecewise_bezier_params, mpc_params, fov_cbf_params};
 
     // main loop
     // load the tasks
@@ -118,7 +119,7 @@ int main() {
     }
 
     SingleParameterPiecewiseCurve traj;
-    double sim_runtime = 20;
+    double sim_runtime = 10;
     double sim_t = 0;
     int loop_idx = 0;
     while (sim_t < sim_runtime) {
@@ -130,7 +131,7 @@ int main() {
                 }
                 other_robot_positions.push_back(init_states.at(j).pos_);
             }
-            BezierMPCCBF bezier_mpc_cbf(bezier_mpc_cbf_params, pred_model_ptr, fov_cbf, bezier_continuity_upto_degree, aligned_box_collision_shape_ptr);
+            BezierIMPCCBF bezier_impc_cbf(bezier_impc_cbf_params, pred_model_ptr, fov_cbf, bezier_continuity_upto_degree, aligned_box_collision_shape_ptr, impc_iter);
 
             Vector ref_positions(DIM*k_hor);
             // static target reference
@@ -138,8 +139,8 @@ int main() {
 
 //            std::cout << "ref_positions shape: (" << ref_positions.rows() << ", " << ref_positions.cols() << ")\n";
 //            std::cout << "ref_positions: " << ref_positions.transpose() << "\n";
-            bool success = bezier_mpc_cbf.optimize(traj, init_states.at(robot_idx), other_robot_positions, ref_positions);
-            Vector U = bezier_mpc_cbf.generatorDerivativeControlInputs(2);
+            bool success = bezier_impc_cbf.optimize(traj, init_states.at(robot_idx), other_robot_positions, ref_positions);
+            Vector U = bezier_impc_cbf.generatorDerivativeControlInputs(2);
 //            std::cout << "curve eval: " << traj.eval(1.5, 0) << "\n";
 
             // log down the optimized curve prediction
