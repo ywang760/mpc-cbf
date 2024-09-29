@@ -10,6 +10,11 @@ import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 from matplotlib import animation, rc, rcParams
 
+# visualization parameters
+preview_fov_range = 0.5
+preview_skip_step = 5
+enable_preview = True
+
 def load_states(json_filename):
     f = open(json_filename)
     data = json.load(f)
@@ -82,8 +87,19 @@ def animation2D_XYYaw(traj, dt, Ts, bbox, pred_curve=None, fov_beta=None, fov_ra
 
     if PredCurve:
         pred = [Line2D([x[0][0]], [y[0][0]]) for i in range(n_agent)]
+        pred_fovs = []  # Store predicted FoV polygons
+        fov_preview_plot_step = list(range(0, pred_curve.shape[-2], preview_skip_step))+list([pred_curve.shape[-2]-1])
         for i in range(n_agent):
             pred[i], = ax.plot([x[i, 0]], [y[i, 0]], c='red', marker=None, alpha=0.8)
+            if enable_preview:
+                pred_fov = []
+                for k in fov_preview_plot_step:
+                    pos = [pred_curve[i, 0, k, 0], pred_curve[i, 0, k, 1]]
+                    fov_x, fov_y = fov_xy(pos, pred_curve[i, 0, k, 2], fov_beta, preview_fov_range)
+                    pred_fov.append(ax.fill(np.concatenate(([pos[0]], fov_x, [pos[0]])),
+                                            np.concatenate(([pos[1]], fov_y, [pos[1]])),
+                                            color='k', alpha=0.1))  # Predicted FoV in red
+                pred_fovs.append(pred_fov)
 
     # loop the frame
     def animate(ts):
@@ -113,6 +129,13 @@ def animation2D_XYYaw(traj, dt, Ts, bbox, pred_curve=None, fov_beta=None, fov_ra
         if PredCurve:
             for i in range(n_agent):
                 pred[i].set_data(pred_curve[i, pred_index, :, 0], pred_curve[i, pred_index, :, 1])
+                if enable_preview:
+                    # Update predicted FoV
+                    for index, k in enumerate(fov_preview_plot_step):
+                        pos = [pred_curve[i, pred_index, k, 0], pred_curve[i, pred_index, k, 1]]
+                        fov_x, fov_y = fov_xy(pos, pred_curve[i, pred_index, k, 2], fov_beta, preview_fov_range)
+                        pred_fovs[i][index][0].set_xy(np.column_stack((np.concatenate(([pos[0]], fov_x, [pos[0]])),
+                                                                       np.concatenate(([pos[1]], fov_y, [pos[1]])))))
 
         return p,
 
