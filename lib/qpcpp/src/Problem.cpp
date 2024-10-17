@@ -270,6 +270,12 @@ namespace qpcpp {
         cost_function_.setZero();
     }
 
+    template <typename T>
+    void Problem<T>::resetProblem() {
+        setCostFunctionToZero();
+        clearLinearConstraints();
+    }
+
     template class Variable<double>;
     template class Variable<float>;
     template class LinearConstraint<double>;

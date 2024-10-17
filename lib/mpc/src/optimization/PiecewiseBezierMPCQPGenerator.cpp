@@ -7,7 +7,7 @@
 namespace mpc {
     template <typename T, unsigned int DIM>
     void PiecewiseBezierMPCQPGenerator<T, DIM>::addPiecewise(
-            std::unique_ptr<PiecewiseBezierMPCQPOperation> &&piecewise_operations_ptr) {
+            std::unique_ptr<PiecewiseBezierMPCQPOperations> &&piecewise_operations_ptr) {
         piecewise_operations_ptr_ = std::move(piecewise_operations_ptr);
 
         const std::vector<std::unique_ptr<BezierQPOperations>> &all_piece_operations_ptrs =
@@ -38,7 +38,7 @@ namespace mpc {
     }
 
     template <typename T, unsigned int DIM>
-    const std::unique_ptr<typename PiecewiseBezierMPCQPGenerator<T, DIM>::PiecewiseBezierMPCQPOperation> &
+    const std::unique_ptr<typename PiecewiseBezierMPCQPGenerator<T, DIM>::PiecewiseBezierMPCQPOperations> &
     PiecewiseBezierMPCQPGenerator<T, DIM>::piecewise_operations_ptr() const {
         return piecewise_operations_ptr_;
     }
@@ -91,9 +91,25 @@ namespace mpc {
     }
 
     template <typename T, unsigned int DIM>
-    void PiecewiseBezierMPCQPGenerator<T, DIM>::addPositionErrorPenaltyCost(const State &current_state, const VectorDIM &target) {
-        const CostAddition cost_addition = piecewise_operations_ptr_->positionErrorPenaltyCost(current_state, target);
+    void PiecewiseBezierMPCQPGenerator<T, DIM>::addPositionErrorPenaltyCost(const State &current_state, const Vector &ref_positions) {
+        const CostAddition cost_addition = piecewise_operations_ptr_->positionErrorPenaltyCost(current_state, ref_positions);
         addCostAdditionForPiecewise(cost_addition);
+    }
+
+    template <typename T, unsigned int DIM>
+    void PiecewiseBezierMPCQPGenerator<T, DIM>::addEvalPositionErrorPenaltyCost(const Vector &ref_positions) {
+        Vector h_samples = piecewise_operations_ptr_->h_samples();
+        int spd_f = piecewise_operations_ptr_->mpc_tuning().spd_f_;
+        T w_pos_err = piecewise_operations_ptr_->mpc_tuning().w_pos_err_;
+        for (size_t k = h_samples.size() - spd_f; k < h_samples.size(); ++k) {
+            T h_sample = h_samples[k];
+            const Vector ref_pos = ref_positions.segment(DIM*k, DIM);
+            const PieceIndexAndParameter& piece_idx_and_parameter = piecewise_operations_ptr_->getPieceIndexAndParameter(h_sample);
+            size_t piece_idx = piece_idx_and_parameter.piece_idx();
+            CostAddition cost_addition = piecewise_operations_ptr_->piece_operations_ptrs().at(piece_idx)
+                    ->evalCost(piece_idx_and_parameter.parameter(), 0, ref_pos, w_pos_err);
+            addCostAdditionForPiece(piece_idx, cost_addition);
+        }
     }
 
     template <typename T, unsigned int DIM>
@@ -191,6 +207,39 @@ namespace mpc {
     }
 
     template <typename T, unsigned int DIM>
+    void PiecewiseBezierMPCQPGenerator<T, DIM>::addBoundingBoxConstraintAll(
+            const AlignedBox &bounding_box, uint64_t derivative_degree) {
+        for (std::size_t piece_idx = 0; piece_idx < piecewise_operations_ptr_->piece_operations_ptrs().size();
+             ++piece_idx) {
+            const std::vector<LinearConstraint>& piece_constraints =
+                    piecewise_operations_ptr_->piece_operations_ptrs().at(piece_idx)->boundingBoxConstraintAll(bounding_box, derivative_degree);
+
+            for (const LinearConstraint& piece_constraint : piece_constraints) {
+                addLinearConstraintForPiece(piece_idx, piece_constraint);
+            }
+        }
+    }
+
+    template <typename T, unsigned int DIM>
+    void
+    PiecewiseBezierMPCQPGenerator<T, DIM>::addHyperplaneConstraintAt(
+            T parameter, const Hyperplane& hyperplane, T epsilon) {
+        const PieceIndexAndParameter& piece_idx_and_parameter =
+                piecewise_operations_ptr_->getPieceIndexAndParameter(parameter);
+
+
+        const std::vector<LinearConstraint>& linear_constraints =
+                piecewise_operations_ptr_->piece_operations_ptrs().at(piece_idx_and_parameter.piece_idx())
+                ->hyperplaneConstraintAt(piece_idx_and_parameter.parameter(),
+                                         hyperplane, epsilon);
+
+        for (const LinearConstraint& linear_constraint : linear_constraints) {
+            addLinearConstraintForPiece(piece_idx_and_parameter.piece_idx(), linear_constraint);
+        }
+
+    }
+
+    template <typename T, unsigned int DIM>
     void PiecewiseBezierMPCQPGenerator<T, DIM>::addCostAdditionForPiecewise(const CostAddition &cost_addition) {
         constexpr T epsilon = std::numeric_limits<T>::epsilon() * T(100.0);
 
@@ -224,6 +273,32 @@ namespace mpc {
                     problem_.cost_function()->addQuadraticTerm(var1_ptr, var2_ptr, cost_addition.quadratic_term()(i,j));
                 }
             }
+        }
+    }
+
+    template <typename T, unsigned int DIM>
+    void PiecewiseBezierMPCQPGenerator<T, DIM>::addLinearConstraintForPiecewise(
+            const LinearConstraint &linear_constraint) {
+        size_t num_decision_variables = variables_.size();
+
+        // linear constraint structure error.
+        if (num_decision_variables != linear_constraint.coefficients().cols()) {
+            throw std::runtime_error("PiecewiseBezierMPCQPGenerator::"
+                                     "addLinearConstraintForPiecewise:"
+                                     " number of decision variables of the piecewise does not match the "
+                                     "LinearConstraint structure");
+        }
+
+        // initialize linear constraint with lower bound and upper bound
+        qpcpp::LinearConstraint<T>* qpcpp_linear_constraint = problem_.addLinearConstraint(
+                linear_constraint.lower_bound(),
+                linear_constraint.upper_bound());
+        // set coefficients for this linear constraint
+        for (std::size_t decision_variable_idx = 0;
+             decision_variable_idx < num_decision_variables;
+             ++decision_variable_idx) {
+            const qpcpp::Variable<T>* var_ptr = variables_.at(decision_variable_idx);
+            qpcpp_linear_constraint->setCoefficient(var_ptr, linear_constraint.coefficients()(decision_variable_idx));
         }
     }
 
@@ -278,7 +353,7 @@ namespace mpc {
 
         // linear constraint structure error.
         if (num_decision_variables != linear_constraint.coefficients().cols()) {
-            throw std::runtime_error("SingleParameterPiecewiseCurveQPGenerator::"
+            throw std::runtime_error("PiecewiseBezierMPCQPGenerator::"
                                      "addLinearConstraintForPiece:"
                                      " number of decision variables of the piece does not match the "
                                      "LinearConstraint structure");

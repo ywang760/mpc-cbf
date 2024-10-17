@@ -6,7 +6,7 @@
 
 namespace mpc {
     template <typename T, unsigned int DIM>
-    PiecewiseBezierMPCQPOperation<T, DIM>::PiecewiseBezierMPCQPOperation(Params &p,
+    PiecewiseBezierMPCQPOperations<T, DIM>::PiecewiseBezierMPCQPOperations(Params &p,
                                                                          std::shared_ptr<DoubleIntegrator> model_ptr)
     {
         // init the piecewise bezier MPC QP Generator
@@ -28,14 +28,14 @@ namespace mpc {
         A0_ = model_ptr_->get_A0(k_hor_); // A0.pos_: [3K, 6], A0.vel_: [3K, 6],
         Lambda_ = model_ptr_->get_lambda(k_hor_); // Lambda_.pos_: [3K, 3K], Lambda_.vel_: [3K, 3K]
         // control sequence U control point coefficient
-        Vector h_samples = Vector::LinSpaced(k_hor_, 0, (k_hor_-1)*h_);
-        U_basis_ = evalSamplingBasisMatrix(h_samples, 2); // [3K, num_piece*dim*num_control_pts] here since the control is acc, derivative degree is 2
+        h_samples_ = Vector::LinSpaced(k_hor_, 0, (k_hor_-1)*h_);
+        U_basis_ = evalSamplingBasisMatrix(h_samples_, 2); // [3K, num_piece*dim*num_control_pts] here since the control is acc, derivative degree is 2
 
     }
 
     template <typename T, unsigned int DIM>
-    typename PiecewiseBezierMPCQPOperation<T, DIM>::Matrix
-    PiecewiseBezierMPCQPOperation<T, DIM>::evalSamplingBasisMatrix(Vector &h_samples, uint64_t derivative_degree) {
+    typename PiecewiseBezierMPCQPOperations<T, DIM>::Matrix
+    PiecewiseBezierMPCQPOperations<T, DIM>::evalSamplingBasisMatrix(Vector &h_samples, uint64_t derivative_degree) {
         int hor = h_samples.size();
         Matrix result = Matrix::Zero(DIM*hor, numDecisionVariables());
         for (size_t k = 0; k < h_samples.size(); ++k) {
@@ -54,8 +54,8 @@ namespace mpc {
     }
 
     template <typename T, unsigned int DIM>
-    typename PiecewiseBezierMPCQPOperation<T, DIM>::CostAddition
-    PiecewiseBezierMPCQPOperation<T, DIM>::positionErrorPenaltyCost(const State &current_state, const VectorDIM &target) {
+    typename PiecewiseBezierMPCQPOperations<T, DIM>::CostAddition
+    PiecewiseBezierMPCQPOperations<T, DIM>::positionErrorPenaltyCost(const State &current_state, const Vector &ref_positions) {
         Matrix quadratic_term(numDecisionVariables(), numDecisionVariables());
         quadratic_term.setZero();
         Vector linear_term(numDecisionVariables());
@@ -77,15 +77,15 @@ namespace mpc {
         Vector x0 = Vector::Zero(2*DIM);
         x0 << current_state.pos_, current_state.vel_; // [6,1]
         Matrix linear_term_coef = (A0_.pos_ * x0).transpose() * Q_pe;
-        linear_term_coef += -1.0 * target.replicate(k_hor_, 1).transpose() * Q_pe; // TODO for some reason, I have to use -1 here. Need to figure it out.
+        linear_term_coef += -1.0 * ref_positions.transpose() * Q_pe; // TODO for some reason, I have to use -1 here. Need to figure it out.
         linear_term = (linear_term_coef * Phi_pred).transpose();
 
         return CostAddition(quadratic_term, linear_term, 0);
     }
 
     template <typename T, unsigned int DIM>
-    typename PiecewiseBezierMPCQPOperation<T, DIM>::CostAddition
-    PiecewiseBezierMPCQPOperation<T, DIM>::controlEffortPenaltyCost() {
+    typename PiecewiseBezierMPCQPOperations<T, DIM>::CostAddition
+    PiecewiseBezierMPCQPOperations<T, DIM>::controlEffortPenaltyCost() {
         Matrix quadratic_term(numDecisionVariables(), numDecisionVariables());
         quadratic_term.setZero();
         Vector linear_term(numDecisionVariables());
@@ -100,18 +100,18 @@ namespace mpc {
     }
 
     template <typename T, unsigned int DIM>
-    std::size_t PiecewiseBezierMPCQPOperation<T, DIM>::numDecisionVariables() const {
+    std::size_t PiecewiseBezierMPCQPOperations<T, DIM>::numDecisionVariables() const {
         size_t num_pieces = piece_operations_ptrs_.size();
         return num_pieces * piece_operations_ptrs_[0]->numDecisionVariables();
     }
 
     template <typename T, unsigned int DIM>
-    size_t PiecewiseBezierMPCQPOperation<T, DIM>::numPieces() const {
+    size_t PiecewiseBezierMPCQPOperations<T, DIM>::numPieces() const {
         return cumulative_max_parameters_.size();
     }
 
     template <typename T, unsigned int DIM>
-    T PiecewiseBezierMPCQPOperation<T, DIM>::max_parameter() const {
+    T PiecewiseBezierMPCQPOperations<T, DIM>::max_parameter() const {
         if (cumulative_max_parameters_.empty()) {
             throw std::runtime_error("there is no piece in the curve");
         }
@@ -119,18 +119,30 @@ namespace mpc {
     }
 
     template <typename T, unsigned int DIM>
-    const std::vector<std::unique_ptr<typename PiecewiseBezierMPCQPOperation<T, DIM>::BezierQPOperations>> &
-    PiecewiseBezierMPCQPOperation<T, DIM>::piece_operations_ptrs() const {
+    const std::vector<std::unique_ptr<typename PiecewiseBezierMPCQPOperations<T, DIM>::BezierQPOperations>> &
+    PiecewiseBezierMPCQPOperations<T, DIM>::piece_operations_ptrs() const {
         return piece_operations_ptrs_;
     }
 
     template <typename T, unsigned int DIM>
-    const std::vector<T> &PiecewiseBezierMPCQPOperation<T, DIM>::cumulative_max_parameters() const {
+    const std::vector<T> &PiecewiseBezierMPCQPOperations<T, DIM>::cumulative_max_parameters() const {
         return cumulative_max_parameters_;
     }
 
     template <typename T, unsigned int DIM>
-    void PiecewiseBezierMPCQPOperation<T, DIM>::addPiece(
+    const typename PiecewiseBezierMPCQPOperations<T, DIM>::Matrix &
+    PiecewiseBezierMPCQPOperations<T, DIM>::U_basis() {return U_basis_;}
+
+    template <typename T, unsigned int DIM>
+    const typename PiecewiseBezierMPCQPOperations<T, DIM>::Vector &
+    PiecewiseBezierMPCQPOperations<T, DIM>::h_samples() {return h_samples_;}
+
+    template <typename T, unsigned int DIM>
+    const TuningParams<T> &
+    PiecewiseBezierMPCQPOperations<T, DIM>::mpc_tuning() {return mpc_tuning_;}
+
+    template <typename T, unsigned int DIM>
+    void PiecewiseBezierMPCQPOperations<T, DIM>::addPiece(
             std::unique_ptr<BezierQPOperations> &&piece_operations_ptr) {
         // augment the cumulative max parameters
         if (cumulative_max_parameters_.empty()) {
@@ -149,25 +161,25 @@ namespace mpc {
 
 
     template <typename T, unsigned int DIM>
-    PiecewiseBezierMPCQPOperation<T, DIM>::PieceIndexAndParameter::
+    PiecewiseBezierMPCQPOperations<T, DIM>::PieceIndexAndParameter::
     PieceIndexAndParameter(std::size_t piece_idx, T parameter)
             : piece_idx_(piece_idx), parameter_(parameter) {}
 
     template <typename T, unsigned int DIM>
     std::size_t
-    PiecewiseBezierMPCQPOperation<T, DIM>::PieceIndexAndParameter::piece_idx() const {
+    PiecewiseBezierMPCQPOperations<T, DIM>::PieceIndexAndParameter::piece_idx() const {
         return piece_idx_;
     }
 
     template <typename T, unsigned int DIM>
     T
-    PiecewiseBezierMPCQPOperation<T, DIM>::PieceIndexAndParameter::parameter() const {
+    PiecewiseBezierMPCQPOperations<T, DIM>::PieceIndexAndParameter::parameter() const {
         return parameter_;
     }
 
     template <typename T, unsigned int DIM>
-    typename PiecewiseBezierMPCQPOperation<T, DIM>::PieceIndexAndParameter
-    PiecewiseBezierMPCQPOperation<T, DIM>::getPieceIndexAndParameter(T parameter) const {
+    typename PiecewiseBezierMPCQPOperations<T, DIM>::PieceIndexAndParameter
+    PiecewiseBezierMPCQPOperations<T, DIM>::getPieceIndexAndParameter(T parameter) const {
         if (parameter < 0 || parameter > cumulative_max_parameters_.back()) {
             throw std::runtime_error("SingleParameterPiecewiseCurveQPGenerator::pieceIndexAndParameter: "
                                      "parameter is out of range [0,max parameter]. max_parameter: " +
@@ -204,8 +216,8 @@ namespace mpc {
         }
     }
 
-    template class PiecewiseBezierMPCQPOperation<double, 3U>;
-    template class PiecewiseBezierMPCQPOperation<float, 3U>;
-    template class PiecewiseBezierMPCQPOperation<double, 2U>;
-    template class PiecewiseBezierMPCQPOperation<float, 2U>;
+    template class PiecewiseBezierMPCQPOperations<double, 3U>;
+    template class PiecewiseBezierMPCQPOperations<float, 3U>;
+    template class PiecewiseBezierMPCQPOperations<double, 2U>;
+    template class PiecewiseBezierMPCQPOperations<float, 2U>;
 } // mpc

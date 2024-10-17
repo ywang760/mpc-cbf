@@ -158,6 +158,7 @@ namespace qpcpp {
 
         void clearLinearConstraints();
         void setCostFunctionToZero();
+        void resetProblem();
 
     private:
         // We need pointer stability since pointers

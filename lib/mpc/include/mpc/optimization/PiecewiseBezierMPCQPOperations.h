@@ -40,7 +40,7 @@ namespace mpc {
     };
 
     template <typename T, unsigned int DIM>
-    class PiecewiseBezierMPCQPOperation {
+    class PiecewiseBezierMPCQPOperations {
     public:
         using QPOperation = qpcpp::QPOperations<T>;
         using BezierQPOperations = splines::BezierQPOperations<T, DIM>;
@@ -59,8 +59,8 @@ namespace mpc {
             PiecewiseBezierParams<T, DIM> &piecewise_bezier_params;
             MPCParams<T> &mpc_params;
         };
-        PiecewiseBezierMPCQPOperation(Params &p, std::shared_ptr<DoubleIntegrator> model_ptr);
-        ~PiecewiseBezierMPCQPOperation()=default;
+        PiecewiseBezierMPCQPOperations(Params &p, std::shared_ptr<DoubleIntegrator> model_ptr);
+        ~PiecewiseBezierMPCQPOperations()=default;
 
         // return the total number of decision variables of the piecewise curve
         std::size_t numDecisionVariables() const;
@@ -71,12 +71,15 @@ namespace mpc {
         T max_parameter() const;
         const std::vector<std::unique_ptr<BezierQPOperations>>& piece_operations_ptrs() const;
         const std::vector<T>& cumulative_max_parameters() const;
+        const Matrix &U_basis();
+        const Vector &h_samples();
+        const TuningParams<T> &mpc_tuning();
 
 
         Matrix evalSamplingBasisMatrix(Vector &h_samples, uint64_t derivative_degree);
 
         /// objective
-        CostAddition positionErrorPenaltyCost(const State &current_state, const VectorDIM &target);
+        CostAddition positionErrorPenaltyCost(const State &current_state, const Vector &ref_positions);
         CostAddition controlEffortPenaltyCost();
 
         /// constraints
@@ -117,6 +120,7 @@ namespace mpc {
         std::shared_ptr<DoubleIntegrator> model_ptr_;
         StatePropagator A0_;
         StatePropagator Lambda_;
+        Vector h_samples_;
         Matrix U_basis_;
 
         // contains pointers to operations for pieces

@@ -8,7 +8,12 @@
 
 
 namespace cbf
-{   
+{
+    template <typename T>
+    struct FoVCBFParams {
+        T beta_, ds_, rs_;
+    };
+
     // template <typename T>
     class FovCBF
     {
