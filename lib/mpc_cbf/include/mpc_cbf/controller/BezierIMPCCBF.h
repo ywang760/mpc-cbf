@@ -25,6 +25,7 @@ namespace mpc_cbf {
         using SingleParameterPiecewiseCurve = splines::SingleParameterPiecewiseCurve<T, DIM>;
         using VectorDIM = math::VectorDIM<T, DIM>;
         using Vector = math::Vector<T>;
+        using AlignedBox = math::AlignedBox<T, DIM>;
         using Matrix = math::Matrix<T>;
         using CollisionShape = math::CollisionShape<T, DIM>;
         using Problem = qpcpp::Problem<T>;
@@ -37,7 +38,7 @@ namespace mpc_cbf {
                       int impc_iter);
         ~BezierIMPCCBF()=default;
 
-        bool optimize(SingleParameterPiecewiseCurve &result_curve,
+        bool optimize(std::vector<SingleParameterPiecewiseCurve> &result_curve,
                       const State &current_state, const std::vector<VectorDIM>& other_robot_positions,
                       const Vector &ref_positions);
 

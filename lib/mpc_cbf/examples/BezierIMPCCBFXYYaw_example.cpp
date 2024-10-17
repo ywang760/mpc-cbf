@@ -92,7 +92,7 @@ int main() {
     std::shared_ptr<FovCBF> fov_cbf = std::make_unique<FovCBF>(fov_beta, fov_Ds, fov_Rs);
     // init bezier mpc-cbf
     uint64_t bezier_continuity_upto_degree = 4;
-    int impc_iter = 4;
+    int impc_iter = 2;
     BezierMPCCBFParams bezier_impc_cbf_params = {piecewise_bezier_params, mpc_params, fov_cbf_params};
 
     // main loop
@@ -118,8 +118,7 @@ int main() {
         target_positions.push_back(target_pos);
     }
 
-    SingleParameterPiecewiseCurve traj;
-    double sim_runtime = 10;
+    double sim_runtime = 15;
     double sim_t = 0;
     int loop_idx = 0;
     while (sim_t < sim_runtime) {
@@ -139,15 +138,21 @@ int main() {
 
 //            std::cout << "ref_positions shape: (" << ref_positions.rows() << ", " << ref_positions.cols() << ")\n";
 //            std::cout << "ref_positions: " << ref_positions.transpose() << "\n";
-            bool success = bezier_impc_cbf.optimize(traj, init_states.at(robot_idx), other_robot_positions, ref_positions);
+            std::vector<SingleParameterPiecewiseCurve> trajs;
+            bool success = bezier_impc_cbf.optimize(trajs, init_states.at(robot_idx), other_robot_positions, ref_positions);
+            if (!success) {
+                std::cout << "QP failed at ts: " << sim_t << "\n";
+            }
             Vector U = bezier_impc_cbf.generatorDerivativeControlInputs(2);
 //            std::cout << "curve eval: " << traj.eval(1.5, 0) << "\n";
 
             // log down the optimized curve prediction
             double t = 0;
             while (t <= 1.5) {
-                VectorDIM pred_pos = traj.eval(t, 0);
-                states["robots"][std::to_string(robot_idx)]["pred_curve"][loop_idx].push_back({pred_pos(0), pred_pos(1), pred_pos(2)});
+                for (size_t traj_index = 0; traj_index < trajs.size(); ++traj_index) {
+                    VectorDIM pred_pos = trajs.at(traj_index).eval(t, 0);
+                    states["robots"][std::to_string(robot_idx)]["pred_curve"][loop_idx][traj_index].push_back({pred_pos(0), pred_pos(1), pred_pos(2)});
+                }
                 t += 0.05;
             }
             //

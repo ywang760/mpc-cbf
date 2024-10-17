@@ -37,6 +37,7 @@ namespace mpc_cbf {
         std::vector<LinearConstraint> fovLBConstraint(const State& current_state, const Vector& other_pos);
         std::vector<LinearConstraint> fovRBConstraint(const State& current_state, const Vector& other_pos);
 
+        std::vector<LinearConstraint> predSafetyCBFConstraints(const std::vector<State>& pred_states, const Vector& other_pos);
         std::vector<LinearConstraint> predFovLBConstraints(const std::vector<State>& pred_states, const Vector& other_pos);
         std::vector<LinearConstraint> predFovRBConstraints(const std::vector<State>& pred_states, const Vector& other_pos);
 

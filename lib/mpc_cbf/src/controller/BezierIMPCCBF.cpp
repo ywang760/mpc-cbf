@@ -36,7 +36,7 @@ namespace mpc_cbf {
     }
 
     template <typename T, unsigned int DIM>
-    bool BezierIMPCCBF<T, DIM>::optimize(SingleParameterPiecewiseCurve &result_curve,
+    bool BezierIMPCCBF<T, DIM>::optimize(std::vector<SingleParameterPiecewiseCurve> &result_curves,
                                          const State &current_state,
                                          const std::vector<VectorDIM> &other_robot_positions,
                                          const Vector &ref_positions) {
@@ -50,6 +50,7 @@ namespace mpc_cbf {
             size_t num_pieces = qp_generator_.piecewise_mpc_qp_generator_ptr()->numPieces();
             // add the position error cost
             qp_generator_.piecewise_mpc_qp_generator_ptr()->addPositionErrorPenaltyCost(current_state, ref_positions);
+//            qp_generator_.piecewise_mpc_qp_generator_ptr()->addEvalPositionErrorPenaltyCost(ref_positions);
             // minimize the control effort for the curve up to specified degree
             for (size_t d = 1; d <= bezier_continuity_upto_degree_; ++d) {
                 qp_generator_.piecewise_mpc_qp_generator_ptr()->addIntegratedSquaredDerivativeCost(d,
@@ -81,20 +82,28 @@ namespace mpc_cbf {
             } else if (iter > 0 && success) {
                 // pred the robot's position in the horizon, use for the CBF constraints
                 std::vector<State> pred_states;
-                for (size_t k = 0; k < 4; ++k) {
+                for (size_t k = 0; k < 2; ++k) {
                     State pred_state;
-                    pred_state.pos_ = result_curve.eval(h_samples_(k), 0);
-                    pred_state.vel_ = result_curve.eval(h_samples_(k), 1);
+                    pred_state.pos_ = result_curves.back().eval(h_samples_(k), 0);
+                    pred_state.vel_ = result_curves.back().eval(h_samples_(k), 1);
                     pred_states.push_back(pred_state);
                 }
                 for (size_t i = 0; i < other_robot_positions.size(); ++i) {
                     Vector other_xy(2);
                     other_xy << other_robot_positions.at(i)(0), other_robot_positions.at(i)(1);
+//                    qp_generator_.addPredSafetyCBFConstraints(pred_states, other_xy);
                     qp_generator_.addSafetyCBFConstraint(current_state, other_xy);
                     qp_generator_.addPredFovLBConstraints(pred_states, other_xy);
                     qp_generator_.addPredFovRBConstraints(pred_states, other_xy);
                 }
             }
+
+//            // dynamics constraints
+//            T a_max = 2;
+//            VectorDIM a_min_vec = {-a_max, -a_max, -a_max};
+//            VectorDIM a_max_vec = {a_max, a_max, a_max};
+//            AlignedBox derivative_bbox(a_min_vec, a_max_vec);
+//            qp_generator_.piecewise_mpc_qp_generator_ptr()->addBoundingBoxConstraintAll(derivative_bbox, 2);
 
             // solve QP
             Problem &problem = qp_generator_.problem();
@@ -107,7 +116,7 @@ namespace mpc_cbf {
             }
 
             // generate bezier
-            result_curve = qp_generator_.piecewise_mpc_qp_generator_ptr()->generateCurveFromSolution();
+            result_curves.push_back(qp_generator_.piecewise_mpc_qp_generator_ptr()->generateCurveFromSolution());
         }
 
         return success;

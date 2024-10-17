@@ -32,7 +32,7 @@ def fov_xy(pos, radian, fov_beta, fov_range, num_points=100):
 def animation2D_XYYaw(traj, dt, Ts, bbox, pred_curve=None, fov_beta=None, fov_range=None, Trailing=True, PredCurve=True, save_name= "./test.mp4"):
     # animation settings
     n_agent, total_frame, _ = traj.shape
-    trailing_buf_size = 100
+    trailing_buf_size = 1000
     dir_len = 0.1  # length for orientation tick
 
     # load traj
@@ -86,20 +86,32 @@ def animation2D_XYYaw(traj, dt, Ts, bbox, pred_curve=None, fov_beta=None, fov_ra
             trail[i], = ax.plot([x[i, 0]], [y[i, 0]], c='dodgerblue', marker=None, alpha=0.2)
 
     if PredCurve:
-        pred = [Line2D([x[0][0]], [y[0][0]]) for i in range(n_agent)]
-        pred_fovs = []  # Store predicted FoV polygons
         fov_preview_plot_step = list(range(0, pred_curve.shape[-2], preview_skip_step))+list([pred_curve.shape[-2]-1])
+        iter_color = ['r', 'b', 'y', 'purple', 'pink', 'c', 'green', 'k']
+        impc_iters = pred_curve.shape[-3]
+
+        preds = []
+        pred_fovs = []  # Store predicted FoV polygons
         for i in range(n_agent):
-            pred[i], = ax.plot([x[i, 0]], [y[i, 0]], c='red', marker=None, alpha=0.8)
-            if enable_preview:
-                pred_fov = []
-                for k in fov_preview_plot_step:
-                    pos = [pred_curve[i, 0, k, 0], pred_curve[i, 0, k, 1]]
-                    fov_x, fov_y = fov_xy(pos, pred_curve[i, 0, k, 2], fov_beta, preview_fov_range)
-                    pred_fov.append(ax.fill(np.concatenate(([pos[0]], fov_x, [pos[0]])),
-                                            np.concatenate(([pos[1]], fov_y, [pos[1]])),
-                                            color='k', alpha=0.1))  # Predicted FoV in red
-                pred_fovs.append(pred_fov)
+            iter_pred = []
+            iter_pred_fov = []
+            for impc_it in range(impc_iters):
+                iter_pred_curve = pred_curve[:,:,impc_it,:,:]
+                pred, = ax.plot([x[i, 0]], [y[i, 0]], c=iter_color[impc_it], marker=None, alpha=0.8)
+                iter_pred.append(pred)
+                if enable_preview:
+                    if impc_it == impc_iters-1 or impc_it == 0:
+                        pred_fov = []
+                        for k in fov_preview_plot_step:
+                            pos = [iter_pred_curve[i, 0, k, 0], iter_pred_curve[i, 0, k, 1]]
+                            fov_x, fov_y = fov_xy(pos, iter_pred_curve[i, 0, k, 2], fov_beta, preview_fov_range)
+                            pred_fov.append(ax.fill(np.concatenate(([pos[0]], fov_x, [pos[0]])),
+                                                    np.concatenate(([pos[1]], fov_y, [pos[1]])),
+                                                    color=iter_color[impc_it], alpha=0.1))  # Predicted FoV in red
+                        iter_pred_fov.append(pred_fov)
+            preds.append(iter_pred)
+            pred_fovs.append(iter_pred_fov)
+
 
     # loop the frame
     def animate(ts):
@@ -128,14 +140,18 @@ def animation2D_XYYaw(traj, dt, Ts, bbox, pred_curve=None, fov_beta=None, fov_ra
         pred_index = int(ts//int(dt/Ts))
         if PredCurve:
             for i in range(n_agent):
-                pred[i].set_data(pred_curve[i, pred_index, :, 0], pred_curve[i, pred_index, :, 1])
-                if enable_preview:
-                    # Update predicted FoV
-                    for index, k in enumerate(fov_preview_plot_step):
-                        pos = [pred_curve[i, pred_index, k, 0], pred_curve[i, pred_index, k, 1]]
-                        fov_x, fov_y = fov_xy(pos, pred_curve[i, pred_index, k, 2], fov_beta, preview_fov_range)
-                        pred_fovs[i][index][0].set_xy(np.column_stack((np.concatenate(([pos[0]], fov_x, [pos[0]])),
-                                                                       np.concatenate(([pos[1]], fov_y, [pos[1]])))))
+                for impc_it in range(impc_iters):
+                    iter_pred_curve = pred_curve[:,:,impc_it,:,:]
+                    preds[i][impc_it].set_data(iter_pred_curve[i, pred_index, :, 0], iter_pred_curve[i, pred_index, :, 1])
+                    if enable_preview:
+                        for index_i, iter_index in enumerate([0, impc_iters-1]):
+                            if impc_it == iter_index:
+                                # Update predicted FoV
+                                for index, k in enumerate(fov_preview_plot_step):
+                                    pos = [iter_pred_curve[i, pred_index, k, 0], iter_pred_curve[i, pred_index, k, 1]]
+                                    fov_x, fov_y = fov_xy(pos, iter_pred_curve[i, pred_index, k, 2], fov_beta, preview_fov_range)
+                                    pred_fovs[i][index_i][index][0].set_xy(np.column_stack((np.concatenate(([pos[0]], fov_x, [pos[0]])),
+                                                                                            np.concatenate(([pos[1]], fov_y, [pos[1]])))))
 
         return p,
 
@@ -174,12 +190,13 @@ def plot2D_XYYaw(traj, obs_time=None, save_name="./test.jpg"):
 
 
 if __name__ == "__main__":
-    num_robots = len(load_states("CBFXYYawStates.json")["robots"])
-    traj = np.array([load_states("CBFXYYawStates.json")["robots"][str(_)]["states"] for _ in range(num_robots)])  # [n_robot, ts, dim]
-    dt = load_states("CBFXYYawStates.json")["dt"]
-    Ts = load_states("CBFXYYawStates.json")["Ts"]
+    states_json = load_states("CBFXYYawStates.json")
+    num_robots = len(states_json["robots"])
+    traj = np.array([states_json["robots"][str(_)]["states"] for _ in range(num_robots)])  # [n_robot, ts, dim]
+    dt = states_json["dt"]
+    Ts = states_json["Ts"]
     bbox = load_states("../config/config.json")["robot_params"]["collision_shape"]["aligned_box"][:2]
-    pred_curve = np.array([load_states("CBFXYYawStates.json")["robots"][str(_)]["pred_curve"] for _ in range(num_robots)])
+    pred_curve = np.array([states_json["robots"][str(_)]["pred_curve"] for _ in range(num_robots)])  # [n, h_samples, impc_iter, horizon, dim]
     # plot2D_XYYaw(traj)
     FoV_beta = load_states("../config/config.json")["fov_cbf_params"]["beta"] * np.pi/180
     FoV_range = load_states("../config/config.json")["fov_cbf_params"]["Rs"]

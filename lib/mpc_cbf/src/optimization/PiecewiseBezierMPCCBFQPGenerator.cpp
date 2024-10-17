@@ -47,6 +47,15 @@ namespace mpc_cbf {
     }
 
     template <typename T, unsigned int DIM>
+    void PiecewiseBezierMPCCBFQPGenerator<T, DIM>::addPredSafetyCBFConstraints(const std::vector<State> &pred_states,
+                                                                               const Vector &other_pos) {
+        std::vector<LinearConstraint> linear_constraints = piecewise_mpc_cbf_operations_ptr_->predSafetyCBFConstraints(pred_states, other_pos);
+        for (size_t i = 0; i < linear_constraints.size(); ++i) {
+            piecewise_mpc_qp_generator_ptr_->addLinearConstraintForPiecewise(linear_constraints.at(i));
+        }
+    }
+
+    template <typename T, unsigned int DIM>
     void PiecewiseBezierMPCCBFQPGenerator<T, DIM>::addPredFovLBConstraints(const std::vector<State> &pred_states,
                                                                            const Vector &other_pos) {
         std::vector<LinearConstraint> linear_constraints = piecewise_mpc_cbf_operations_ptr_->predFovLBConstraints(pred_states, other_pos);
