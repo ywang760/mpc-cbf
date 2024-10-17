@@ -53,6 +53,7 @@ int main() {
     double fov_beta = 120.0 * M_PI / 180.0;
     double fov_Ds = 3.0;
     double fov_Rs = 8.0;
+    double vmax = 2.0;
 
     VectorDIM a_min;
     a_min << -5,-5,-5;
@@ -66,7 +67,7 @@ int main() {
     // init model
     std::shared_ptr<DoubleIntegratorXYYaw> pred_model_ptr = std::make_shared<DoubleIntegratorXYYaw>(h);
     // init cbf
-    std::shared_ptr<FovCBF> fov_cbf = std::make_unique<FovCBF>(fov_beta, fov_Ds, fov_Rs);
+    std::shared_ptr<FovCBF> fov_cbf = std::make_unique<FovCBF>(fov_beta, fov_Ds, fov_Rs, vmax);
 
     // load the tasks
     std::vector<State> init_states;

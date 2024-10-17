@@ -2,10 +2,22 @@
 #include <cbf/detail/cbf.h>
 
 
+// Default: alpha = gamma * b
+GiNaC::ex defaultAlpha(GiNaC::ex b, double gamma = 1.0)
+{
+    return gamma * b;
+}
+
+GiNaC::ex myAlpha(GiNaC::ex myh, double mygamma)
+{
+    return mygamma * GiNaC::pow(myh, 3);
+}
+
 namespace cbf
 {   
     // template <typename T>
-    FovCBF::FovCBF(double fov, double safety_dist, double max_dist) : fov(fov), Ds(safety_dist), Rs(max_dist), px("px"), py("py"), th("th"), vx("vx"), vy("vy"), w("w"), xt("xt"), yt("yt")
+    FovCBF::FovCBF(double fov, double safety_dist, double max_dist, double vmax) : 
+    fov(fov), Ds(safety_dist), Rs(max_dist), vmax(vmax), vmin(-vmax), px("px"), py("py"), th("th"), vx("vx"), vy("vy"), w("w"), xt("xt"), yt("yt")
     {
         STATE_VARS = 6;
         CONTROL_VARS = 3;
@@ -36,30 +48,58 @@ namespace cbf
         f = A.mul(state);
         g = B;
 
+        // Set default alpha
+        alpha = myAlpha;
+
         // ------- Safety constraint ------- //
         auto res = initSafetyCBF();
         Ac_safe = res.first;
         Bc_safe = res.second;
-        // std::cout << "A1: " << Ac_safe << std::endl;
-        // std::cout << "B1: " << Bc_safe.evalm() << std::endl;
 
         auto res2 = initBorder1CBF();
         Ac_lb = res2.first;
         Bc_lb = res2.second;
-        // std::cout << "A2: " << Ac_lb << std::endl;
-        // std::cout << "B2: " << bc_lb << std::endl;
 
         auto res3 = initBorder2CBF();
         Ac_rb = res3.first;
         Bc_rb = res3.second;
-        // std::cout << "A3: " << Ac_rb << std::endl;
-        // std::cout << "B3: " << bc_rb << std::endl;
 
         auto res4 = initRangeCBF();
         Ac_range = res4.first;
         Bc_range = res4.second;
-        // std::cout << "A4: " << Ac_range << std::endl;
-        // std::cout << "B4: " << Bc_range << std::endl;
+
+
+        GiNaC::ex bv1 = -state[3] + vmax;
+        res = initVelCBF(bv1);
+        Ac_v1_max = res.first;
+        Bc_v1_max = res.second;
+
+        GiNaC::ex bv2 = -state[4] + vmax;
+        res = initVelCBF(bv2);
+        Ac_v2_max = res.first;
+        Bc_v2_max = res.second;
+
+
+        GiNaC::ex bv3 = -state[5] + vmax;
+        res = initVelCBF(bv3);
+        Ac_v3_max = res.first;
+        Bc_v3_max = res.second;
+
+        GiNaC::ex bv4 = state[3] - vmin;
+        res = initVelCBF(bv4);
+        Ac_v1_min = res.first;
+        Bc_v1_min = res.second;
+
+        GiNaC::ex bv5 = state[4] - vmin;
+        res = initVelCBF(bv5);
+        Ac_v2_min = res.first;
+        Bc_v2_min = res.second;
+
+        GiNaC::ex bv6 = state[5] - vmin;
+        res = initVelCBF(bv6);
+        Ac_v3_min = res.first;
+        Bc_v3_min = res.second;
+
     }
 
     FovCBF::~FovCBF()
@@ -105,6 +145,20 @@ namespace cbf
             lf2b1 = lf2b1 + grad2_b1(i, 0) * f(i, 0);
         }
 
+        GiNaC::matrix grad_bc = GiNaC::matrix(STATE_VARS, 1);
+        GiNaC::ex alpha_b = alpha(b1, gamma);
+        grad_bc(0, 0) = GiNaC::diff(alpha_b, px);
+        grad_bc(1, 0) = GiNaC::diff(alpha_b, py); 
+        grad_bc(2, 0) = GiNaC::diff(alpha_b, th); 
+        grad_bc(3, 0) = GiNaC::diff(alpha_b, vx); 
+        grad_bc(4, 0) = GiNaC::diff(alpha_b, vy); 
+        grad_bc(5, 0) = GiNaC::diff(alpha_b, w);
+        GiNaC::ex lfb_c = 0.0;
+        for (int i = 0; i < STATE_VARS; i++)
+        {
+            lfb_c = lfb_c + grad_bc(i, 0) * f(i, 0);
+        }
+
         GiNaC::matrix Ac1 =  GiNaC::matrix(1, CONTROL_VARS);
         for (int j = 0; j < CONTROL_VARS; j++) {
             GiNaC::ex Ac1j = 0.0;
@@ -114,14 +168,7 @@ namespace cbf
             Ac1(0, j) = Ac1j;
         }
 
-//        // linear alpha function
-//        GiNaC::ex B1 = lf2b1;
-//        GiNaC::ex B2 = gamma * lfb1;
-//        GiNaC::ex B3 = gamma * lfb1;
-//        GiNaC::ex B4 = 0;
-//        GiNaC::ex B5 = gamma * gamma * b1;
-
-//        // cubic alpha function
+        /*
         GiNaC::ex B1 = lf2b1;
         GiNaC::ex B2 = gamma * 3 * GiNaC::pow(b1, 2) * lfb1;
         GiNaC::ex B3 = gamma * GiNaC::pow(lfb1 + gamma*GiNaC::pow(b1, 3), 3);
@@ -129,6 +176,12 @@ namespace cbf
         GiNaC::ex B5 = 0;
 
         GiNaC::ex Bc1 = B1 + B2 + B3 + B4 + B5;
+        */
+
+        GiNaC::ex B1 = lf2b1;
+        GiNaC::ex B2 = lfb_c;
+        GiNaC::ex B3 = alpha(lfb1 + alpha_b, gamma);
+        GiNaC::ex Bc1 = B1 + B2 + B3;
         
         return std::make_pair(Ac1, Bc1);
     }
@@ -168,6 +221,20 @@ namespace cbf
             lf2b2 = lf2b2 + grad2_b2(i, 0) * f(i, 0);
         }
 
+        GiNaC::matrix grad_bc = GiNaC::matrix(STATE_VARS, 1);
+        GiNaC::ex alpha_b2 = alpha(b2, gamma);
+        grad_bc(0, 0) = GiNaC::diff(alpha_b2, px);
+        grad_bc(1, 0) = GiNaC::diff(alpha_b2, py); 
+        grad_bc(2, 0) = GiNaC::diff(alpha_b2, th); 
+        grad_bc(3, 0) = GiNaC::diff(alpha_b2, vx); 
+        grad_bc(4, 0) = GiNaC::diff(alpha_b2, vy); 
+        grad_bc(5, 0) = GiNaC::diff(alpha_b2, w);
+        GiNaC::ex lfb_c = 0.0;
+        for (int i = 0; i < STATE_VARS; i++)
+        {
+            lfb_c = lfb_c + grad_bc(i, 0) * f(i, 0);
+        }
+
         GiNaC::matrix Ac2 =  GiNaC::matrix(1, CONTROL_VARS);
         for (int j = 0; j < CONTROL_VARS; j++) {
             GiNaC::ex Ac2j = 0.0;
@@ -177,21 +244,11 @@ namespace cbf
             Ac2(0, j) = Ac2j;
         }
 
-//        // linear alpha function
-//        GiNaC::ex B12 = lf2b2;
-//        GiNaC::ex B22 = gamma * lfb2;
-//        GiNaC::ex B32 = gamma * lfb2;
-//        GiNaC::ex B42 = 0;
-//        GiNaC::ex B52 = gamma * gamma * b2;
 
-        // cubic alpha function
-        GiNaC::ex B12 = lf2b2;
-        GiNaC::ex B22 = gamma * 3 * GiNaC::pow(b2, 2) * lfb2;
-        GiNaC::ex B32 = gamma * GiNaC::pow(lfb2 + gamma*GiNaC::pow(b2, 3), 3);
-        GiNaC::ex B42 = 0;
-        GiNaC::ex B52 = 0;
-
-        GiNaC::ex Bc2 = B12 + B22 + B32 + B42 + B52;
+        GiNaC::ex B1 = lf2b2;
+        GiNaC::ex B2 = lfb_c;
+        GiNaC::ex B3 = alpha(lfb2 + alpha_b2, gamma);
+        GiNaC::ex Bc2 = B1 + B2 + B3;
         
         return std::make_pair(Ac2, Bc2);
     }
@@ -230,6 +287,20 @@ namespace cbf
             lf2b3 = lf2b3 + grad2_b3(i, 0) * f(i, 0);
         }
 
+        GiNaC::matrix grad_bc = GiNaC::matrix(STATE_VARS, 1);
+        GiNaC::ex alpha_b3 = alpha(b3, gamma);
+        grad_bc(0, 0) = GiNaC::diff(alpha_b3, px);
+        grad_bc(1, 0) = GiNaC::diff(alpha_b3, py); 
+        grad_bc(2, 0) = GiNaC::diff(alpha_b3, th); 
+        grad_bc(3, 0) = GiNaC::diff(alpha_b3, vx); 
+        grad_bc(4, 0) = GiNaC::diff(alpha_b3, vy); 
+        grad_bc(5, 0) = GiNaC::diff(alpha_b3, w);
+        GiNaC::ex lfb_c = 0.0;
+        for (int i = 0; i < STATE_VARS; i++)
+        {
+            lfb_c = lfb_c + grad_bc(i, 0) * f(i, 0);
+        }
+
         GiNaC::matrix Ac3 =  GiNaC::matrix(1, CONTROL_VARS);
         for (int j = 0; j < CONTROL_VARS; j++) {
             GiNaC::ex Ac3j = 0.0;
@@ -239,21 +310,11 @@ namespace cbf
             Ac3(0, j) = Ac3j;
         }
 
-//        // linear alpha function
-//        GiNaC::ex B13 = lf2b3;
-//        GiNaC::ex B23 = gamma * lfb3;
-//        GiNaC::ex B33 = gamma * lfb3;
-//        GiNaC::ex B43 = 0;
-//        GiNaC::ex B53 = gamma * gamma * b3;
 
-        // cubic alpha function
-        GiNaC::ex B13 = lf2b3;
-        GiNaC::ex B23 = gamma * 3 * GiNaC::pow(b3, 2) * lfb3;
-        GiNaC::ex B33 = gamma * GiNaC::pow(lfb3 + gamma*GiNaC::pow(b3, 3), 3);
-        GiNaC::ex B43 = 0;
-        GiNaC::ex B53 = 0;
-
-        GiNaC::ex Bc3 = B13 + B23 + B33 + B43 + B53;
+        GiNaC::ex B1 = lf2b3;
+        GiNaC::ex B2 = lfb_c;
+        GiNaC::ex B3 = alpha(lfb3 + alpha_b3, gamma);
+        GiNaC::ex Bc3 = B1 + B2 + B3;
 
         return std::make_pair(Ac3, Bc3);
     }
@@ -295,6 +356,20 @@ namespace cbf
             lf2b4 = lf2b4 + grad2_b4(i, 0) * f(i, 0);
         }
 
+        GiNaC::matrix grad_bc = GiNaC::matrix(STATE_VARS, 1);
+        GiNaC::ex alpha_b4 = alpha(b4, gamma);
+        grad_bc(0, 0) = GiNaC::diff(alpha_b4, px);
+        grad_bc(1, 0) = GiNaC::diff(alpha_b4, py); 
+        grad_bc(2, 0) = GiNaC::diff(alpha_b4, th); 
+        grad_bc(3, 0) = GiNaC::diff(alpha_b4, vx); 
+        grad_bc(4, 0) = GiNaC::diff(alpha_b4, vy); 
+        grad_bc(5, 0) = GiNaC::diff(alpha_b4, w);
+        GiNaC::ex lfb_c = 0.0;
+        for (int i = 0; i < STATE_VARS; i++)
+        {
+            lfb_c = lfb_c + grad_bc(i, 0) * f(i, 0);
+        }
+
         GiNaC::matrix Ac4 =  GiNaC::matrix(1, CONTROL_VARS);
         for (int j = 0; j < CONTROL_VARS; j++) {
             GiNaC::ex Ac4j = 0.0;
@@ -304,25 +379,44 @@ namespace cbf
             Ac4(0, j) = Ac4j;
         }
 
-//        // linear alpha function
-//        GiNaC::ex B14 = lf2b4;
-//        GiNaC::ex B24 = gamma * lfb4;
-//        GiNaC::ex B34 = gamma * lfb4;
-//        GiNaC::ex B44 = 0;
-//        GiNaC::ex B54 = gamma * gamma * b4;
 
-        // cubic alpha function
-        GiNaC::ex B14 = lf2b4;
-        GiNaC::ex B24 = gamma * 3 * GiNaC::pow(b4, 2) * lfb4;
-        GiNaC::ex B34 = gamma * GiNaC::pow(lfb4 + gamma*GiNaC::pow(b4, 3), 3);
-        GiNaC::ex B44 = 0;
-        GiNaC::ex B54 = 0;
-
-        GiNaC::ex Bc4 = B14 + B24 + B34 + B44 + B54;
+        GiNaC::ex B1 = lf2b4;
+        GiNaC::ex B2 = lfb_c;
+        GiNaC::ex B3 = alpha(lfb4 + alpha_b4, gamma);
+        GiNaC::ex Bc4 = B1 + B2 + B3;
 
         return std::make_pair(Ac4, Bc4);
 
     }
+
+    std::pair<GiNaC::matrix, GiNaC::ex> FovCBF::initVelCBF(GiNaC::ex bv)
+    {
+        GiNaC::matrix grad_bv = GiNaC::matrix(STATE_VARS, 1);
+        grad_bv(0, 0) = GiNaC::diff(bv, px);
+        grad_bv(1, 0) = GiNaC::diff(bv, py);
+        grad_bv(2, 0) = GiNaC::diff(bv, th);
+        grad_bv(3, 0) = GiNaC::diff(bv, vx);
+        grad_bv(4, 0) = GiNaC::diff(bv, vy);
+        grad_bv(5, 0) = GiNaC::diff(bv, w);
+        GiNaC::ex lfbv = 0.0;
+        for (int i = 0; i < STATE_VARS; i++)
+        {
+            lfbv = lfbv + grad_bv(i, 0) * f(i, 0);
+        }
+        
+        GiNaC::matrix Ac_v1 =  GiNaC::matrix(1, CONTROL_VARS);
+        for (int j = 0; j < CONTROL_VARS; j++) {
+            GiNaC::ex Ac_v1j = 0.0;
+            for (int i = 0; i < STATE_VARS; i++) {
+                Ac_v1j += grad_bv(i, 0) * g(i, j);
+            }
+            Ac_v1(0, j) = Ac_v1j;
+        }
+
+        GiNaC::ex Bc_v1 = lfbv + alpha(bv, 1.0);
+        return std::make_pair(Ac_v1, Bc_v1);
+    }
+
 
     GiNaC::ex FovCBF::matrixSubs(GiNaC::matrix a, Eigen::VectorXd state, Eigen::VectorXd target_state)
     {
@@ -413,6 +507,49 @@ namespace cbf
         return Ac;
     }
 
+    Eigen::MatrixXd FovCBF::getMaxVelContraints(Eigen::VectorXd state)
+    {
+        Eigen::Vector2d dummy_target;
+        dummy_target.setZero();
+        std::vector<GiNaC::ex> expressions(CONTROL_VARS);
+        expressions[0] = matrixSubs(Ac_v1_max, state, dummy_target);
+        expressions[1] = matrixSubs(Ac_v2_max, state, dummy_target);
+        expressions[2] = matrixSubs(Ac_v3_max, state, dummy_target);
+
+        Eigen::MatrixXd Acs;
+        Acs.resize(CONTROL_VARS, CONTROL_VARS);
+        Acs.setZero();
+        for (int i = 0; i < CONTROL_VARS; ++i)
+        {
+            GiNaC::ex val = expressions[i].evalf();
+            Acs(i,i) = GiNaC::ex_to<GiNaC::numeric>(val).to_double();
+        }
+
+        return Acs;
+    }
+
+    Eigen::MatrixXd FovCBF::getMinVelContraints(Eigen::VectorXd state)
+    {
+        Eigen::Vector2d dummy_target;
+        dummy_target.setZero();
+        std::vector<GiNaC::ex> expressions(CONTROL_VARS);
+        expressions[0] = matrixSubs(Ac_v1_min, state, dummy_target);
+        expressions[1] = matrixSubs(Ac_v2_min, state, dummy_target);
+        expressions[2] = matrixSubs(Ac_v3_min, state, dummy_target);
+
+        Eigen::MatrixXd Acs;
+        Acs.resize(CONTROL_VARS, CONTROL_VARS);
+        Acs.setZero();
+        for (int i = 0; i < CONTROL_VARS; ++i)
+        {
+            GiNaC::ex val = expressions[i].evalf();
+            Acs(i,i) = GiNaC::ex_to<GiNaC::numeric>(val).to_double();
+        }
+
+        return Acs;
+    }
+
+
     double FovCBF::getSafetyBound(Eigen::VectorXd state, Eigen::VectorXd target_state)
     {
         GiNaC::ex expr = valueSubs(Bc_safe, state, target_state);
@@ -445,8 +582,51 @@ namespace cbf
         return Bc;
     }
 
-    
+    Eigen::VectorXd FovCBF::getMaxVelBounds(Eigen::VectorXd state)
+    {
+        Eigen::Vector2d dummy_target;
+        dummy_target.setZero();
+        std::vector<GiNaC::ex> expressions(CONTROL_VARS);
+        expressions[0] = valueSubs(Bc_v1_max, state, dummy_target);
+        expressions[1] = valueSubs(Bc_v2_max, state, dummy_target);
+        expressions[2] = valueSubs(Bc_v3_max, state, dummy_target);
 
+        Eigen::VectorXd Bs;
+        Bs.resize(CONTROL_VARS);
+
+        for (int i = 0; i < CONTROL_VARS; ++i)
+        {
+            Bs(i) = GiNaC::ex_to<GiNaC::numeric>(expressions[i]).to_double();
+        }
+
+        return Bs;
+    }
+
+    Eigen::VectorXd FovCBF::getMinVelBounds(Eigen::VectorXd state)
+    {
+        Eigen::Vector2d dummy_target;
+        dummy_target.setZero();
+        std::vector<GiNaC::ex> expressions(CONTROL_VARS);
+        expressions[0] = valueSubs(Bc_v1_min, state, dummy_target);
+        expressions[1] = valueSubs(Bc_v2_min, state, dummy_target);
+        expressions[2] = valueSubs(Bc_v3_min, state, dummy_target);
+
+        Eigen::VectorXd Bs;
+        Bs.resize(CONTROL_VARS);
+
+        for (int i = 0; i < CONTROL_VARS; ++i)
+        {
+            Bs(i) = GiNaC::ex_to<GiNaC::numeric>(expressions[i]).to_double();
+        }
+
+        return Bs;
+    }
+
+    void FovCBF::setAlpha(std::function<GiNaC::ex(GiNaC::ex, double)> newAlpha)
+    {
+        alpha = newAlpha;
+    }
+    
     
 
 

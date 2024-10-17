@@ -53,6 +53,7 @@ int main() {
     double fov_beta = double(experiment_config_json["fov_cbf_params"]["beta"]) * M_PI / 180.0;
     double fov_Ds = experiment_config_json["fov_cbf_params"]["Ds"];
     double fov_Rs = experiment_config_json["fov_cbf_params"]["Rs"];
+    double vmax = 2.0;
 
     VectorDIM a_min;
     a_min << experiment_config_json["mpc_params"]["physical_limits"]["a_min"][0],
@@ -70,7 +71,7 @@ int main() {
     // init model
     std::shared_ptr<DoubleIntegratorXYYaw> pred_model_ptr = std::make_shared<DoubleIntegratorXYYaw>(h);
     // init cbf
-    std::shared_ptr<FovCBF> fov_cbf = std::make_unique<FovCBF>(fov_beta, fov_Ds, fov_Rs);
+    std::shared_ptr<FovCBF> fov_cbf = std::make_unique<FovCBF>(fov_beta, fov_Ds, fov_Rs, vmax);
 
     // load the tasks
     std::vector<State> init_states;

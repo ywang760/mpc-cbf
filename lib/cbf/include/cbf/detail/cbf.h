@@ -4,6 +4,7 @@
 
 #include <eigen3/Eigen/Dense>
 #include <eigen3/Eigen/Sparse>
+#include <functional>
 #include <ginac/ginac.h>
 
 
@@ -22,6 +23,8 @@ namespace cbf
             double fov;          // FoV
             double Ds;           // Safety dist
             double Rs;           // Max dist
+            double vmax;         // max velocity
+            double vmin;         // min velocity
             int STATE_VARS;
             int CONTROL_VARS;
             double gamma;
@@ -42,30 +45,53 @@ namespace cbf
             GiNaC::matrix Ac_lb;                        // left border constraints
             GiNaC::matrix Ac_rb;                        // right border constraints
             GiNaC::matrix Ac_range;
+            GiNaC::matrix Ac_v1_max;
+            GiNaC::matrix Ac_v2_max;
+            GiNaC::matrix Ac_v3_max;
+            GiNaC::matrix Ac_v1_min;
+            GiNaC::matrix Ac_v2_min;
+            GiNaC::matrix Ac_v3_min;
+            
             GiNaC::ex Bc_safe;
             GiNaC::ex Bc_lb;                            // left border
             GiNaC::ex Bc_rb;                            // right border
             GiNaC::ex Bc_range;
+            GiNaC::ex Bc_v1_max;
+            GiNaC::ex Bc_v2_max;
+            GiNaC::ex Bc_v3_max;
+            GiNaC::ex Bc_v1_min;
+            GiNaC::ex Bc_v2_min;
+            GiNaC::ex Bc_v3_min;
+
+            std::function<GiNaC::ex(GiNaC::ex, double)> alpha;
 
             std::pair<GiNaC::matrix, GiNaC::ex> initSafetyCBF();
             std::pair<GiNaC::matrix, GiNaC::ex> initBorder1CBF();
             std::pair<GiNaC::matrix, GiNaC::ex> initBorder2CBF();
             std::pair<GiNaC::matrix, GiNaC::ex> initRangeCBF();
+            std::pair<GiNaC::matrix, GiNaC::ex> initVelCBF(GiNaC::ex bv);
             GiNaC::ex matrixSubs(GiNaC::matrix a, Eigen::VectorXd state, Eigen::VectorXd target_state);
             GiNaC::ex valueSubs(GiNaC::ex m, Eigen::VectorXd state, Eigen::VectorXd target_state);
+            
 
 
         public:
-            FovCBF(double fov, double safety_dist, double max_dist);
+            FovCBF(double fov, double safety_dist, double max_dist, double vmax);
             ~FovCBF();
             Eigen::VectorXd getSafetyConstraints(Eigen::VectorXd state, Eigen::VectorXd target_state);
             Eigen::VectorXd getRangeConstraints(Eigen::VectorXd state, Eigen::VectorXd target_state);
             Eigen::VectorXd getLBConstraints(Eigen::VectorXd state, Eigen::VectorXd target_state);
             Eigen::VectorXd getRBConstraints(Eigen::VectorXd state, Eigen::VectorXd target_state);
+            Eigen::MatrixXd getMaxVelContraints(Eigen::VectorXd state);
+            Eigen::MatrixXd getMinVelContraints(Eigen::VectorXd state);
             double getSafetyBound(Eigen::VectorXd state, Eigen::VectorXd target_state);
             double getRangeBound(Eigen::VectorXd state, Eigen::VectorXd target_state);
             double getLBBound(Eigen::VectorXd state, Eigen::VectorXd target_state);
             double getRBBound(Eigen::VectorXd state, Eigen::VectorXd target_state);
+            Eigen::VectorXd getMaxVelBounds(Eigen::VectorXd state);
+            Eigen::VectorXd getMinVelBounds(Eigen::VectorXd state);
+            void setAlpha(std::function<GiNaC::ex(GiNaC::ex, double)> newAlpha);
+            
 
 
 
