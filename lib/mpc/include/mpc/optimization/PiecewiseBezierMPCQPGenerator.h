@@ -23,6 +23,7 @@ namespace mpc {
         using State = model::State<T, DIM>;
         using VectorDIM = math::VectorDIM<T, DIM>;
         using Vector = math::Vector<T>;
+        using AlignedBox = math::AlignedBox<T, DIM>;
         using Hyperplane = math::Hyperplane<T, DIM>;
 
         void addPiecewise(std::unique_ptr<PiecewiseBezierMPCQPOperations> &&piecewise_operations_ptr);
@@ -41,6 +42,7 @@ namespace mpc {
 
         // mpc cost, for piecewise
         void addPositionErrorPenaltyCost(const State &current_state, const Vector &ref_positions);
+        void addEvalPositionErrorPenaltyCost(const Vector &ref_positions);
         void addControlEffortPenaltyCost();
         // add
         // lambda*\int_{0}^{max_parameter}||df^{derivative_degree}(t)/dt^{derivative_degree}||^2dt
@@ -67,6 +69,10 @@ namespace mpc {
         void addHyperplaneConstraintForPiece(std::size_t piece_idx,
                                              const Hyperplane& hyperplane,
                                              T epsilon = 1e-8);
+
+        // constraint the derivative of the curve within a bounding box
+        void addBoundingBoxConstraintAll(const AlignedBox& bounding_box,
+                                         uint64_t derivative_degree);
 
         // constraint the trajectory at the given parameter to be in the negative
         // side of the given hyperplane

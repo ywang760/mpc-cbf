@@ -97,6 +97,22 @@ namespace mpc {
     }
 
     template <typename T, unsigned int DIM>
+    void PiecewiseBezierMPCQPGenerator<T, DIM>::addEvalPositionErrorPenaltyCost(const Vector &ref_positions) {
+        Vector h_samples = piecewise_operations_ptr_->h_samples();
+        int spd_f = piecewise_operations_ptr_->mpc_tuning().spd_f_;
+        T w_pos_err = piecewise_operations_ptr_->mpc_tuning().w_pos_err_;
+        for (size_t k = h_samples.size() - spd_f; k < h_samples.size(); ++k) {
+            T h_sample = h_samples[k];
+            const Vector ref_pos = ref_positions.segment(DIM*k, DIM);
+            const PieceIndexAndParameter& piece_idx_and_parameter = piecewise_operations_ptr_->getPieceIndexAndParameter(h_sample);
+            size_t piece_idx = piece_idx_and_parameter.piece_idx();
+            CostAddition cost_addition = piecewise_operations_ptr_->piece_operations_ptrs().at(piece_idx)
+                    ->evalCost(piece_idx_and_parameter.parameter(), 0, ref_pos, w_pos_err);
+            addCostAdditionForPiece(piece_idx, cost_addition);
+        }
+    }
+
+    template <typename T, unsigned int DIM>
     void PiecewiseBezierMPCQPGenerator<T, DIM>::addControlEffortPenaltyCost() {
         const CostAddition cost_addition = piecewise_operations_ptr_->controlEffortPenaltyCost();
         addCostAdditionForPiecewise(cost_addition);
@@ -188,6 +204,20 @@ namespace mpc {
             addLinearConstraintForPiece(piece_idx, linear_constraint);
         }
 
+    }
+
+    template <typename T, unsigned int DIM>
+    void PiecewiseBezierMPCQPGenerator<T, DIM>::addBoundingBoxConstraintAll(
+            const AlignedBox &bounding_box, uint64_t derivative_degree) {
+        for (std::size_t piece_idx = 0; piece_idx < piecewise_operations_ptr_->piece_operations_ptrs().size();
+             ++piece_idx) {
+            const std::vector<LinearConstraint>& piece_constraints =
+                    piecewise_operations_ptr_->piece_operations_ptrs().at(piece_idx)->boundingBoxConstraintAll(bounding_box, derivative_degree);
+
+            for (const LinearConstraint& piece_constraint : piece_constraints) {
+                addLinearConstraintForPiece(piece_idx, piece_constraint);
+            }
+        }
     }
 
     template <typename T, unsigned int DIM>

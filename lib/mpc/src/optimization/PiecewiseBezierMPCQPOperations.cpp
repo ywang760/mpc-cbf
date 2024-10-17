@@ -28,8 +28,8 @@ namespace mpc {
         A0_ = model_ptr_->get_A0(k_hor_); // A0.pos_: [3K, 6], A0.vel_: [3K, 6],
         Lambda_ = model_ptr_->get_lambda(k_hor_); // Lambda_.pos_: [3K, 3K], Lambda_.vel_: [3K, 3K]
         // control sequence U control point coefficient
-        Vector h_samples = Vector::LinSpaced(k_hor_, 0, (k_hor_-1)*h_);
-        U_basis_ = evalSamplingBasisMatrix(h_samples, 2); // [3K, num_piece*dim*num_control_pts] here since the control is acc, derivative degree is 2
+        h_samples_ = Vector::LinSpaced(k_hor_, 0, (k_hor_-1)*h_);
+        U_basis_ = evalSamplingBasisMatrix(h_samples_, 2); // [3K, num_piece*dim*num_control_pts] here since the control is acc, derivative degree is 2
 
     }
 
@@ -132,6 +132,14 @@ namespace mpc {
     template <typename T, unsigned int DIM>
     const typename PiecewiseBezierMPCQPOperations<T, DIM>::Matrix &
     PiecewiseBezierMPCQPOperations<T, DIM>::U_basis() {return U_basis_;}
+
+    template <typename T, unsigned int DIM>
+    const typename PiecewiseBezierMPCQPOperations<T, DIM>::Vector &
+    PiecewiseBezierMPCQPOperations<T, DIM>::h_samples() {return h_samples_;}
+
+    template <typename T, unsigned int DIM>
+    const TuningParams<T> &
+    PiecewiseBezierMPCQPOperations<T, DIM>::mpc_tuning() {return mpc_tuning_;}
 
     template <typename T, unsigned int DIM>
     void PiecewiseBezierMPCQPOperations<T, DIM>::addPiece(

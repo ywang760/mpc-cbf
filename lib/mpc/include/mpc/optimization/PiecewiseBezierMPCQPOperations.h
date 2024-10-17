@@ -72,6 +72,9 @@ namespace mpc {
         const std::vector<std::unique_ptr<BezierQPOperations>>& piece_operations_ptrs() const;
         const std::vector<T>& cumulative_max_parameters() const;
         const Matrix &U_basis();
+        const Vector &h_samples();
+        const TuningParams<T> &mpc_tuning();
+
 
         Matrix evalSamplingBasisMatrix(Vector &h_samples, uint64_t derivative_degree);
 
@@ -117,6 +120,7 @@ namespace mpc {
         std::shared_ptr<DoubleIntegrator> model_ptr_;
         StatePropagator A0_;
         StatePropagator Lambda_;
+        Vector h_samples_;
         Matrix U_basis_;
 
         // contains pointers to operations for pieces
