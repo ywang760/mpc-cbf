@@ -30,6 +30,9 @@ class Node
             this->nh_priv_.getParam("ROBOT_ID", ROBOT_ID);
             this->nh_priv_.getParam("TARGET_ID", TARGET_ID);
             this->nh_priv_.getParam("rate", rate);
+            this->nh_priv_.getParam("STATE_SIZE", state_size);
+            this->nh_priv_.getParam("PARTICLES_NUM", PARTICLES_NUM);
+
 
             // ---------- Subs and Pubs -------------------
             target_sub_ = nh_.subscribe<geometry_msgs::Pose>("/robot"+std::to_string(ROBOT_ID)+"/tag"+std::to_string(TARGET_ID)+"/pose", 1, std::bind(&Node::target_callback, this, std::placeholders::_1));
@@ -37,14 +40,16 @@ class Node
             timer_ = nh_.createTimer(ros::Duration(1/rate), std::bind(&Node::timer_callback, this));
 
             // Init params
-            int samples_num = 100;
-            Eigen::VectorXd state = Eigen::Vector2d::Ones();
-            Eigen::MatrixXd initCov = 1.0*Eigen::Matrix2d::Identity();
-            Eigen::MatrixXd processCov = 1.0*Eigen::Matrix2d::Identity();
-            Eigen::MatrixXd measCov = 0.5*Eigen::Matrix2d::Identity();
+            Eigen::VectorXd state = Eigen::VectorXd::Ones(state_size);
+            Eigen::MatrixXd initCov = 1.0*Eigen::MatrixXd::Identity(state_size, state_size);
+            Eigen::MatrixXd processCov = 0.5*Eigen::MatrixXd::Identity(state_size, state_size);
+            Eigen::MatrixXd measCov = 0.5*Eigen::MatrixXd::Identity(state_size, state_size);
 
-            pf::ParticleFilter filter(samples_num, state, initCov, processCov, measCov);
+            filter.init(PARTICLES_NUM, state, initCov, processCov, measCov);
 
+            obs_rel.resize(state_size);
+            estimate.resize(state_size);
+            covariance.resize(state_size, state_size);
             obs_rel.setZero();
             estimate.setZero();
             covariance.setZero();
@@ -66,11 +71,13 @@ class Node
         int ROBOT_ID = 0;
         int TARGET_ID = 1;
         double rate = 10.0;
+        double state_size = 3;
+        int PARTICLES_NUM = 100;
 
         pf::ParticleFilter filter;
-        Eigen::Vector2d obs_rel;
-        Eigen::Vector2d estimate;
-        Eigen::Matrix2d covariance;
+        Eigen::VectorXd obs_rel;
+        Eigen::VectorXd estimate;
+        Eigen::MatrixXd covariance;
 
         // ROS
         ros::NodeHandle nh_;
@@ -84,8 +91,9 @@ class Node
 
 void Node::target_callback(const geometry_msgs::Pose::ConstPtr& msg)
 {
-    Eigen::Vector2d meas;
-    meas << msg->position.x, msg->position.y;
+    Eigen::VectorXd meas;
+    meas.resize(state_size);
+    meas << msg->position.x, msg->position.y, msg->position.z;
     filter.update(meas);
 }
 
@@ -98,25 +106,33 @@ void Node::stop()
 void Node::timer_callback()
 {
     // Run PF
-    filter.predict();
+    Eigen::VectorXd input;
+    input.resize(3);
+    input.setZero();
+    filter.predict(input);
     filter.resample();
     filter.estimateState();
 
     // Update variables
     estimate = filter.getState();
+    std::cout << "Estimated state: " << estimate.transpose() << std::endl;
     covariance = filter.getDistribution();
-    std::cout << "Estimate state: " << estimate.transpose() << std::endl;
-    std::cout << "Covariance: " << covariance << std::endl;
 
     // Publish estimate msg
     est_msg.header.stamp = ros::Time::now();
-    est_msg.header.frame_id = "target"+std::to_string(TARGET_ID);
+    est_msg.header.frame_id = "map";
     est_msg.pose.pose.position.x = estimate(0);
     est_msg.pose.pose.position.y = estimate(1);
+    est_msg.pose.pose.position.z = estimate(2);
     est_msg.pose.covariance[0] = covariance(0,0);       // xx
     est_msg.pose.covariance[1] = covariance(0,1);       // xy
+    est_msg.pose.covariance[1] = covariance(0,2);       // xz
     est_msg.pose.covariance[6] = covariance(1,0);       // yx
     est_msg.pose.covariance[7] = covariance(1,1);       // yy
+    est_msg.pose.covariance[8] = covariance(1,2);       // yz
+    est_msg.pose.covariance[12] = covariance(2,0);       // zx
+    est_msg.pose.covariance[13] = covariance(2,1);       // zy
+    est_msg.pose.covariance[14] = covariance(2,2);       // zz
     est_pub_.publish(est_msg);
 
 }

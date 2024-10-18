@@ -1,6 +1,13 @@
 <launch>
+
     <node name="filter" pkg="fovmpc_estimator" type="filter_node" output="screen">
         <!--<rosparam "ROBOT_ID" value="0"/> -->
         <!--<rosparam "TARGET_ID" value="1"/> -->
     </node>
+
+
+	<!-- Visualization -->
+	<node type="rviz" name="rviz" pkg="rviz" args="-d $(find fovmpc_estimator)/rviz/estimator.rviz" />
+
+
 </launch>

@@ -13,7 +13,8 @@ int main()
     Eigen::MatrixXd processCov = 1.0*Eigen::Matrix3d::Identity();
     Eigen::MatrixXd measCov = 0.5*Eigen::Matrix3d::Identity();
 
-    pf::ParticleFilter filter(samples_num, state, initCov, processCov, measCov);
+    pf::ParticleFilter filter;
+    filter.init(samples_num, state, initCov, processCov, measCov);
     std::cout << "Dsitrib: \n" << filter.getDistribution() << std::endl;
     // Eigen::Vector3d detection;
     // detection << 2.3, 1.5, 1.1;
