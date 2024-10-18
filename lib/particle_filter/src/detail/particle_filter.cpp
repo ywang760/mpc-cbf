@@ -61,6 +61,11 @@ namespace pf
 
     }
 
+    ParticleFilter::ParticleFilter()
+    {
+        
+    }
+
     ParticleFilter::~ParticleFilter()
     {
         std::cout << "Closing particle filter...\n";

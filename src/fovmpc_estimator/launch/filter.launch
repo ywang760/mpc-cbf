@@ -1,0 +1,6 @@
+<launch>
+    <node name="filter" pkg="fovmpc_estimator" type="filter_node" output="screen">
+        <!--<rosparam "ROBOT_ID" value="0"/> -->
+        <!--<rosparam "TARGET_ID" value="1"/> -->
+    </node>
+</launch>

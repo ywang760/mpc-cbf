@@ -29,6 +29,7 @@ namespace pf
 
         public:
             ParticleFilter(int particles_num, Eigen::VectorXd initState, Eigen::MatrixXd initCov, Eigen::MatrixXd processCov, Eigen::MatrixXd measurementCov);
+            ParticleFilter();
             ~ParticleFilter();
             void predict();
             void predict(Eigen::VectorXd input);
