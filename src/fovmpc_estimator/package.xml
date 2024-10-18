@@ -1,8 +1,8 @@
 <?xml version="1.0"?>
 <package format="2">
-  <name>fov_estimator</name>
+  <name>fovmpc_estimator</name>
   <version>0.0.0</version>
-  <description>The fov_estimator package</description>
+  <description>The fovmpc_estimator package</description>
 
   <!-- One maintainer tag required, multiple allowed, one person per tag -->
   <!-- Example:  -->
@@ -19,7 +19,7 @@
   <!-- Url tags are optional, but multiple are allowed, one per tag -->
   <!-- Optional attribute type can be: website, bugtracker, or repository -->
   <!-- Example: -->
-  <!-- <url type="website">http://wiki.ros.org/fov_estimator</url> -->
+  <!-- <url type="website">http://wiki.ros.org/fovmpc_estimator</url> -->
 
 
   <!-- Author tags are optional, multiple are allowed, one per tag -->
