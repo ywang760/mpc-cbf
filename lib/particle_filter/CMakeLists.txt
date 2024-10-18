@@ -4,20 +4,11 @@ set_property(GLOBAL PROPERTY pf_ADDED "ON")
 
 set(CMAKE_CXX_STANDARD 17)
 
-# add local library
-get_property(is_model_ADDED GLOBAL PROPERTY model_ADDED)
-if(NOT is_model_ADDED)
-    add_subdirectory(../model ${CMAKE_CURRENT_BINARY_DIR}/model)
-endif()
-
-get_property(is_qpcpp_ADDED GLOBAL PROPERTY qpcpp_ADDED)
-if(NOT is_qpcpp_ADDED)
-    add_subdirectory(../qpcpp ${CMAKE_CURRENT_BINARY_DIR}/qpcpp)
-endif()
+find_package(Eigen3 REQUIRED)
 
 # add libraries
 add_library(ParticleFilter SHARED src/detail/particle_filter.cpp)
-target_include_directories(ParticleFilter PUBLIC include)
+target_include_directories(ParticleFilter PUBLIC include ${EIGEN3_INCLUDE_DIR})
 # target_link_libraries(ParticleFilter PUBLIC ginac cln)
 
 
