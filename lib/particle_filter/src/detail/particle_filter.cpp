@@ -11,7 +11,12 @@
 
 namespace pf
 {   
-    ParticleFilter::ParticleFilter(int particles_num, Eigen::VectorXd initState, Eigen::MatrixXd initCov, Eigen::MatrixXd processCov, Eigen::MatrixXd measurementCov)
+    ParticleFilter::ParticleFilter()
+    {
+        std::cout << "Particle filter initialized.\n";
+    }
+
+    void ParticleFilter::init(int particles_num, Eigen::VectorXd initState, Eigen::MatrixXd initCov, Eigen::MatrixXd processCov, Eigen::MatrixXd measurementCov)
     {
         n_ = particles_num;
         state_ = initState;
@@ -20,9 +25,8 @@ namespace pf
         R_ = measurementCov;             // measurement covariance
         dt = 0.2;
         std::srand(std::time(0));       // random seed for Eigen random gen
-        std::cout << "Init  cov: \n" << W_ << std::endl;
 
-        log_file_.open("samples.txt");
+        // log_file_.open("samples.txt");
 
         state_size_ = state_.size();
         if (state_size_ != W_.cols() || state_size_ != W_.rows())
@@ -58,6 +62,8 @@ namespace pf
         w_.setOnes();
         w_ /= n_;
 
+        std::cout << "Particle filter initialized\n";
+
 
     }
 
@@ -81,6 +87,7 @@ namespace pf
         auto func = [&] (int) {return dist(gen_);};
         Eigen::MatrixXd noise = W_ * Eigen::MatrixXd::NullaryExpr(state_size_, n_, func);
         particles_ += noise;
+
     }
 
     void ParticleFilter::predict()
@@ -109,6 +116,7 @@ namespace pf
         Eigen::VectorXd coeff = dist.diagonal();
         w_ = (-0.5 * coeff).array().exp();
         w_ /= w_.sum();
+
     }
 
     void ParticleFilter::update(Eigen::VectorXd measurement)
@@ -130,6 +138,7 @@ namespace pf
         }
 
         particles_ = resampled_particles;
+
     }
 
     void ParticleFilter::estimateState()
