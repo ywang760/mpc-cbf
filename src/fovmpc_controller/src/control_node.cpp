@@ -14,6 +14,7 @@
 #include <message_filters/sync_policies/approximate_time.h>
 #include <geometry_msgs/PoseWithCovarianceStamped.h>
 #include <geometry_msgs/PoseStamped.h>
+#include <geometry_msgs/Pose.h>
 #include <mavros_msgs/PositionTarget.h>
 #include <nav_msgs/Odometry.h>
 #include <tf2/utils.h>
@@ -31,6 +32,8 @@
 
 using namespace std::chrono_literals;
 using std::placeholders::_1;
+sig_atomic_t volatile node_shutdown_request = 0;    //signal manually generated when ctrl+c is pressed
+
 constexpr unsigned int DIM = 3U;
 class ControlNode
 {
@@ -166,9 +169,9 @@ public:
     void stop();
     void timer_callback();
     void optimization_call_back();
-    void target_update_callback(const geometry_msgs::PoseWithCovarianceStamped& msg, size_t target_index);
-    void state_update_callback(const geometry_msgs::PoseStamped& msg);
-    void goal_update_callback(const geometry_msgs::Pose& msg);
+    void target_update_callback(const geometry_msgs::PoseWithCovarianceStamped::ConstPtr& msg, size_t target_index);
+    void state_update_callback(const geometry_msgs::PoseStamped::ConstPtr& msg);
+    void goal_update_callback(const geometry_msgs::Pose::ConstPtr& msg);
 
 private:
     int ROBOT_ID = 0;
@@ -200,23 +203,23 @@ private:
 
 };
 
-void ControlNode::target_update_callback(const geometry_msgs::PoseWithCovarianceStamped& msg, size_t target_index) {
-    target_states_[target_index] << msg.pose.pose.position.x, msg.pose.pose.position.y, 0;
+void ControlNode::target_update_callback(const geometry_msgs::PoseWithCovarianceStamped::ConstPtr& msg, size_t target_index) {
+    target_states_[target_index] << msg->pose.pose.position.x, msg->pose.pose.position.y, 0;
 }
 
-void ControlNode::state_update_callback(const geometry_msgs::PoseStamped& msg) {
+void ControlNode::state_update_callback(const geometry_msgs::PoseStamped::ConstPtr& msg) {
     // convert the orientation to yaw
-    tf2::Quaternion q(msg.pose.orientation.x, msg.pose.orientation.y, msg.pose.orientation.z, msg.pose.orientation.w);
+    tf2::Quaternion q(msg->pose.orientation.x, msg->pose.orientation.y, msg->pose.orientation.z, msg->pose.orientation.w);
     tf2::Matrix3x3 m(q);
     double roll, pitch, yaw;
     m.getRPY(roll, pitch, yaw);
     // update the position
-    state_.pos_ << msg.pose.position.x, msg.pose.position.y, yaw;
+    state_.pos_ << msg->pose.position.x, msg->pose.position.y, yaw;
 }
 
-void ControlNode::goal_update_callback(const geometry_msgs::Pose& msg) {
+void ControlNode::goal_update_callback(const geometry_msgs::Pose::ConstPtr& msg) {
     // update the goal TODO update yaw
-    goal_ << msg.position.x, msg.position.y, 0;
+    goal_ << msg->position.x, msg->position.y, 0;
 }
 
 void ControlNode::optimization_call_back() {
@@ -264,7 +267,37 @@ void ControlNode::timer_callback() {
     eval_t_ += Ts_;
 }
 
+/*******************************************************************************
+* Main function
+*******************************************************************************/
+//alternatively to a global variable to have access to the method you can make STATIC the class method interested,
+//but some class function may not be accessed: "this->" method cannot be used
+
+void nodeobj_wrapper_function(int){
+    ROS_WARN("signal handler function CALLED");
+    node_shutdown_request = 1;
+}
+
 int main(int argc, char* argv[])
 {
+    ros::init(argc, argv, "supervisor_node", ros::init_options::NoSigintHandler);
+    signal(SIGINT, nodeobj_wrapper_function);
+
+    //Controller node_controller;
+    auto node_controller = std::make_shared<ControlNode>();
+
+    while (!node_shutdown_request){
+        ros::spinOnce();
+    }
+    node_controller->stop();
+
+    //ros::spin();
+    //do pre-shutdown tasks
+    if (ros::ok())
+    {
+        ROS_WARN("ROS HAS NOT BEEN PROPERLY SHUTDOWN, it is being shutdown again.");
+        ros::shutdown();
+    }
+
     return 0;
 }
