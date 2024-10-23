@@ -23,6 +23,9 @@
 
 using std::placeholders::_1;
 sig_atomic_t volatile node_shutdown_request = 0;    //signal manually generated when ctrl+c is pressed
+double ctrl_freq = 20.0;
+mavros_msgs::State current_state;
+double takeoff_time = 10;
 
 constexpr unsigned int DIM = 3U;
 class ControlNode
@@ -54,6 +57,12 @@ public:
         this->nh_priv_.getParam("NUM_TARGETS", NUM_TARGETS);
         this->nh_priv_.getParam("rate", rate);
         this->nh_priv_.getParam("CONFIG_FILENAME", CONFIG_FILENAME);
+
+        geometry_msgs::PoseStamped takeoff_pose;
+        takeoff_pose.header.frame_id = "map";
+        takeoff_pose.pose.position.x = 0;
+        takeoff_pose.pose.position.y = 0;
+        takeoff_pose.pose.position.z = z_;
 
 
         // ---------- Subs and Pubs -------------------
@@ -87,6 +96,7 @@ public:
         std::string experiment_config_filename = CONFIG_FILENAME;
         std::fstream experiment_config_fc(experiment_config_filename.c_str(), std::ios_base::in);
         json experiment_config_json = json::parse(experiment_config_fc);
+        std::cout << "successfully load the json..." << "\n";
 
         // piecewise bezier params
         size_t num_pieces = experiment_config_json["bezier_params"]["num_pieces"];
@@ -150,6 +160,9 @@ public:
         BezierMPCCBFParams bezier_impc_cbf_params = {piecewise_bezier_params, mpc_params, fov_cbf_params};
 
         bezier_impc_cbf_ptr_ = std::make_unique<BezierIMPCCBF>(bezier_impc_cbf_params, pred_model_ptr, fov_cbf, bezier_continuity_upto_degree, aligned_box_collision_shape_ptr, impc_iter);
+        std::cout << "successfully init the control core..." << "\n";
+
+        last_request_ = ros::Time::now();
     }
 
     ~ControlNode()
@@ -190,8 +203,12 @@ private:
     std::vector<ros::Subscriber> target_subs_;
     ros::Subscriber goal_sub_;
     ros::Publisher control_pub_;
+    ros::Publisher local_pos_pub_;
     ros::Timer optimizer_;
     ros::Timer timer_;
+    ros::ServiceClient arming_client_;
+    ros::ServiceClient set_mode_client_;
+    ros::Time last_request_;
 
 };
 
@@ -240,32 +257,63 @@ void ControlNode::optimization_callback() {
 }
 
 void ControlNode::timer_callback() {
-    std::vector<VectorDIM> evals;
-    for (size_t d = 0; d < 2; ++d) {
-        VectorDIM eval = curve_->eval(eval_t_, d);
-        evals.push_back(eval);
+    // arming and offboard
+    mavros_msgs::SetMode offb_set_mode;
+    offb_set_mode.request.custom_mode = "OFFBOARD";
+    mavros_msgs::CommandBool arm_cmd;
+    arm_cmd.request.value = true;
+
+    if (current_state.mode != "OFFBOARD" && ros::Time::now() - last_request_ > ros::Duration(2.0))
+    {
+        if (set_mode_client_.call(offb_set_mode) && offb_set_mode.response.mode_sent)
+        {
+            ROS_INFO("Offboard enabled.");
+        }
+        last_request_ = ros::Time::now();
+    } else {
+        if (!current_state.armed && (ros::Time::now() - last_request_ > ros::Duration(2.0)))
+        {
+            if (arming_client_.call(arm_cmd) && arm_cmd.response.success)
+            {
+                ROS_INFO("Vehicle armed.");
+            }
+            last_request_ = ros::Time::now();
+        }
     }
 
-    // publish the control msg
-    mavros_msgs::PositionTarget msg;
-    msg.header.stamp = ros::Time::now();
-    msg.coordinate_frame = 1;
-    msg.position.x = evals[0](0);
-    msg.position.y = evals[0](1);
-    msg.position.z = z_;
-    msg.velocity.x = evals[1](0);
-    msg.velocity.y = evals[1](1);
-    msg.velocity.z = 0;
-    msg.acceleration_or_force.x = evals[2](0);
-    msg.acceleration_or_force.y = evals[2](1);
-    msg.acceleration_or_force.z = 0;
-    msg.yaw = evals[0](2);
-    msg.yaw_rate = evals[1](2);
-    control_pub_.publish(msg);
-    // update the higher order states
-    state_.vel_ << evals[1];
+    if (ros::Time::now() - last_request_ < ros::Duration(takeoff_time))
+    {
+        local_pos_pub_.publish(takeoff_pose);
+    } else {
 
-    eval_t_ += Ts_;
+
+        std::vector<VectorDIM> evals;
+        for (size_t d = 0; d < 2; ++d) {
+            VectorDIM eval = curve_->eval(eval_t_, d);
+            evals.push_back(eval);
+        }
+
+        // publish the control msg
+        mavros_msgs::PositionTarget msg;
+        msg.header.stamp = ros::Time::now();
+        msg.coordinate_frame = 1;
+        msg.position.x = evals[0](0);
+        msg.position.y = evals[0](1);
+        msg.position.z = z_;
+        msg.velocity.x = evals[1](0);
+        msg.velocity.y = evals[1](1);
+        msg.velocity.z = 0;
+        msg.acceleration_or_force.x = evals[2](0);
+        msg.acceleration_or_force.y = evals[2](1);
+        msg.acceleration_or_force.z = 0;
+        msg.yaw = evals[0](2);
+        msg.yaw_rate = evals[1](2);
+        control_pub_.publish(msg);
+        // update the higher order states
+        state_.vel_ << evals[1];
+
+        eval_t_ += Ts_;
+    }
 }
 
 /*******************************************************************************
