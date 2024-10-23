@@ -53,6 +53,7 @@ public:
         this->nh_priv_.getParam("ROBOT_ID", ROBOT_ID);
         this->nh_priv_.getParam("NUM_TARGETS", NUM_TARGETS);
         this->nh_priv_.getParam("rate", rate);
+        this->nh_priv_.getParam("CONFIG_FILENAME", CONFIG_FILENAME);
 
 
         // ---------- Subs and Pubs -------------------
@@ -83,7 +84,7 @@ public:
         // Init params
         state_.vel_ = VectorDIM::Zero();
         // load experiment config
-        std::string experiment_config_filename = "../../../config/config.json";
+        std::string experiment_config_filename = CONFIG_FILENAME;
         std::fstream experiment_config_fc(experiment_config_filename.c_str(), std::ios_base::in);
         json experiment_config_json = json::parse(experiment_config_fc);
 
@@ -167,6 +168,7 @@ private:
     int ROBOT_ID = 0;
     int NUM_TARGETS = 0;
     double rate = 10.0;
+    std::string CONFIG_FILENAME;
 
     // mpc settings
     double h_;
@@ -178,7 +180,7 @@ private:
     VectorDIM goal_;
     std::unique_ptr<SingleParameterPiecewiseCurve> curve_;
     double eval_t_;
-    double z_;
+    double z_ = 1;
     std::unique_ptr<BezierIMPCCBF> bezier_impc_cbf_ptr_;
 
     // ROS
@@ -279,7 +281,7 @@ void nodeobj_wrapper_function(int){
 
 int main(int argc, char* argv[])
 {
-    ros::init(argc, argv, "supervisor_node", ros::init_options::NoSigintHandler);
+    ros::init(argc, argv, "control_node", ros::init_options::NoSigintHandler);
     signal(SIGINT, nodeobj_wrapper_function);
 
     //Controller node_controller;
