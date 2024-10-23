@@ -76,7 +76,7 @@ namespace cbf
 
 
         public:
-            FovCBF(double fov, double safety_dist, double max_dist, double vmax);
+            FovCBF(double fov, double safety_dist, double max_dist, double vmax = 2);
             ~FovCBF();
             Eigen::VectorXd getSafetyConstraints(Eigen::VectorXd state, Eigen::VectorXd target_state);
             Eigen::VectorXd getRangeConstraints(Eigen::VectorXd state, Eigen::VectorXd target_state);
