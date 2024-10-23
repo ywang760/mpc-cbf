@@ -1,8 +1,10 @@
 <launch>
 
-    <node name="filter" pkg="fovmpc_estimator" type="filter_node" output="screen">
-        <!--<rosparam "ROBOT_ID" value="0"/> -->
-        <!--<rosparam "TARGET_ID" value="1"/> -->
+    <node name="filter_node_0" anonymous="true" pkg="fovmpc_estimator" type="filter_node" output="screen">
+        <param name="ROBOT_ID" value="0"/>
+        <param name="TARGET_ID" value="1"/>
+        <!-- <remap from="/tag_0/pose" to="robot0/tag_0/pose"/> -->
+        <!-- <remap from="/tag_1/pose" to="robot0/tag_1/pose"/> -->
     </node>
 
 

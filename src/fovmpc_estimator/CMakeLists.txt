@@ -10,6 +10,7 @@ project(fovmpc_estimator)
 find_package(catkin REQUIRED COMPONENTS
         roscpp
         rospy
+        tf2_ros
 )
 # find_package(particle_filter)
 get_property(is_pf_ADDED GLOBAL PROPERTY pf_ADDED)
