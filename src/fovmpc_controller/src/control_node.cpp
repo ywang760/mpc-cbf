@@ -19,18 +19,8 @@
 #include <nav_msgs/Odometry.h>
 #include <tf2/utils.h>
 #include <tf2/LinearMath/Quaternion.h>
-
-#include <cmath>
-#include <Eigen/Dense>
-#include <Eigen/Core>
-#include <vector>
-#include <math.h>
-#include <chrono>
 #include <signal.h>
 
-#define M_PI   3.14159265358979323846  /*pi*/
-
-using namespace std::chrono_literals;
 using std::placeholders::_1;
 sig_atomic_t volatile node_shutdown_request = 0;    //signal manually generated when ctrl+c is pressed
 
@@ -87,7 +77,7 @@ public:
         // control pub
         control_pub_ = nh_.advertise<mavros_msgs::PositionTarget>("mavros/setpoint_raw/local", 10);
 
-        optimizer_ = nh_.createTimer(ros::Duration(h_), std::bind(&ControlNode::optimization_call_back, this));
+        optimizer_ = nh_.createTimer(ros::Duration(h_), std::bind(&ControlNode::optimization_callback, this));
         timer_ = nh_.createTimer(ros::Duration(Ts_), std::bind(&ControlNode::timer_callback, this));
 
         // Init params
@@ -168,9 +158,9 @@ public:
 
     void stop();
     void timer_callback();
-    void optimization_call_back();
+    void optimization_callback();
     void target_update_callback(const geometry_msgs::PoseWithCovarianceStamped::ConstPtr& msg, size_t target_index);
-    void state_update_callback(const geometry_msgs::PoseStamped::ConstPtr& msg);
+    void state_update_callback(const nav_msgs::Odometry::ConstPtr& msg);
     void goal_update_callback(const geometry_msgs::Pose::ConstPtr& msg);
 
 private:
@@ -203,29 +193,38 @@ private:
 
 };
 
+void ControlNode::stop()
+{
+    ros::Duration(0.1).sleep();
+    ros::shutdown();
+}
+
 void ControlNode::target_update_callback(const geometry_msgs::PoseWithCovarianceStamped::ConstPtr& msg, size_t target_index) {
     target_states_[target_index] << msg->pose.pose.position.x, msg->pose.pose.position.y, 0;
 }
 
-void ControlNode::state_update_callback(const geometry_msgs::PoseStamped::ConstPtr& msg) {
+void ControlNode::state_update_callback(const nav_msgs::Odometry::ConstPtr& msg) {
     // convert the orientation to yaw
-    tf2::Quaternion q(msg->pose.orientation.x, msg->pose.orientation.y, msg->pose.orientation.z, msg->pose.orientation.w);
+    tf2::Quaternion q(msg->pose.pose.orientation.x, msg->pose.pose.orientation.y, msg->pose.pose.orientation.z, msg->pose.pose.orientation.w);
     tf2::Matrix3x3 m(q);
     double roll, pitch, yaw;
     m.getRPY(roll, pitch, yaw);
     // update the position
-    state_.pos_ << msg->pose.position.x, msg->pose.position.y, yaw;
+    state_.pos_ << msg->pose.pose.position.x, msg->pose.pose.position.y, yaw;
 }
 
 void ControlNode::goal_update_callback(const geometry_msgs::Pose::ConstPtr& msg) {
-    // update the goal TODO update yaw
-    goal_ << msg->position.x, msg->position.y, 0;
+    // update the goal
+    tf2::Quaternion q(msg->orientation.x, msg->orientation.y, msg->orientation.z, msg->orientation.w);
+    tf2::Matrix3x3 m(q);
+    double roll, pitch, yaw;
+    m.getRPY(roll, pitch, yaw);
+    goal_ << msg->position.x, msg->position.y, yaw;
 }
 
-void ControlNode::optimization_call_back() {
+void ControlNode::optimization_callback() {
     bezier_impc_cbf_ptr_->resetProblem();
 
-    // TODO modify the init_states & add the subscribe of ref_position.
     Vector ref_positions(DIM*k_hor_);
     // static target reference
     ref_positions = goal_.replicate(k_hor_, 1);
