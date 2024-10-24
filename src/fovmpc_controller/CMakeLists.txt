@@ -57,3 +57,8 @@ target_link_libraries(control_node PUBLIC
         mpc_cbf_controller_BezierIMPCCBF
         model_DoubleIntegratorXYYaw
         math_collision_shapes_AlignedBoxCollisionShape)
+
+add_executable(goal_node src/goal_node.cpp)
+target_include_directories(goal_node PUBLIC include ../../third_party/json/single_include)
+add_dependencies(goal_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+target_link_libraries(goal_node PUBLIC ${catkin_LIBRARIES} math_Types)
