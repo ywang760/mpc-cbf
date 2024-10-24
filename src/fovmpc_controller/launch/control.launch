@@ -1,0 +1,11 @@
+<launch>
+
+    <node name="goal" pkg="fovmpc_controller" type="goal_node" output="screen">
+        <param name="CONFIG_FILENAME" type="string" value="$(find fovmpc_controller)/../../config/config.json"/>
+    </node>
+
+    <node name="control" pkg="fovmpc_controller" type="control_node" output="screen">
+            <param name="CONFIG_FILENAME" type="string" value="$(find fovmpc_controller)/../../config/config.json"/>
+    </node>
+
+</launch>
