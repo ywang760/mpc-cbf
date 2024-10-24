@@ -16,6 +16,9 @@
 #include <geometry_msgs/PoseStamped.h>
 #include <geometry_msgs/Pose.h>
 #include <mavros_msgs/PositionTarget.h>
+#include <mavros_msgs/CommandBool.h>
+#include <mavros_msgs/SetMode.h>
+#include <mavros_msgs/State.h>
 #include <nav_msgs/Odometry.h>
 #include <tf2/utils.h>
 #include <tf2/LinearMath/Quaternion.h>
@@ -24,10 +27,23 @@
 using std::placeholders::_1;
 sig_atomic_t volatile node_shutdown_request = 0;    //signal manually generated when ctrl+c is pressed
 double ctrl_freq = 20.0;
+geometry_msgs::PoseStamped current_pose;
 mavros_msgs::State current_state;
 double takeoff_time = 10;
 
 constexpr unsigned int DIM = 3U;
+
+void state_cb(const mavros_msgs::State::ConstPtr& msg)
+{
+    current_state = *msg;
+}
+
+
+void pose_cb(const geometry_msgs::PoseStamped::ConstPtr& msg)
+{
+    current_pose = *msg;
+}
+
 class ControlNode
 {
 public:
@@ -58,12 +74,6 @@ public:
         this->nh_priv_.getParam("rate", rate);
         this->nh_priv_.getParam("CONFIG_FILENAME", CONFIG_FILENAME);
 
-        geometry_msgs::PoseStamped takeoff_pose;
-        takeoff_pose.header.frame_id = "map";
-        takeoff_pose.pose.position.x = 0;
-        takeoff_pose.pose.position.y = 0;
-        takeoff_pose.pose.position.z = z_;
-
 
         // ---------- Subs and Pubs -------------------
         std::vector<size_t> neighbor_ids;
@@ -75,12 +85,19 @@ public:
         }
         assert(neighbor_ids.size() == NUM_TARGETS);
 
+
+        mavros_state_sub_ = nh_.subscribe<mavros_msgs::State>("mavros/state", 10, state_cb);
+        pose_sub_ = nh_.subscribe<geometry_msgs::PoseStamped>("mavros/local_position/pose", 10, pose_cb);
+        arming_client_ = nh_.serviceClient<mavros_msgs::CommandBool>("mavros/cmd/arming");
+        set_mode_client_ = nh_.serviceClient<mavros_msgs::SetMode>("mavros/set_mode");
+        local_pos_pub_ = nh_.advertise<geometry_msgs::PoseStamped>("mavros/setpoint_position/local", 10);
+
         // subs
-        state_sub_ = nh_.subscribe<nav_msgs::Odometry>("/supervisor/uav" + std::to_string(ROBOT_ID) + "/odom", 1, std::bind(&ControlNode::state_update_callback, this, std::placeholders::_1));
+        state_sub_ = nh_.subscribe<nav_msgs::Odometry>("/mavros/local_position/odom", 1, std::bind(&ControlNode::state_update_callback, this, std::placeholders::_1));
         target_subs_.resize(NUM_TARGETS);
         for (size_t i = 0; i < NUM_TARGETS; ++i) {
             size_t target_id = neighbor_ids[i];
-            target_subs_[i] = nh_.subscribe<geometry_msgs::PoseWithCovarianceStamped>("/target"+std::to_string(target_id)+"estimate", 1, std::bind(&ControlNode::target_update_callback, this, std::placeholders::_1, i));
+            target_subs_[i] = nh_.subscribe<geometry_msgs::PoseWithCovarianceStamped>("/target"+std::to_string(target_id)+"/estimate", 1, std::bind(&ControlNode::target_update_callback, this, std::placeholders::_1, i));
         }
         goal_sub_ = nh_.subscribe<geometry_msgs::Pose>("/uav" + std::to_string(ROBOT_ID) + "/goal", 1, std::bind(&ControlNode::goal_update_callback, this, std::placeholders::_1));
 
@@ -89,6 +106,30 @@ public:
 
         optimizer_ = nh_.createTimer(ros::Duration(h_), std::bind(&ControlNode::optimization_callback, this));
         timer_ = nh_.createTimer(ros::Duration(Ts_), std::bind(&ControlNode::timer_callback, this));
+        std::cout << "finished all sub/pub" << "\n";
+
+//        // Arming
+//        ros::Rate fcu_rate(ctrl_freq);
+//
+//        // wait for FCU connection
+//        while(ros::ok() && !current_state.connected)
+//        {
+//            ros::spinOnce();
+//            fcu_rate.sleep();
+//        }
+//        std::cout << "finished FCU connection" << "\n";
+        takeoff_pose_.header.frame_id = "map";
+        takeoff_pose_.pose.position.x = 0;
+        takeoff_pose_.pose.position.y = 0;
+        takeoff_pose_.pose.position.z = z_;
+//
+//        // send a few waypoints before starting
+//        for (int i = 100; ros::ok() && i > 0; --i)
+//        {
+//            local_pos_pub_.publish(takeoff_pose_);
+//            ros::spinOnce();
+//            fcu_rate.sleep();
+//        }
 
         // Init params
         state_.vel_ = VectorDIM::Zero();
@@ -179,7 +220,7 @@ public:
 
 private:
     int ROBOT_ID = 0;
-    int NUM_TARGETS = 0;
+    int NUM_TARGETS = 1;
     double rate = 10.0;
     std::string CONFIG_FILENAME;
 
@@ -188,10 +229,12 @@ private:
     double Ts_;
     int k_hor_;
 
+
+    geometry_msgs::PoseStamped takeoff_pose_;
     State state_;
     std::vector<VectorDIM> target_states_;
     VectorDIM goal_;
-    std::unique_ptr<SingleParameterPiecewiseCurve> curve_;
+    std::shared_ptr<SingleParameterPiecewiseCurve> curve_;
     double eval_t_;
     double z_ = 1;
     std::unique_ptr<BezierIMPCCBF> bezier_impc_cbf_ptr_;
@@ -200,6 +243,8 @@ private:
     ros::NodeHandle nh_;
     ros::NodeHandle nh_priv_;
     ros::Subscriber state_sub_;
+    ros::Subscriber mavros_state_sub_;
+    ros::Subscriber pose_sub_;
     std::vector<ros::Subscriber> target_subs_;
     ros::Subscriber goal_sub_;
     ros::Publisher control_pub_;
@@ -250,69 +295,77 @@ void ControlNode::optimization_callback() {
 
     std::vector<SingleParameterPiecewiseCurve> trajs;
     bool success = bezier_impc_cbf_ptr_->optimize(trajs, state_, target_states_, ref_positions);
-    curve_ = std::make_unique<SingleParameterPiecewiseCurve>(std::move(trajs.back()));
+    if (success) {
+        std::cout << "QP success" << "\n";
+    }
+//    std::cout << "trajs.back() vel eval" << trajs.back().eval(0.02, 1) << "\n";
+
+    curve_ = std::make_shared<SingleParameterPiecewiseCurve>(std::move(trajs.back()));
+
+//    std::cout << "curve_ vel eval" << curve_->eval(0.02, 1) << "\n";
 
     // reset the eval_t
     eval_t_ = 0;
 }
 
 void ControlNode::timer_callback() {
-    // arming and offboard
-    mavros_msgs::SetMode offb_set_mode;
-    offb_set_mode.request.custom_mode = "OFFBOARD";
-    mavros_msgs::CommandBool arm_cmd;
-    arm_cmd.request.value = true;
 
-    if (current_state.mode != "OFFBOARD" && ros::Time::now() - last_request_ > ros::Duration(2.0))
-    {
-        if (set_mode_client_.call(offb_set_mode) && offb_set_mode.response.mode_sent)
-        {
-            ROS_INFO("Offboard enabled.");
-        }
-        last_request_ = ros::Time::now();
+    if (!current_state.connected) {
     } else {
-        if (!current_state.armed && (ros::Time::now() - last_request_ > ros::Duration(2.0)))
-        {
-            if (arming_client_.call(arm_cmd) && arm_cmd.response.success)
-            {
-                ROS_INFO("Vehicle armed.");
+        // arming and offboard
+        mavros_msgs::SetMode offb_set_mode;
+        offb_set_mode.request.custom_mode = "OFFBOARD";
+        mavros_msgs::CommandBool arm_cmd;
+        arm_cmd.request.value = true;
+
+        if (current_state.mode != "OFFBOARD" && ros::Time::now() - last_request_ > ros::Duration(2.0)) {
+            if (set_mode_client_.call(offb_set_mode) && offb_set_mode.response.mode_sent) {
+                ROS_INFO("Offboard enabled.");
             }
             last_request_ = ros::Time::now();
-        }
-    }
-
-    if (ros::Time::now() - last_request_ < ros::Duration(takeoff_time))
-    {
-        local_pos_pub_.publish(takeoff_pose);
-    } else {
-
-
-        std::vector<VectorDIM> evals;
-        for (size_t d = 0; d < 2; ++d) {
-            VectorDIM eval = curve_->eval(eval_t_, d);
-            evals.push_back(eval);
+        } else {
+            if (!current_state.armed && (ros::Time::now() - last_request_ > ros::Duration(2.0))) {
+                if (arming_client_.call(arm_cmd) && arm_cmd.response.success) {
+                    ROS_INFO("Vehicle armed.");
+                }
+                last_request_ = ros::Time::now();
+            }
         }
 
-        // publish the control msg
-        mavros_msgs::PositionTarget msg;
-        msg.header.stamp = ros::Time::now();
-        msg.coordinate_frame = 1;
-        msg.position.x = evals[0](0);
-        msg.position.y = evals[0](1);
-        msg.position.z = z_;
-        msg.velocity.x = evals[1](0);
-        msg.velocity.y = evals[1](1);
-        msg.velocity.z = 0;
-        msg.acceleration_or_force.x = evals[2](0);
-        msg.acceleration_or_force.y = evals[2](1);
-        msg.acceleration_or_force.z = 0;
-        msg.yaw = evals[0](2);
-        msg.yaw_rate = evals[1](2);
-        control_pub_.publish(msg);
-        // update the higher order states
-        state_.vel_ << evals[1];
+        if (ros::Time::now() - last_request_ < ros::Duration(takeoff_time)) {
+            std::cout << "take command" << "\n";
+            local_pos_pub_.publish(takeoff_pose_);
+        } else {
 
-        eval_t_ += Ts_;
+            eval_t_ += Ts_;
+            std::vector<VectorDIM> evals;
+            for (size_t d = 0; d <= 2; ++d) {
+                std::cout << "eval time" << eval_t_ << "\n";
+                VectorDIM eval = curve_->eval(eval_t_, d);
+                std::cout << "eval : " << eval.transpose() << "\n";
+                evals.push_back(eval);
+            }
+
+            // publish the control msg
+            mavros_msgs::PositionTarget msg;
+            msg.header.stamp = ros::Time::now();
+            msg.coordinate_frame = 1;
+            msg.position.x = evals[0](0);
+            msg.position.y = evals[0](1);
+            msg.position.z = z_;
+            msg.velocity.x = evals[1](0);
+            msg.velocity.y = evals[1](1);
+            msg.velocity.z = 0;
+            msg.acceleration_or_force.x = evals[2](0);
+            msg.acceleration_or_force.y = evals[2](1);
+            msg.acceleration_or_force.z = 0;
+            msg.yaw = evals[0](2);
+            msg.yaw_rate = evals[1](2);
+            control_pub_.publish(msg);
+            // update the higher order states
+            state_.vel_ << evals[1];
+
+        }
     }
 }
 
