@@ -123,6 +123,11 @@ namespace mpc_cbf {
     }
 
     template <typename T, unsigned int DIM>
+    void BezierIMPCCBF<T, DIM>::resetProblem() {
+        qp_generator_.problem().resetProblem();
+    }
+
+    template <typename T, unsigned int DIM>
     typename BezierIMPCCBF<T, DIM>::Vector
     BezierIMPCCBF<T, DIM>::generatorDerivativeControlInputs(uint64_t derivative_degree) {
         Matrix U_basis = qp_generator_.piecewise_mpc_qp_generator_ptr()->piecewise_operations_ptr()->evalSamplingBasisMatrix(ts_samples_, derivative_degree); // [3I, num_piece*dim*num_control_pts]
