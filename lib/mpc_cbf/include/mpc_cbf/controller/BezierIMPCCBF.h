@@ -42,6 +42,8 @@ namespace mpc_cbf {
                       const State &current_state, const std::vector<VectorDIM>& other_robot_positions,
                       const Vector &ref_positions);
 
+        void resetProblem();
+
         Vector generatorDerivativeControlInputs(uint64_t derivative_degree);
 
     private:
