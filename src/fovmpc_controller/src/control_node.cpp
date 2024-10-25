@@ -97,7 +97,7 @@ public:
         target_subs_.resize(NUM_TARGETS);
         for (size_t i = 0; i < NUM_TARGETS; ++i) {
             size_t target_id = neighbor_ids[i];
-            target_subs_[i] = nh_.subscribe<geometry_msgs::PoseWithCovarianceStamped>("/target"+std::to_string(target_id)+"/estimate", 1, std::bind(&ControlNode::target_update_callback, this, std::placeholders::_1, i));
+            target_subs_[i] = nh_.subscribe<geometry_msgs::PoseWithCovarianceStamped>("/target_"+std::to_string(target_id)+"/estimate", 1, std::bind(&ControlNode::target_update_callback, this, std::placeholders::_1, i));
         }
         goal_sub_ = nh_.subscribe<geometry_msgs::Pose>("/uav" + std::to_string(ROBOT_ID) + "/goal", 1, std::bind(&ControlNode::goal_update_callback, this, std::placeholders::_1));
 
@@ -132,6 +132,11 @@ public:
 //        }
 
         // Init params
+        target_states_.resize(NUM_TARGETS);
+        target_states_[0] = VectorDIM::Zero();
+        std::cout << "NUM_TARGETS: " << NUM_TARGETS << "\n";
+        std::cout << target_states_.size() << "\n";
+        state_.pos_ = VectorDIM::Zero();
         state_.vel_ = VectorDIM::Zero();
         // load experiment config
         std::string experiment_config_filename = CONFIG_FILENAME;
@@ -217,6 +222,7 @@ public:
     void target_update_callback(const geometry_msgs::PoseWithCovarianceStamped::ConstPtr& msg, size_t target_index);
     void state_update_callback(const nav_msgs::Odometry::ConstPtr& msg);
     void goal_update_callback(const geometry_msgs::Pose::ConstPtr& msg);
+    VectorDIM convertToClosestYaw();
 
 private:
     int ROBOT_ID = 0;
@@ -284,6 +290,7 @@ void ControlNode::goal_update_callback(const geometry_msgs::Pose::ConstPtr& msg)
     double roll, pitch, yaw;
     m.getRPY(roll, pitch, yaw);
     goal_ << msg->position.x, msg->position.y, yaw;
+    goal_ = convertToClosestYaw();
 }
 
 void ControlNode::optimization_callback() {
@@ -293,10 +300,17 @@ void ControlNode::optimization_callback() {
     // static target reference
     ref_positions = goal_.replicate(k_hor_, 1);
 
+
+    std::cout << "goal: " << goal_.transpose() << "\n";
+    std::cout << "state pos: " << state_.pos_.transpose() << "\n";
+    std::cout << "state vel: " << state_.vel_.transpose() << "\n";
+    std::cout << "target: " << target_states_[0].transpose() << "\n";
+    std::cout << "target: " << target_states_.size() << "\n";
+
     std::vector<SingleParameterPiecewiseCurve> trajs;
     bool success = bezier_impc_cbf_ptr_->optimize(trajs, state_, target_states_, ref_positions);
-    if (success) {
-        std::cout << "QP success" << "\n";
+    if (!success) {
+        std::cout << "QP not success" << "\n";
     }
 //    std::cout << "trajs.back() vel eval" << trajs.back().eval(0.02, 1) << "\n";
 
@@ -367,6 +381,41 @@ void ControlNode::timer_callback() {
 
         }
     }
+}
+
+ControlNode::VectorDIM ControlNode::convertToClosestYaw() {
+//    std::cout << "start get the current_yaw\n";
+    double current_yaw = state_.pos_(2);
+    // generate the candidate desire yaws
+    ControlNode::Vector candidate_yaws(3);
+
+//    std::cout << "start build candidate yaw\n";
+//    std::cout << goal_(2) << "\n";
+//    std::cout << M_PI << "\n";
+    candidate_yaws << goal_(2), goal_(2) + 2 * M_PI, goal_(2) - 2 * M_PI;
+
+//    std::cout << "compute the offset\n";
+    ControlNode::Vector candidate_yaws_offset(3);
+    candidate_yaws_offset << std::abs(candidate_yaws(0) - current_yaw), std::abs(candidate_yaws(1) - current_yaw), std::abs(candidate_yaws(2) - current_yaw);
+
+
+//    std::cout << "start to find the argmin\n";
+    // Find the index of the minimum element
+    int argmin_index = 0;
+    double min_value = candidate_yaws_offset(0);
+
+    for (int i = 1; i < candidate_yaws_offset.size(); ++i) {
+        if (candidate_yaws_offset(i) < min_value) {
+            min_value = candidate_yaws_offset(i);
+            argmin_index = i;
+        }
+    }
+
+    ControlNode::VectorDIM converted_goal;
+    converted_goal << goal_(0), goal_(1), candidate_yaws(argmin_index);
+    std::cout << "converted_goal: " << converted_goal.transpose() << "\n";
+    return converted_goal;
+
 }
 
 /*******************************************************************************
