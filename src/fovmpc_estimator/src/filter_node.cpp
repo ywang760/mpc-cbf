@@ -219,7 +219,7 @@ void Node::timer_callback()
     filter.predict();
 
     // Remove particles inside FoV
-    /*Eigen::VectorXd weights = filter.getWeights();
+    Eigen::VectorXd weights = filter.getWeights();
     samples = filter.getParticles();
     for (int i = 0; i < PARTICLES_NUM; ++i)
     {
@@ -229,7 +229,7 @@ void Node::timer_callback()
         }
     }
 
-    filter.setWeights(weights);*/
+    filter.setWeights(weights);
 
     filter.resample();
     filter.estimateState();

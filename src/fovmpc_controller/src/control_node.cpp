@@ -20,6 +20,7 @@
 #include <mavros_msgs/SetMode.h>
 #include <mavros_msgs/State.h>
 #include <nav_msgs/Odometry.h>
+#include <nav_msgs/Path.h>
 #include <tf2/utils.h>
 #include <tf2/LinearMath/Quaternion.h>
 #include <signal.h>
@@ -103,6 +104,9 @@ public:
 
         // control pub
         control_pub_ = nh_.advertise<mavros_msgs::PositionTarget>("mavros/setpoint_raw/local", 10);
+
+        // planned path visualization
+        path_pub_ = nh_.advertise<nav_msgs::Path>("/uav"+std::to_string(ROBOT_ID)+"/planned_path", 10);
 
         optimizer_ = nh_.createTimer(ros::Duration(h_), std::bind(&ControlNode::optimization_callback, this));
         timer_ = nh_.createTimer(ros::Duration(Ts_), std::bind(&ControlNode::timer_callback, this));
@@ -255,6 +259,7 @@ private:
     ros::Subscriber goal_sub_;
     ros::Publisher control_pub_;
     ros::Publisher local_pos_pub_;
+    ros::Publisher path_pub_;
     ros::Timer optimizer_;
     ros::Timer timer_;
     ros::ServiceClient arming_client_;
@@ -350,7 +355,6 @@ void ControlNode::timer_callback() {
             std::cout << "take command" << "\n";
             local_pos_pub_.publish(takeoff_pose_);
         } else {
-
             eval_t_ += Ts_;
             std::vector<VectorDIM> evals;
             for (size_t d = 0; d <= 2; ++d) {
@@ -360,6 +364,24 @@ void ControlNode::timer_callback() {
                 evals.push_back(eval);
             }
 
+            // Publish planned path
+            nav_msgs::Path path_msg;
+            path_msg.header.frame_id = "map";
+            path_msg.header.stamp = ros::Time::now();
+            for (double t_i = 0; t_i < h_*(k_hor_-1); t_i=t_i+2*h_)
+            {
+                geometry_msgs::PoseStamped pose;
+                VectorDIM eval = curve_->eval(t_i, 0);
+                pose.pose.position.x = eval(0);
+                pose.pose.position.y = eval(1);
+                pose.pose.position.z = z_;
+                tf2::Quaternion q;
+                q.setRPY(0, 0, eval(2));
+                pose.pose.orientation = tf2::toMsg(q);
+                path_msg.poses.push_back(pose);
+            }
+            path_pub_.publish(path_msg);
+            
             // publish the control msg
             mavros_msgs::PositionTarget msg;
             msg.header.stamp = ros::Time::now();
