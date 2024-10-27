@@ -110,37 +110,21 @@ public:
 
         optimizer_ = nh_.createTimer(ros::Duration(h_), std::bind(&ControlNode::optimization_callback, this));
         timer_ = nh_.createTimer(ros::Duration(Ts_), std::bind(&ControlNode::timer_callback, this));
+        take_off_module_ = nh_.createTimer(ros::Duration(Ts_), std::bind(&ControlNode::takeoff_callback, this));
         std::cout << "finished all sub/pub" << "\n";
 
-//        // Arming
-//        ros::Rate fcu_rate(ctrl_freq);
-//
-//        // wait for FCU connection
-//        while(ros::ok() && !current_state.connected)
-//        {
-//            ros::spinOnce();
-//            fcu_rate.sleep();
-//        }
-//        std::cout << "finished FCU connection" << "\n";
+        // Init params
+        // take off height
         takeoff_pose_.header.frame_id = "map";
         takeoff_pose_.pose.position.x = 0;
         takeoff_pose_.pose.position.y = 0;
         takeoff_pose_.pose.position.z = z_;
-//
-//        // send a few waypoints before starting
-//        for (int i = 100; ros::ok() && i > 0; --i)
-//        {
-//            local_pos_pub_.publish(takeoff_pose_);
-//            ros::spinOnce();
-//            fcu_rate.sleep();
-//        }
 
-        // Init params
         target_states_.resize(NUM_TARGETS);
         target_states_[0] = VectorDIM::Zero();
-        std::cout << "NUM_TARGETS: " << NUM_TARGETS << "\n";
+//        std::cout << "NUM_TARGETS: " << NUM_TARGETS << "\n";
         std::cout << target_states_.size() << "\n";
-        state_.pos_ = VectorDIM::Zero();
+//        state_.pos_ = VectorDIM::Zero();
         state_.vel_ = VectorDIM::Zero();
         // load experiment config
         std::string experiment_config_filename = CONFIG_FILENAME;
@@ -221,6 +205,7 @@ public:
     }
 
     void stop();
+    void takeoff_callback();
     void timer_callback();
     void optimization_callback();
     void target_update_callback(const geometry_msgs::PoseWithCovarianceStamped::ConstPtr& msg, size_t target_index);
@@ -248,6 +233,7 @@ private:
     double eval_t_;
     double z_ = 1;
     std::unique_ptr<BezierIMPCCBF> bezier_impc_cbf_ptr_;
+    bool taken_off_ = false;
 
     // ROS
     ros::NodeHandle nh_;
@@ -262,6 +248,7 @@ private:
     ros::Publisher path_pub_;
     ros::Timer optimizer_;
     ros::Timer timer_;
+    ros::Timer take_off_module_;
     ros::ServiceClient arming_client_;
     ros::ServiceClient set_mode_client_;
     ros::Time last_request_;
@@ -299,110 +286,116 @@ void ControlNode::goal_update_callback(const geometry_msgs::Pose::ConstPtr& msg)
 }
 
 void ControlNode::optimization_callback() {
-    bezier_impc_cbf_ptr_->resetProblem();
+    if (taken_off_) {
+        bezier_impc_cbf_ptr_->resetProblem();
 
-    Vector ref_positions(DIM*k_hor_);
-    // static target reference
-    ref_positions = goal_.replicate(k_hor_, 1);
+        Vector ref_positions(DIM * k_hor_);
+        // static target reference
+        ref_positions = goal_.replicate(k_hor_, 1);
 
 
-    std::cout << "goal: " << goal_.transpose() << "\n";
-    std::cout << "state pos: " << state_.pos_.transpose() << "\n";
-    std::cout << "state vel: " << state_.vel_.transpose() << "\n";
-    std::cout << "target: " << target_states_[0].transpose() << "\n";
-    std::cout << "target: " << target_states_.size() << "\n";
+//        std::cout << "goal: " << goal_.transpose() << "\n";
+//        std::cout << "state pos: " << state_.pos_.transpose() << "\n";
+//        std::cout << "state vel: " << state_.vel_.transpose() << "\n";
+//        std::cout << "target: " << target_states_[0].transpose() << "\n";
+//        std::cout << "target: " << target_states_.size() << "\n";
 
-    std::vector<SingleParameterPiecewiseCurve> trajs;
-    bool success = bezier_impc_cbf_ptr_->optimize(trajs, state_, target_states_, ref_positions);
-    if (!success) {
-        std::cout << "QP not success" << "\n";
+        std::vector <SingleParameterPiecewiseCurve> trajs;
+        bool success = bezier_impc_cbf_ptr_->optimize(trajs, state_, target_states_, ref_positions);
+        if (!success) {
+            std::cout << "QP not success" << "\n";
+        }
+
+        curve_ = std::make_shared<SingleParameterPiecewiseCurve>(std::move(trajs.back()));
+
+        // reset the eval_t
+        eval_t_ = 0;
+
+        // Publish planned path
+        nav_msgs::Path path_msg;
+        path_msg.header.frame_id = "map";
+        path_msg.header.stamp = ros::Time::now();
+        for (double t_i = 0; t_i < h_*(k_hor_-1); t_i=t_i+2*h_)
+        {
+            geometry_msgs::PoseStamped pose;
+            VectorDIM eval = curve_->eval(t_i, 0);
+            pose.pose.position.x = eval(0);
+            pose.pose.position.y = eval(1);
+            pose.pose.position.z = z_;
+            tf2::Quaternion q;
+            q.setRPY(0, 0, eval(2));
+            pose.pose.orientation = tf2::toMsg(q);
+            path_msg.poses.push_back(pose);
+        }
+        path_pub_.publish(path_msg);
     }
-//    std::cout << "trajs.back() vel eval" << trajs.back().eval(0.02, 1) << "\n";
+}
 
-    curve_ = std::make_shared<SingleParameterPiecewiseCurve>(std::move(trajs.back()));
+void ControlNode::takeoff_callback() {
+    if (!taken_off_) {
+        if (!current_state.connected) {
+        } else {
+            // arming and offboard
+            mavros_msgs::SetMode offb_set_mode;
+            offb_set_mode.request.custom_mode = "OFFBOARD";
+            mavros_msgs::CommandBool arm_cmd;
+            arm_cmd.request.value = true;
 
-//    std::cout << "curve_ vel eval" << curve_->eval(0.02, 1) << "\n";
-
-    // reset the eval_t
-    eval_t_ = 0;
+            if (current_state.mode != "OFFBOARD" && ros::Time::now() - last_request_ > ros::Duration(2.0)) {
+                if (set_mode_client_.call(offb_set_mode) && offb_set_mode.response.mode_sent) {
+                    ROS_INFO("Offboard enabled.");
+                }
+                last_request_ = ros::Time::now();
+            } else {
+                if (!current_state.armed && (ros::Time::now() - last_request_ > ros::Duration(2.0))) {
+                    if (arming_client_.call(arm_cmd) && arm_cmd.response.success) {
+                        ROS_INFO("Vehicle armed.");
+                    }
+                    last_request_ = ros::Time::now();
+                }
+            }
+            // take off
+            if (ros::Time::now() - last_request_ < ros::Duration(takeoff_time)) {
+                local_pos_pub_.publish(takeoff_pose_);
+            } else {
+                std::cout << "taken off..." << "\n";
+                taken_off_ = true;
+            }
+        }
+    }
 }
 
 void ControlNode::timer_callback() {
-
-    if (!current_state.connected) {
-    } else {
-        // arming and offboard
-        mavros_msgs::SetMode offb_set_mode;
-        offb_set_mode.request.custom_mode = "OFFBOARD";
-        mavros_msgs::CommandBool arm_cmd;
-        arm_cmd.request.value = true;
-
-        if (current_state.mode != "OFFBOARD" && ros::Time::now() - last_request_ > ros::Duration(2.0)) {
-            if (set_mode_client_.call(offb_set_mode) && offb_set_mode.response.mode_sent) {
-                ROS_INFO("Offboard enabled.");
-            }
-            last_request_ = ros::Time::now();
-        } else {
-            if (!current_state.armed && (ros::Time::now() - last_request_ > ros::Duration(2.0))) {
-                if (arming_client_.call(arm_cmd) && arm_cmd.response.success) {
-                    ROS_INFO("Vehicle armed.");
-                }
-                last_request_ = ros::Time::now();
-            }
+     if (taken_off_) {
+        eval_t_ += Ts_;
+        std::vector<VectorDIM> evals;
+        for (size_t d = 0; d <= 2; ++d) {
+//            std::cout << "eval time" << eval_t_ << "\n";
+            VectorDIM eval = curve_->eval(eval_t_, d);
+//            std::cout << "eval : " << eval.transpose() << "\n";
+            evals.push_back(eval);
         }
 
-        if (ros::Time::now() - last_request_ < ros::Duration(takeoff_time)) {
-            std::cout << "take command" << "\n";
-            local_pos_pub_.publish(takeoff_pose_);
-        } else {
-            eval_t_ += Ts_;
-            std::vector<VectorDIM> evals;
-            for (size_t d = 0; d <= 2; ++d) {
-                std::cout << "eval time" << eval_t_ << "\n";
-                VectorDIM eval = curve_->eval(eval_t_, d);
-                std::cout << "eval : " << eval.transpose() << "\n";
-                evals.push_back(eval);
-            }
+        // publish the control msg
+        mavros_msgs::PositionTarget msg;
+        msg.header.stamp = ros::Time::now();
+        msg.coordinate_frame = 1;
+        msg.position.x = evals[0](0);
+        msg.position.y = evals[0](1);
+        msg.position.z = z_;
+        msg.velocity.x = evals[1](0);
+        msg.velocity.y = evals[1](1);
+        msg.velocity.z = 0;
+        msg.acceleration_or_force.x = evals[2](0);
+        msg.acceleration_or_force.y = evals[2](1);
+        msg.acceleration_or_force.z = 0;
+        msg.yaw = evals[0](2);
+        msg.yaw_rate = evals[1](2);
+        control_pub_.publish(msg);
+        // update the higher order states
+        state_.vel_ << evals[1];
+     }
 
-            // Publish planned path
-            nav_msgs::Path path_msg;
-            path_msg.header.frame_id = "map";
-            path_msg.header.stamp = ros::Time::now();
-            for (double t_i = 0; t_i < h_*(k_hor_-1); t_i=t_i+2*h_)
-            {
-                geometry_msgs::PoseStamped pose;
-                VectorDIM eval = curve_->eval(t_i, 0);
-                pose.pose.position.x = eval(0);
-                pose.pose.position.y = eval(1);
-                pose.pose.position.z = z_;
-                tf2::Quaternion q;
-                q.setRPY(0, 0, eval(2));
-                pose.pose.orientation = tf2::toMsg(q);
-                path_msg.poses.push_back(pose);
-            }
-            path_pub_.publish(path_msg);
-            
-            // publish the control msg
-            mavros_msgs::PositionTarget msg;
-            msg.header.stamp = ros::Time::now();
-            msg.coordinate_frame = 1;
-            msg.position.x = evals[0](0);
-            msg.position.y = evals[0](1);
-            msg.position.z = z_;
-            msg.velocity.x = evals[1](0);
-            msg.velocity.y = evals[1](1);
-            msg.velocity.z = 0;
-            msg.acceleration_or_force.x = evals[2](0);
-            msg.acceleration_or_force.y = evals[2](1);
-            msg.acceleration_or_force.z = 0;
-            msg.yaw = evals[0](2);
-            msg.yaw_rate = evals[1](2);
-            control_pub_.publish(msg);
-            // update the higher order states
-            state_.vel_ << evals[1];
-
-        }
-    }
 }
 
 ControlNode::VectorDIM ControlNode::convertToClosestYaw() {
@@ -435,7 +428,7 @@ ControlNode::VectorDIM ControlNode::convertToClosestYaw() {
 
     ControlNode::VectorDIM converted_goal;
     converted_goal << goal_(0), goal_(1), candidate_yaws(argmin_index);
-    std::cout << "converted_goal: " << converted_goal.transpose() << "\n";
+//    std::cout << "converted_goal: " << converted_goal.transpose() << "\n";
     return converted_goal;
 
 }
