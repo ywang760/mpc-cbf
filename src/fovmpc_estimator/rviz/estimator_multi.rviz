@@ -7,6 +7,8 @@ Panels:
         - /Global Options1
         - /Status1
         - /Odometry1/Shape1
+        - /Path3
+        - /Range3
       Splitter Ratio: 0.5
     Tree Height: 872
   - Class: rviz/Selection
@@ -181,10 +183,20 @@ Visualization Manager:
           Value: true
         uav_0/target_1:
           Value: false
+        uav_0/target_2:
+          Value: true
         uav_1:
           Value: true
         uav_1/target_0:
           Value: false
+        uav_1/target_2:
+          Value: true
+        uav_2:
+          Value: true
+        uav_2/target_0:
+          Value: true
+        uav_2/target_1:
+          Value: true
       Marker Alpha: 1
       Marker Scale: 1
       Name: TF
@@ -201,8 +213,17 @@ Visualization Manager:
           uav_0:
             uav_0/target_1:
               {}
+            uav_0/target_2:
+              {}
           uav_1:
             uav_1/target_0:
+              {}
+            uav_1/target_2:
+              {}
+          uav_2:
+            uav_2/target_0:
+              {}
+            uav_2/target_1:
               {}
         odom:
           odom_ned:
@@ -271,12 +292,46 @@ Visualization Manager:
       Buffer Length: 1
       Class: rviz/Range
       Color: 255; 255; 255
-      Enabled: false
+      Enabled: true
       Name: Range
       Queue Size: 10
       Topic: /uav1/range
       Unreliable: false
-      Value: false
+      Value: true
+    - Alpha: 1
+      Buffer Length: 1
+      Class: rviz/Path
+      Color: 25; 255; 0
+      Enabled: true
+      Head Diameter: 0.30000001192092896
+      Head Length: 0.20000000298023224
+      Length: 0.15000000596046448
+      Line Style: Lines
+      Line Width: 0.029999999329447746
+      Name: Path
+      Offset:
+        X: 0
+        Y: 0
+        Z: 0
+      Pose Color: 255; 85; 255
+      Pose Style: Axes
+      Queue Size: 10
+      Radius: 0.029999999329447746
+      Shaft Diameter: 0.10000000149011612
+      Shaft Length: 0.10000000149011612
+      Topic: /uav2/planned_path
+      Unreliable: false
+      Value: true
+    - Alpha: 0.5
+      Buffer Length: 1
+      Class: rviz/Range
+      Color: 255; 255; 255
+      Enabled: true
+      Name: Range
+      Queue Size: 10
+      Topic: /uav2/range
+      Unreliable: false
+      Value: true
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
@@ -304,7 +359,7 @@ Visualization Manager:
   Value: true
   Views:
     Current:
-      Angle: -0.014999988488852978
+      Angle: 0.03000001609325409
       Class: rviz/TopDownOrtho
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
@@ -314,7 +369,7 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Scale: 103.7446060180664
+      Scale: 61.31925964355469
       Target Frame: <Fixed Frame>
       X: 2.417712688446045
       Y: -0.6358519196510315

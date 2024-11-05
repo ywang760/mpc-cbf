@@ -98,7 +98,7 @@ public:
         target_subs_.resize(NUM_TARGETS);
         for (size_t i = 0; i < NUM_TARGETS; ++i) {
             size_t target_id = neighbor_ids[i];
-            target_subs_[i] = nh_.subscribe<geometry_msgs::PoseWithCovarianceStamped>("/target_"+std::to_string(target_id)+"/estimate", 1, std::bind(&ControlNode::target_update_callback, this, std::placeholders::_1, i));
+            target_subs_[i] = nh_.subscribe<geometry_msgs::PoseWithCovarianceStamped>("uav"+std::to_string(ROBOT_ID)+"/target_"+std::to_string(target_id)+"/estimate", 1, std::bind(&ControlNode::target_update_callback, this, std::placeholders::_1, i));
         }
         goal_sub_ = nh_.subscribe<geometry_msgs::Pose>("/uav" + std::to_string(ROBOT_ID) + "/goal", 1, std::bind(&ControlNode::goal_update_callback, this, std::placeholders::_1));
 
