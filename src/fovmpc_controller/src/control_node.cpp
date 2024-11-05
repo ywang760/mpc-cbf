@@ -226,6 +226,7 @@ private:
 
 
     geometry_msgs::PoseStamped takeoff_pose_;
+    geometry_msgs::PoseStamped takeoff_pose_global_;
     State state_;
     std::vector<VectorDIM> target_states_;
     VectorDIM goal_;
@@ -273,6 +274,17 @@ void ControlNode::state_update_callback(const nav_msgs::Odometry::ConstPtr& msg)
     m.getRPY(roll, pitch, yaw);
     // update the position
     state_.pos_ << msg->pose.pose.position.x, msg->pose.pose.position.y, yaw;
+    std::cout << "State: " << state_.pos_.transpose() << std::endl;
+    if (!taken_off_)
+    {
+        takeoff_pose_.pose.orientation = tf2::toMsg(q);
+
+        takeoff_pose_global_.pose.position.x = msg->pose.pose.position.x;
+        takeoff_pose_global_.pose.position.y = msg->pose.pose.position.y;
+        takeoff_pose_global_.pose.position.z = msg->pose.pose.position.z;
+        takeoff_pose_global_.pose.orientation = tf2::toMsg(q);
+
+    }
 }
 
 void ControlNode::goal_update_callback(const geometry_msgs::Pose::ConstPtr& msg) {
@@ -283,6 +295,8 @@ void ControlNode::goal_update_callback(const geometry_msgs::Pose::ConstPtr& msg)
     m.getRPY(roll, pitch, yaw);
     goal_ << msg->position.x, msg->position.y, yaw;
     goal_ = convertToClosestYaw();
+    
+    std::cout << "Goal: " << goal_.transpose() << std::endl;
 }
 
 void ControlNode::optimization_callback() {

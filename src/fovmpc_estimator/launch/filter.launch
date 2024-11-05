@@ -1,15 +1,27 @@
 <launch>
-
+    <arg name="ROBOT_RANGE" default="8.0"/>
+    <arg name="ROBOT_FOV" default="120.0"/>
+   
     <node name="filter_node_0" anonymous="true" pkg="fovmpc_estimator" type="filter_node" output="screen">
         <param name="ROBOT_ID" value="0"/>
         <param name="TARGET_ID" value="1"/>
+        <param name="ROBOT_RANGE" value="$(arg ROBOT_RANGE)"/>
+        <param name="ROBOT_FOV" value="$(arg ROBOT_FOV)"/>
         <!-- <remap from="/tag_0/pose" to="robot0/tag_0/pose"/> -->
         <!-- <remap from="/tag_1/pose" to="robot0/tag_1/pose"/> -->
     </node>
 
+    <node name="filter_node_1" anonymous="true" pkg="fovmpc_estimator" type="filter_node" output="screen">
+        <param name="ROBOT_ID" value="1"/>
+        <param name="TARGET_ID" value="0"/>
+        <param name="ROBOT_RANGE" value="$(arg ROBOT_RANGE)"/>
+        <param name="ROBOT_FOV" value="$(arg ROBOT_FOV)"/>
+        <!-- <remap from="/tag_0/pose" to="robot0/tag_0/pose"/> -->
+        <!-- <remap from="/tag_1/pose" to="robot0/tag_1/pose"/> -->
+    </node>
 
 	<!-- Visualization -->
-	<node type="rviz" name="rviz" pkg="rviz" args="-d $(find fovmpc_estimator)/rviz/estimator.rviz" />
+	<node type="rviz" name="rviz" pkg="rviz" args="-d $(find fovmpc_estimator)/rviz/estimator_multi.rviz" />
 
 
 </launch>
