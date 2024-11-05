@@ -230,6 +230,7 @@ private:
     State state_;
     std::vector<VectorDIM> target_states_;
     VectorDIM goal_;
+    VectorDIM takeoff_p_;
     std::shared_ptr<SingleParameterPiecewiseCurve> curve_;
     double eval_t_;
     double z_ = 1;
@@ -283,6 +284,7 @@ void ControlNode::state_update_callback(const nav_msgs::Odometry::ConstPtr& msg)
         takeoff_pose_global_.pose.position.y = msg->pose.pose.position.y;
         takeoff_pose_global_.pose.position.z = msg->pose.pose.position.z;
         takeoff_pose_global_.pose.orientation = tf2::toMsg(q);
+        takeoff_p_ << msg->pose.pose.position.x, msg->pose.pose.position.y, yaw;
 
     }
 }
@@ -295,8 +297,6 @@ void ControlNode::goal_update_callback(const geometry_msgs::Pose::ConstPtr& msg)
     m.getRPY(roll, pitch, yaw);
     goal_ << msg->position.x, msg->position.y, yaw;
     goal_ = convertToClosestYaw();
-    
-    std::cout << "Goal: " << goal_.transpose() << std::endl;
 }
 
 void ControlNode::optimization_callback() {
@@ -394,8 +394,8 @@ void ControlNode::timer_callback() {
         mavros_msgs::PositionTarget msg;
         msg.header.stamp = ros::Time::now();
         msg.coordinate_frame = 1;
-        msg.position.x = evals[0](0);
-        msg.position.y = evals[0](1);
+        msg.position.x = evals[0](0) - takeoff_p_(0);
+        msg.position.y = evals[0](1) - takeoff_p_(1);
         msg.position.z = z_;
         msg.velocity.x = evals[1](0);
         msg.velocity.y = evals[1](1);

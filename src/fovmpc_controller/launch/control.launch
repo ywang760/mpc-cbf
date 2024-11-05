@@ -7,7 +7,7 @@
         <param name="CONFIG_FILENAME" type="string" value="$(arg config_file)"/>
     </node>
 
-    <node name="control" pkg="fovmpc_controller" type="control_node">
+    <node name="control" pkg="fovmpc_controller" type="control_node" output="screen">
         <param name="ROBOT_ID" value="0"/>
         <param name="CONFIG_FILENAME" type="string" value="$(arg config_file)"/>
         <remap from="mavros/state" to="/uav0/mavros/state"/>
