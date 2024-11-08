@@ -54,6 +54,14 @@ namespace splines {
                 T parameter, uint64_t derivative_degree,
                 const VectorDIM& target) const = 0;
 
+        //  returns set of constraints that enforces
+        //  f^{derivative_degree}(parameter) = target. return status is not ok if
+        //  parameter is out of range or anything overflows.
+        virtual std::vector<LinearConstraint> evalBound(
+                T parameter, uint64_t derivative_degree,
+                const VectorDIM& LB,
+                const VectorDIM& UB) const = 0;
+
         // returns the number of decision variables of the QP that will be generated
         // from these operations.
         virtual std::size_t numDecisionVariables() const = 0;

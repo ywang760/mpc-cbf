@@ -98,12 +98,20 @@ namespace mpc_cbf {
                 }
             }
 
-//            // dynamics constraints
-//            T a_max = 2;
-//            VectorDIM a_min_vec = {-a_max, -a_max, -a_max};
-//            VectorDIM a_max_vec = {a_max, a_max, a_max};
-//            AlignedBox derivative_bbox(a_min_vec, a_max_vec);
-//            qp_generator_.piecewise_mpc_qp_generator_ptr()->addBoundingBoxConstraintAll(derivative_bbox, 2);
+            // dynamics constraints
+            T a_max = 5;
+            T v_max = 1;
+            VectorDIM a_min_vec = {-a_max, -a_max, -a_max};
+            VectorDIM a_max_vec = {a_max, a_max, a_max};
+            VectorDIM v_min_vec = {-v_max, -v_max, -v_max};
+            VectorDIM v_max_vec = {v_max, v_max, v_max};
+            qp_generator_.piecewise_mpc_qp_generator_ptr()->addEvalBoundConstraints(2, a_min_vec, a_max_vec);
+//            qp_generator_.piecewise_mpc_qp_generator_ptr()->addEvalBoundConstraints(1, v_min_vec, v_max_vec);
+
+//            AlignedBox acc_derivative_bbox(a_min_vec, a_max_vec);
+//            AlignedBox vel_derivative_bbox(v_min_vec, v_max_vec);
+//            qp_generator_.piecewise_mpc_qp_generator_ptr()->addBoundingBoxConstraintAll(acc_derivative_bbox, 2);
+//            qp_generator_.piecewise_mpc_qp_generator_ptr()->addBoundingBoxConstraintAll(vel_derivative_bbox, 1);
 
             // solve QP
             Problem &problem = qp_generator_.problem();
