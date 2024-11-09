@@ -94,6 +94,7 @@ int main() {
     uint64_t bezier_continuity_upto_degree = 4;
     int impc_iter = 2;
     BezierMPCCBFParams bezier_impc_cbf_params = {piecewise_bezier_params, mpc_params, fov_cbf_params};
+    BezierIMPCCBF bezier_impc_cbf(bezier_impc_cbf_params, pred_model_ptr, fov_cbf, bezier_continuity_upto_degree, aligned_box_collision_shape_ptr, impc_iter);
 
     // main loop
     // load the tasks
@@ -118,7 +119,7 @@ int main() {
         target_positions.push_back(target_pos);
     }
 
-    double sim_runtime = 15;
+    double sim_runtime = 30;
     double sim_t = 0;
     int loop_idx = 0;
     while (sim_t < sim_runtime) {
@@ -130,8 +131,8 @@ int main() {
                 }
                 other_robot_positions.push_back(init_states.at(j).pos_);
             }
-            BezierIMPCCBF bezier_impc_cbf(bezier_impc_cbf_params, pred_model_ptr, fov_cbf, bezier_continuity_upto_degree, aligned_box_collision_shape_ptr, impc_iter);
-
+//            BezierIMPCCBF bezier_impc_cbf(bezier_impc_cbf_params, pred_model_ptr, fov_cbf, bezier_continuity_upto_degree, aligned_box_collision_shape_ptr, impc_iter);
+            bezier_impc_cbf.resetProblem();
             Vector ref_positions(DIM*k_hor);
             // static target reference
             ref_positions = target_positions.at(robot_idx).replicate(k_hor, 1);

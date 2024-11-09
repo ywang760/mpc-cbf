@@ -168,6 +168,27 @@ namespace splines {
     }
 
     template <typename T, unsigned int DIM>
+    std::vector<typename BezierQPOperations<T, DIM>::LinearConstraint>
+    BezierQPOperations<T, DIM>::evalBound(T parameter, uint64_t derivative_degree,
+                                          const VectorDIM& LB,
+                                          const VectorDIM& UB) const {
+        std::vector<LinearConstraint> linear_constraints;
+        if (num_control_points_ == 0) {
+            return linear_constraints;
+        }
+        const Row &basis = bernsteinBasis(/*bezier_degree=*/num_control_points_ - 1,
+        max_parameter_, parameter, derivative_degree);
+        // evalConstraint for each dimension
+        for (unsigned int dimension = 0; dimension < DIM; dimension++) {
+            Row coefficients(numDecisionVariables());
+            coefficients.setZero();
+            coefficients.block(0, dimension*num_control_points_, 1, num_control_points_) = basis;
+            linear_constraints.push_back(LinearConstraint(coefficients, LB(dimension), UB(dimension)));
+        }
+        return linear_constraints;
+    }
+
+    template <typename T, unsigned int DIM>
     typename BezierQPOperations<T, DIM>::DecisionVariableBounds
     BezierQPOperations<T, DIM>::boundingBoxConstraint(
             const AlignedBox& bounding_box) const {
