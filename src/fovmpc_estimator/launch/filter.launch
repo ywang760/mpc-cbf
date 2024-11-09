@@ -16,8 +16,6 @@
         <param name="TARGET_ID" value="2"/>
         <param name="ROBOT_RANGE" value="$(arg ROBOT_RANGE)"/>
         <param name="ROBOT_FOV" value="$(arg ROBOT_FOV)"/>
-        <!-- <remap from="/tag_0/pose" to="robot0/tag_0/pose"/> -->
-        <!-- <remap from="/tag_1/pose" to="robot0/tag_1/pose"/> -->
     </node>
 
     <!-- UAV 1 -->
@@ -26,16 +24,12 @@
         <param name="TARGET_ID" value="0"/>
         <param name="ROBOT_RANGE" value="$(arg ROBOT_RANGE)"/>
         <param name="ROBOT_FOV" value="$(arg ROBOT_FOV)"/>
-        <!-- <remap from="/tag_0/pose" to="robot0/tag_0/pose"/> -->
-        <!-- <remap from="/tag_1/pose" to="robot0/tag_1/pose"/> -->
     </node>
     <node name="filter_node_12" anonymous="true" pkg="fovmpc_estimator" type="filter_node" output="screen">
         <param name="ROBOT_ID" value="1"/>
         <param name="TARGET_ID" value="2"/>
         <param name="ROBOT_RANGE" value="$(arg ROBOT_RANGE)"/>
         <param name="ROBOT_FOV" value="$(arg ROBOT_FOV)"/>
-        <!-- <remap from="/tag_0/pose" to="robot0/tag_0/pose"/> -->
-        <!-- <remap from="/tag_1/pose" to="robot0/tag_1/pose"/> -->
     </node>
 
     <!-- UAV 2 -->
@@ -44,16 +38,12 @@
         <param name="TARGET_ID" value="0"/>
         <param name="ROBOT_RANGE" value="$(arg ROBOT_RANGE)"/>
         <param name="ROBOT_FOV" value="$(arg ROBOT_FOV)"/>
-        <!-- <remap from="/tag_0/pose" to="robot0/tag_0/pose"/> -->
-        <!-- <remap from="/tag_1/pose" to="robot0/tag_1/pose"/> -->
     </node>
     <node name="filter_node_21" anonymous="true" pkg="fovmpc_estimator" type="filter_node" output="screen">
         <param name="ROBOT_ID" value="2"/>
         <param name="TARGET_ID" value="1"/>
         <param name="ROBOT_RANGE" value="$(arg ROBOT_RANGE)"/>
         <param name="ROBOT_FOV" value="$(arg ROBOT_FOV)"/>
-        <!-- <remap from="/tag_0/pose" to="robot0/tag_0/pose"/> -->
-        <!-- <remap from="/tag_1/pose" to="robot0/tag_1/pose"/> -->
     </node>
 
 	<!-- Visualization -->

@@ -6,6 +6,7 @@ Panels:
       Expanded:
         - /Global Options1
         - /Status1
+        - /PoseWithCovariance2
         - /Odometry1/Shape1
         - /Path3
         - /Range3
@@ -82,7 +83,7 @@ Visualization Manager:
       Shaft Length: 1
       Shaft Radius: 0.05000000074505806
       Shape: Arrow
-      Topic: /target_1/estimate
+      Topic: /uav2/target_0/estimate
       Unreliable: false
       Value: true
     - Alpha: 1
@@ -113,7 +114,7 @@ Visualization Manager:
       Shaft Length: 1
       Shaft Radius: 0.05000000074505806
       Shape: Arrow
-      Topic: /target_0/estimate
+      Topic: /uav2/target_1/estimate
       Unreliable: false
       Value: true
     - Alpha: 1
@@ -282,22 +283,22 @@ Visualization Manager:
       Buffer Length: 1
       Class: rviz/Range
       Color: 255; 255; 255
-      Enabled: true
+      Enabled: false
       Name: Range
       Queue Size: 10
       Topic: /uav0/range
       Unreliable: false
-      Value: true
+      Value: false
     - Alpha: 0.5
       Buffer Length: 1
       Class: rviz/Range
       Color: 255; 255; 255
-      Enabled: true
+      Enabled: false
       Name: Range
       Queue Size: 10
       Topic: /uav1/range
       Unreliable: false
-      Value: true
+      Value: false
     - Alpha: 1
       Buffer Length: 1
       Class: rviz/Path
@@ -369,10 +370,10 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Scale: 61.31925964355469
+      Scale: 91.04828643798828
       Target Frame: <Fixed Frame>
-      X: 2.417712688446045
-      Y: -0.6358519196510315
+      X: 2.013958215713501
+      Y: 2.865338087081909
     Saved: ~
 Window Geometry:
   Displays:
