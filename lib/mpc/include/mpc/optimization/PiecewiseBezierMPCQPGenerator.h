@@ -50,7 +50,10 @@ namespace mpc {
         void addIntegratedSquaredDerivativeCost(uint64_t derivative_degree,
                                                 T lambda);
 
-        // piece cost
+        // piecewise constraints
+        void addEvalBoundConstraints(uint64_t derivative_degree,
+                                     const VectorDIM& LB,
+                                     const VectorDIM& UB);
 
         // constraints
         // add df^{derivative_degree}/dt^{derivative_degree}(paramter) = target

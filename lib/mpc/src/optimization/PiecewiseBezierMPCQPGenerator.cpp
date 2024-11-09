@@ -129,6 +129,24 @@ namespace mpc {
     }
 
     template <typename T, unsigned int DIM>
+    void PiecewiseBezierMPCQPGenerator<T, DIM>::addEvalBoundConstraints(uint64_t derivative_degree,
+                                                                        const VectorDIM &LB,
+                                                                        const VectorDIM &UB) {
+        Vector h_samples = piecewise_operations_ptr_->h_samples();
+        for (size_t k = 0; k < h_samples.size(); ++k) {
+            T h_sample = h_samples[k];
+            const PieceIndexAndParameter& piece_idx_and_parameter = piecewise_operations_ptr_->getPieceIndexAndParameter(h_sample);
+            size_t piece_idx = piece_idx_and_parameter.piece_idx();
+            std::vector<LinearConstraint> linear_constraints = piecewise_operations_ptr_->piece_operations_ptrs().at(piece_idx)
+                    ->evalBound(piece_idx_and_parameter.parameter(), derivative_degree, LB, UB);
+            for (size_t i = 0; i < linear_constraints.size(); ++i) {
+                addLinearConstraintForPiece(piece_idx, linear_constraints.at(i));
+            }
+        }
+    }
+
+
+    template <typename T, unsigned int DIM>
     void PiecewiseBezierMPCQPGenerator<T, DIM>::addEvalConstraint(T parameter, uint64_t derivative_degree,
                                                                   const VectorDIM &target) {
         const PieceIndexAndParameter& piece_idx_and_parameter =

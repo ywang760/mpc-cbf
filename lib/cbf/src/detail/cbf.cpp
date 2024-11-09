@@ -10,7 +10,7 @@ GiNaC::ex defaultAlpha(GiNaC::ex b, double gamma = 1.0)
 
 GiNaC::ex myAlpha(GiNaC::ex myh, double mygamma)
 {
-    return mygamma * GiNaC::pow(myh, 3);
+    return mygamma * GiNaC::pow(myh, 5);
 }
 
 namespace cbf

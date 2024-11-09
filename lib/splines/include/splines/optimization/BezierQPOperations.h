@@ -51,6 +51,12 @@ namespace splines {
                 T parameter, uint64_t derivative_degree,
                 const VectorDIM& target) const override;
 
+        virtual std::vector<LinearConstraint> evalBound(
+                T parameter, uint64_t derivative_degree,
+                const VectorDIM& LB,
+                const VectorDIM& UB) const override;
+
+
         virtual DecisionVariableBounds boundingBoxConstraint(
                 const AlignedBox& bounding_box) const override;
 

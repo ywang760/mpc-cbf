@@ -82,7 +82,7 @@ namespace mpc_cbf {
             } else if (iter > 0 && success) {
                 // pred the robot's position in the horizon, use for the CBF constraints
                 std::vector<State> pred_states;
-                for (size_t k = 0; k < 4; ++k) {
+                for (size_t k = 0; k < 2; ++k) {
                     State pred_state;
                     pred_state.pos_ = result_curves.back().eval(h_samples_(k), 0);
                     pred_state.vel_ = result_curves.back().eval(h_samples_(k), 1);
@@ -99,12 +99,19 @@ namespace mpc_cbf {
             }
 
             // dynamics constraints
-            T a_max = 1;
-            VectorDIM a_min_vec = {-a_max, -a_max, -0.5*a_max};
-            VectorDIM a_max_vec = {a_max, a_max, 0.5*a_max};
-            AlignedBox derivative_bbox(a_min_vec, a_max_vec);
-            qp_generator_.piecewise_mpc_qp_generator_ptr()->addBoundingBoxConstraintAll(derivative_bbox, 1);
-            qp_generator_.piecewise_mpc_qp_generator_ptr()->addBoundingBoxConstraintAll(derivative_bbox, 2);
+            T a_max = 5;
+            T v_max = 1;
+            VectorDIM a_min_vec = {-a_max, -a_max, -a_max};
+            VectorDIM a_max_vec = {a_max, a_max, a_max};
+            VectorDIM v_min_vec = {-v_max, -v_max, -v_max};
+            VectorDIM v_max_vec = {v_max, v_max, v_max};
+            qp_generator_.piecewise_mpc_qp_generator_ptr()->addEvalBoundConstraints(2, a_min_vec, a_max_vec);
+//            qp_generator_.piecewise_mpc_qp_generator_ptr()->addEvalBoundConstraints(1, v_min_vec, v_max_vec);
+
+//            AlignedBox acc_derivative_bbox(a_min_vec, a_max_vec);
+//            AlignedBox vel_derivative_bbox(v_min_vec, v_max_vec);
+//            qp_generator_.piecewise_mpc_qp_generator_ptr()->addBoundingBoxConstraintAll(acc_derivative_bbox, 2);
+//            qp_generator_.piecewise_mpc_qp_generator_ptr()->addBoundingBoxConstraintAll(vel_derivative_bbox, 1);
 
             // solve QP
             Problem &problem = qp_generator_.problem();
