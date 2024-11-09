@@ -145,7 +145,6 @@ namespace mpc {
         }
     }
 
-
     template <typename T, unsigned int DIM>
     void PiecewiseBezierMPCQPGenerator<T, DIM>::addEvalConstraint(T parameter, uint64_t derivative_degree,
                                                                   const VectorDIM &target) {

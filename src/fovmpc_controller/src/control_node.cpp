@@ -94,18 +94,12 @@ public:
         local_pos_pub_ = nh_.advertise<geometry_msgs::PoseStamped>("mavros/setpoint_position/local", 10);
 
         // Init params
-        // take off height
-        takeoff_pose_.header.frame_id = "map";
-        takeoff_pose_.pose.position.x = 0;
-        takeoff_pose_.pose.position.y = 0;
-        takeoff_pose_.pose.position.z = z_;
-
         target_states_.resize(NUM_TARGETS);
         target_states_[0] = VectorDIM::Zero();
 //        std::cout << "NUM_TARGETS: " << NUM_TARGETS << "\n";
         std::cout << target_states_.size() << "\n";
 //        state_.pos_ = VectorDIM::Zero();
-        // state_.vel_ = VectorDIM::Zero();
+        state_.vel_ = VectorDIM::Zero();
         // load experiment config
         std::string experiment_config_filename = CONFIG_FILENAME;
         std::fstream experiment_config_fc(experiment_config_filename.c_str(), std::ios_base::in);
@@ -151,6 +145,17 @@ public:
         AlignedBox robot_bbox_at_zero = {-aligned_box_collision_vec, aligned_box_collision_vec};
         std::shared_ptr<const AlignedBoxCollisionShape> aligned_box_collision_shape_ptr =
                 std::make_shared<const AlignedBoxCollisionShape>(robot_bbox_at_zero);
+
+        // take off state
+        takeoff_pose_.header.frame_id = "map";
+        takeoff_pose_.pose.position.x = 0;
+        takeoff_pose_.pose.position.y = 0;
+        takeoff_pose_.pose.position.z = z_;
+        double yaw = experiment_config_json["tasks"]["so"][ROBOT_ID][2];
+        tf2::Quaternion q;
+        q.setEuler(yaw, 0, 0);
+        takeoff_pose_.pose.orientation = tf2::toMsg(q);
+
         // create params
         PiecewiseBezierParams piecewise_bezier_params = {num_pieces, num_control_points, piece_max_parameter};
         MPCParams mpc_params = {h_, Ts_, k_hor_, {w_pos_err, w_u_eff, spd_f}, {p_min, p_max, a_min, a_max}};
@@ -230,15 +235,16 @@ private:
 
 
     geometry_msgs::PoseStamped takeoff_pose_;
-    geometry_msgs::PoseStamped takeoff_pose_global_;
     State state_;
     std::vector<VectorDIM> target_states_;
     VectorDIM goal_;
-    VectorDIM takeoff_p_;
+    VectorDIM init_state_;
     std::shared_ptr<SingleParameterPiecewiseCurve> curve_;
     double eval_t_;
     double z_ = 1;
     std::unique_ptr<BezierIMPCCBF> bezier_impc_cbf_ptr_;
+    bool state_update_started_ = false;
+    bool init_state_initialized_ = false;
     bool taken_off_ = false;
     bool optim_done_ = false;
 
@@ -277,6 +283,9 @@ void ControlNode::target_odom_callback(const nav_msgs::Odometry::ConstPtr& msg, 
 }
 
 void ControlNode::state_update_callback(const nav_msgs::Odometry::ConstPtr& msg) {
+    if (!state_update_started_) {
+        state_update_started_ = true;
+    }
     // convert the orientation to yaw
     tf2::Quaternion q(msg->pose.pose.orientation.x, msg->pose.pose.orientation.y, msg->pose.pose.orientation.z, msg->pose.pose.orientation.w);
     tf2::Matrix3x3 m(q);
@@ -284,20 +293,9 @@ void ControlNode::state_update_callback(const nav_msgs::Odometry::ConstPtr& msg)
     m.getRPY(roll, pitch, yaw);
     // update the position
     state_.pos_ << msg->pose.pose.position.x, msg->pose.pose.position.y, yaw;
-    // std::cout << "Pos: " << state_.pos_.transpose() << std::endl;
+    // std::cout << "Pos: " << state_.pos_.transpose() << std::endl; TODO Vicon has no access to vel directly
     state_.vel_ << msg->twist.twist.linear.x, msg->twist.twist.linear.y, msg->twist.twist.angular.z;
     // std::cout << "Vel: " << state_.vel_.transpose() << std::endl;
-    if (!taken_off_)
-    {
-        takeoff_pose_.pose.orientation = tf2::toMsg(q);
-
-        takeoff_pose_global_.pose.position.x = msg->pose.pose.position.x;
-        takeoff_pose_global_.pose.position.y = msg->pose.pose.position.y;
-        takeoff_pose_global_.pose.position.z = msg->pose.pose.position.z;
-        takeoff_pose_global_.pose.orientation = tf2::toMsg(q);
-        takeoff_p_ << msg->pose.pose.position.x, msg->pose.pose.position.y, yaw;
-
-    }
 }
 
 void ControlNode::goal_update_callback(const geometry_msgs::Pose::ConstPtr& msg) {
@@ -362,6 +360,10 @@ void ControlNode::takeoff_callback() {
     if (!taken_off_) {
         if (!current_state.connected) {
         } else {
+            if (!init_state_initialized_ && state_update_started_) {
+                init_state_ = state_.pos_;
+                init_state_initialized_ = true;
+            }
             // arming and offboard
             mavros_msgs::SetMode offb_set_mode;
             offb_set_mode.request.custom_mode = "OFFBOARD";
@@ -408,8 +410,8 @@ void ControlNode::timer_callback() {
         mavros_msgs::PositionTarget msg;
         msg.header.stamp = ros::Time::now();
         msg.coordinate_frame = 1;
-        msg.position.x = evals[0](0) - takeoff_p_(0);
-        msg.position.y = evals[0](1) - takeoff_p_(1);
+        msg.position.x = evals[0](0) - init_state_(0);
+        msg.position.y = evals[0](1) - init_state_(1);
         msg.position.z = z_;
         msg.velocity.x = evals[1](0);
         msg.velocity.y = evals[1](1);
