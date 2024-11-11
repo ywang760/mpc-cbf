@@ -265,6 +265,7 @@ private:
     ros::ServiceClient arming_client_;
     ros::ServiceClient set_mode_client_;
     ros::Time last_request_;
+    ros::Time last_traj_optim_t_;
 
 };
 
@@ -294,7 +295,7 @@ void ControlNode::state_update_callback(const nav_msgs::Odometry::ConstPtr& msg)
     // update the position
     state_.pos_ << msg->pose.pose.position.x, msg->pose.pose.position.y, yaw;
     // std::cout << "Pos: " << state_.pos_.transpose() << std::endl; TODO Vicon has no access to vel directly
-    state_.vel_ << msg->twist.twist.linear.x, msg->twist.twist.linear.y, msg->twist.twist.angular.z;
+//    state_.vel_ << msg->twist.twist.linear.x, msg->twist.twist.linear.y, msg->twist.twist.angular.z;
     // std::cout << "Vel: " << state_.vel_.transpose() << std::endl;
 }
 
@@ -334,6 +335,7 @@ void ControlNode::optimization_callback() {
 
         // reset the eval_t
         eval_t_ = 0;
+        last_traj_optim_t_ = ros::Time::now();
 
         // Publish planned path
         nav_msgs::Path path_msg;
@@ -397,7 +399,7 @@ void ControlNode::takeoff_callback() {
 void ControlNode::timer_callback() {
      if (taken_off_ && optim_done_) {
         // std::cout << "Inside control loop\n";
-        eval_t_ += Ts_;
+        eval_t_ = (ros::Time::now() - last_traj_optim_t_).toSec();
         std::vector<VectorDIM> evals;
         for (size_t d = 0; d <= 2; ++d) {
             // std::cout << "eval time" << eval_t_ << "\n";
@@ -423,7 +425,7 @@ void ControlNode::timer_callback() {
         msg.yaw_rate = evals[1](2);
         control_pub_.publish(msg);
         // update the higher order states
-        // state_.vel_ << evals[1];
+        state_.vel_ << evals[1];
         // std::cout << "Desired vel: " << evals[1].transpose() << std::endl;
         // std::cout << "Desired acc: " << evals[2].transpose() << std::endl;
      }
