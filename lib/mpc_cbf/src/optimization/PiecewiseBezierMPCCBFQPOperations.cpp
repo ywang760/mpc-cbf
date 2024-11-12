@@ -43,6 +43,7 @@ namespace mpc_cbf {
         Vector A0 = Vector::Zero(DIM*k_hor_); // [3K, 1]
         A0.segment(0, DIM) = a;
         Row A_control_pts = -1.0 * A0.transpose() * U_basis_; // [1, num_piece*dim*num_control_pts]
+        // std::cout << "Safety: \nA: " << A_control_pts << " b: " << b << std::endl;
         return LinearConstraint(A_control_pts, std::numeric_limits<T>::lowest(), b);
     }
 
@@ -66,6 +67,7 @@ namespace mpc_cbf {
         Vector A1 = Vector::Zero(DIM*k_hor_); // [3K, 1]
         A1.segment(DIM, DIM) = a;
         Row A1_control_pts = -1.0 * A1.transpose() * U_basis_; // [1, num_piece*dim*num_control_pts]
+        // std::cout << "LB: \nA: " << A_control_pts << " b: " << b << std::endl;
 //        linear_constraints.push_back(LinearConstraint(A1_control_pts, std::numeric_limits<T>::lowest(), b));
 
         return linear_constraints;
@@ -91,6 +93,7 @@ namespace mpc_cbf {
         Vector A1 = Vector::Zero(DIM*k_hor_); // [3K, 1]
         A1.segment(DIM, DIM) = a;
         Row A1_control_pts = -1.0 * A1.transpose() * U_basis_; // [1, num_piece*dim*num_control_pts]
+        // std::cout << "RB: \nA: " << A_control_pts << " b: " << b << std::endl;
 //        linear_constraints.push_back(LinearConstraint(A1_control_pts, std::numeric_limits<T>::lowest(), b));
 
         return linear_constraints;

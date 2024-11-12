@@ -47,7 +47,7 @@ class Node
             // ---------- Subs and Pubs -------------------
             odom_sub_ = nh_.subscribe<nav_msgs::Odometry>("/supervisor/uav"+std::to_string(ROBOT_ID)+"/odom", 1, std::bind(&Node::odom_callback, this, std::placeholders::_1));
             target_sub_ = nh_.subscribe<geometry_msgs::Pose>("/robot"+std::to_string(ROBOT_ID)+"/tag_"+std::to_string(TARGET_ID)+"/pose", 1, std::bind(&Node::target_callback, this, std::placeholders::_1));
-            est_pub_ = nh_.advertise<geometry_msgs::PoseWithCovarianceStamped>("/target_"+std::to_string(TARGET_ID)+"/estimate", 10);
+            est_pub_ = nh_.advertise<geometry_msgs::PoseWithCovarianceStamped>("/uav"+std::to_string(ROBOT_ID)+"/target_"+std::to_string(TARGET_ID)+"/estimate", 10);
             timer_ = nh_.createTimer(ros::Duration(1/rate), std::bind(&Node::timer_callback, this));
 
             // Init params
