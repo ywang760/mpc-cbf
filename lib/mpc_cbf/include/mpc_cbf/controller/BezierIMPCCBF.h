@@ -7,6 +7,8 @@
 
 #include <mpc_cbf/optimization/PiecewiseBezierMPCCBFQPGenerator.h>
 #include <math/collision_shapes/CollisionShape.h>
+#include <math/Helpers.h>
+#include <separating_hyperplanes/Voronoi.h>
 #include <qpcpp/Problem.h>
 #include <qpcpp/solvers/CPLEX.h>
 
@@ -26,6 +28,7 @@ namespace mpc_cbf {
         using VectorDIM = math::VectorDIM<T, DIM>;
         using Vector = math::Vector<T>;
         using AlignedBox = math::AlignedBox<T, DIM>;
+        using Hyperplane = math::Hyperplane<T, DIM>;
         using Matrix = math::Matrix<T>;
         using CollisionShape = math::CollisionShape<T, DIM>;
         using Problem = qpcpp::Problem<T>;
@@ -39,8 +42,14 @@ namespace mpc_cbf {
         ~BezierIMPCCBF()=default;
 
         bool optimize(std::vector<SingleParameterPiecewiseCurve> &result_curve,
-                      const State &current_state, const std::vector<VectorDIM>& other_robot_positions,
+                      const State &current_state,
+                      const std::vector<VectorDIM>& other_robot_positions,
+                      const std::vector<Matrix>& other_robot_covs,
                       const Vector &ref_positions);
+
+        T sigmoid(T x);
+
+        T distanceToEllipse(const VectorDIM& robot_position, const Vector& target_mean, const Matrix& target_cov);
 
         void resetProblem();
 

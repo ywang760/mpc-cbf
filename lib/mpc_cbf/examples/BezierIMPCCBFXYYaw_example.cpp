@@ -9,6 +9,55 @@
 #include <nlohmann/json.hpp>
 #include <fstream>
 
+double convertYawInRange(double yaw) {
+    assert(yaw < 2 * M_PI && yaw > -2 * M_PI);
+    if (yaw > M_PI) {
+        return yaw - 2 * M_PI;
+    } else if (yaw < -M_PI) {
+        return yaw + 2 * M_PI;
+    } else {
+        return yaw;
+    }
+}
+
+math::VectorDIM<double, 3U> convertToClosestYaw(model::State<double, 3U>& state, const math::VectorDIM<double, 3U>& goal) {
+    using VectorDIM = math::VectorDIM<double, 3U>;
+    using Vector = math::Vector<double>;
+
+//    std::cout << "start get the current_yaw\n";
+    double current_yaw = state.pos_(2);
+    // generate the candidate desire yaws
+    Vector candidate_yaws(3);
+
+//    std::cout << "start build candidate yaw\n";
+//    std::cout << goal_(2) << "\n";
+//    std::cout << M_PI << "\n";
+    candidate_yaws << goal(2), goal(2) + 2 * M_PI, goal(2) - 2 * M_PI;
+
+//    std::cout << "compute the offset\n";
+    Vector candidate_yaws_offset(3);
+    candidate_yaws_offset << std::abs(candidate_yaws(0) - current_yaw), std::abs(candidate_yaws(1) - current_yaw), std::abs(candidate_yaws(2) - current_yaw);
+
+
+//    std::cout << "start to find the argmin\n";
+    // Find the index of the minimum element
+    int argmin_index = 0;
+    double min_value = candidate_yaws_offset(0);
+
+    for (int i = 1; i < candidate_yaws_offset.size(); ++i) {
+        if (candidate_yaws_offset(i) < min_value) {
+            min_value = candidate_yaws_offset(i);
+            argmin_index = i;
+        }
+    }
+
+    VectorDIM converted_goal;
+    converted_goal << goal(0), goal(1), candidate_yaws(argmin_index);
+//    std::cout << "converted_goal: " << converted_goal.transpose() << "\n";
+    return converted_goal;
+
+}
+
 int main() {
     constexpr unsigned int DIM = 3U;
     using FovCBF = cbf::FovCBF;
@@ -92,7 +141,7 @@ int main() {
     std::shared_ptr<FovCBF> fov_cbf = std::make_unique<FovCBF>(fov_beta, fov_Ds, fov_Rs);
     // init bezier mpc-cbf
     uint64_t bezier_continuity_upto_degree = 4;
-    int impc_iter = 2;
+    int impc_iter = 5;
     BezierMPCCBFParams bezier_impc_cbf_params = {piecewise_bezier_params, mpc_params, fov_cbf_params};
     BezierIMPCCBF bezier_impc_cbf(bezier_impc_cbf_params, pred_model_ptr, fov_cbf, bezier_continuity_upto_degree, aligned_box_collision_shape_ptr, impc_iter);
 
@@ -119,28 +168,39 @@ int main() {
         target_positions.push_back(target_pos);
     }
 
-    double sim_runtime = 30;
+    double sim_runtime = 20;
     double sim_t = 0;
     int loop_idx = 0;
     while (sim_t < sim_runtime) {
         for (int robot_idx = 0; robot_idx < num_robots; ++robot_idx) {
             std::vector<VectorDIM> other_robot_positions;
+            std::vector<Matrix> other_robot_covs;
             for (int j = 0; j < num_robots; ++j) {
                 if (j==robot_idx) {
                     continue;
                 }
                 other_robot_positions.push_back(init_states.at(j).pos_);
+
+                Matrix other_robot_cov(DIM, DIM);
+                other_robot_cov << 0.1, 0, 0,
+                                   0, 0.1, 0,
+                                   0, 0, 0.1;
+                other_robot_covs.push_back(other_robot_cov);
             }
 //            BezierIMPCCBF bezier_impc_cbf(bezier_impc_cbf_params, pred_model_ptr, fov_cbf, bezier_continuity_upto_degree, aligned_box_collision_shape_ptr, impc_iter);
             bezier_impc_cbf.resetProblem();
             Vector ref_positions(DIM*k_hor);
             // static target reference
-            ref_positions = target_positions.at(robot_idx).replicate(k_hor, 1);
+            VectorDIM converted_target_position = convertToClosestYaw(init_states.at(robot_idx), target_positions.at(robot_idx));
+            ref_positions = converted_target_position.replicate(k_hor, 1);
+//            ref_positions = target_positions.at(robot_idx).replicate(k_hor, 1);
 
 //            std::cout << "ref_positions shape: (" << ref_positions.rows() << ", " << ref_positions.cols() << ")\n";
 //            std::cout << "ref_positions: " << ref_positions.transpose() << "\n";
             std::vector<SingleParameterPiecewiseCurve> trajs;
-            bool success = bezier_impc_cbf.optimize(trajs, init_states.at(robot_idx), other_robot_positions, ref_positions);
+            bool success = bezier_impc_cbf.optimize(trajs, init_states.at(robot_idx),
+                                                    other_robot_positions, other_robot_covs,
+                                                    ref_positions);
             if (!success) {
                 std::cout << "QP failed at ts: " << sim_t << "\n";
             }
@@ -174,7 +234,8 @@ int main() {
             }
             init_states.at(robot_idx).pos_(0) = current_states.at(robot_idx)(0);
             init_states.at(robot_idx).pos_(1) = current_states.at(robot_idx)(1);
-            init_states.at(robot_idx).pos_(2) = current_states.at(robot_idx)(2);
+            init_states.at(robot_idx).pos_(2) = convertYawInRange(current_states.at(robot_idx)(2));
+//            init_states.at(robot_idx).pos_(2) = current_states.at(robot_idx)(2);
             init_states.at(robot_idx).vel_(0) = current_states.at(robot_idx)(3);
             init_states.at(robot_idx).vel_(1) = current_states.at(robot_idx)(4);
             init_states.at(robot_idx).vel_(2) = current_states.at(robot_idx)(5);

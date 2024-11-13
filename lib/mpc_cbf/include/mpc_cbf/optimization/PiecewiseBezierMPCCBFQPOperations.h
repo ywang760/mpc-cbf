@@ -33,13 +33,13 @@ namespace mpc_cbf {
         PiecewiseBezierMPCCBFQPOperations(Params &p, std::shared_ptr<DoubleIntegrator> model_ptr, std::shared_ptr<FovCBF> fov_cbf_ptr);
         std::unique_ptr<PiecewiseBezierMPCQPOperations> piecewise_mpc_operations_ptr();
 
-        LinearConstraint safetyCBFConstraint(const State& current_state, const Vector& other_pos);
-        std::vector<LinearConstraint> fovLBConstraint(const State& current_state, const Vector& other_pos);
-        std::vector<LinearConstraint> fovRBConstraint(const State& current_state, const Vector& other_pos);
+        LinearConstraint safetyCBFConstraint(const State& current_state, const Vector& other_pos, T slack_value=0);
+        std::vector<LinearConstraint> fovLBConstraint(const State& current_state, const Vector& other_pos, T slack_value=0);
+        std::vector<LinearConstraint> fovRBConstraint(const State& current_state, const Vector& other_pos, T slack_value=0);
 
-        std::vector<LinearConstraint> predSafetyCBFConstraints(const std::vector<State>& pred_states, const Vector& other_pos);
-        std::vector<LinearConstraint> predFovLBConstraints(const std::vector<State>& pred_states, const Vector& other_pos);
-        std::vector<LinearConstraint> predFovRBConstraints(const std::vector<State>& pred_states, const Vector& other_pos);
+        std::vector<LinearConstraint> predSafetyCBFConstraints(const std::vector<State>& pred_states, const Vector& other_pos, const std::vector<T>& slack_values);
+        std::vector<LinearConstraint> predFovLBConstraints(const std::vector<State>& pred_states, const Vector& other_pos, const std::vector<T>& slack_values);
+        std::vector<LinearConstraint> predFovRBConstraints(const std::vector<State>& pred_states, const Vector& other_pos, const std::vector<T>& slack_values);
 
     private:
         std::unique_ptr<PiecewiseBezierMPCQPOperations> piecewise_mpc_operations_ptr_;

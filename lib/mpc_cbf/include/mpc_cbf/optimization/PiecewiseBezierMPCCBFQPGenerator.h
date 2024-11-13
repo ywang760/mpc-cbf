@@ -24,13 +24,13 @@ namespace mpc_cbf {
         // return a pointer to the PiecewiseBezierMPCQPGenerator API
         std::shared_ptr<PiecewiseBezierMPCQPGenerator> piecewise_mpc_qp_generator_ptr();
 
-        void addSafetyCBFConstraint(const State& current_state, const Vector& other_pos);
-        void addFovLBConstraint(const State& current_state, const Vector& other_pos);
-        void addFovRBConstraint(const State& current_state, const Vector& other_pos);
+        void addSafetyCBFConstraint(const State& current_state, const Vector& other_pos, T slack_value=0);
+        void addFovLBConstraint(const State& current_state, const Vector& other_pos, T slack_value=0);
+        void addFovRBConstraint(const State& current_state, const Vector& other_pos, T slack_value=0);
 
-        void addPredSafetyCBFConstraints(const std::vector<State>& pred_states, const Vector& other_pos);
-        void addPredFovLBConstraints(const std::vector<State>& pred_states, const Vector& other_pos);
-        void addPredFovRBConstraints(const std::vector<State>& pred_states, const Vector& other_pos);
+        void addPredSafetyCBFConstraints(const std::vector<State>& pred_states, const Vector& other_pos, const std::vector<T>& slack_values);
+        void addPredFovLBConstraints(const std::vector<State>& pred_states, const Vector& other_pos, const std::vector<T>& slack_values);
+        void addPredFovRBConstraints(const std::vector<State>& pred_states, const Vector& other_pos, const std::vector<T>& slack_values);
 
     private:
         std::shared_ptr<PiecewiseBezierMPCQPGenerator> piecewise_mpc_qp_generator_ptr_ = std::make_shared<PiecewiseBezierMPCQPGenerator>();
