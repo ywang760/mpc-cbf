@@ -39,6 +39,7 @@ namespace mpc_cbf {
     bool BezierIMPCCBF<T, DIM>::optimize(std::vector<SingleParameterPiecewiseCurve> &result_curves,
                                          const State &current_state,
                                          const std::vector<VectorDIM> &other_robot_positions,
+                                         const std::vector<Matrix> &other_robot_covs,
                                          const Vector &ref_positions) {
         bool success = true;
         assert(impc_iter_ >= 1);
@@ -70,19 +71,43 @@ namespace mpc_cbf {
                 }
             }
 
+            // add the collision avoidance constraints
+            AlignedBox robot_bbox_at_zero = collision_shape_ptr_->boundingBox(VectorDIM::Zero());
+            for (size_t i = 0; i < other_robot_positions.size(); ++i) {
+                const VectorDIM& other_robot_pos = other_robot_positions.at(i);
+
+                // TODO this is model specific, here the last dimension is orientation data
+                VectorDIM current_xy = current_pos; current_xy(DIM-1) = 0;
+                VectorDIM other_robot_xy = other_robot_pos; other_robot_xy(DIM-1) = 0;
+
+                Hyperplane hyperplane = separating_hyperplanes::voronoi<T, DIM>(current_xy, other_robot_xy);
+                // shifted hyperplane
+                Hyperplane shifted_hyperplane = math::shiftHyperplane<T, DIM>(hyperplane, robot_bbox_at_zero);
+                qp_generator_.piecewise_mpc_qp_generator_ptr()->addHyperplaneConstraintForPiece(0, shifted_hyperplane); // add the collision avoidance constraint on the first segment
+            }
+
             // cbf constraints
             if (iter == 0) {
                 for (size_t i = 0; i < other_robot_positions.size(); ++i) {
                     Vector other_xy(2);
                     other_xy << other_robot_positions.at(i)(0), other_robot_positions.at(i)(1);
-                    qp_generator_.addSafetyCBFConstraint(current_state, other_xy);
-                    qp_generator_.addFovLBConstraint(current_state, other_xy);
-                    qp_generator_.addFovRBConstraint(current_state, other_xy);
+
+                    Matrix other_xy_cov(2, 2);
+                    other_xy_cov = other_robot_covs.at(i).block(0,0,2,2);
+                    // compute the distance to target ellipse
+                    T distance_to_ellipse = distanceToEllipse(current_pos, other_xy, other_xy_cov);
+                    T slack_value = sigmoid(distance_to_ellipse - 3*0.3); // TODO pass in param
+
+                    qp_generator_.addSafetyCBFConstraint(current_state, other_xy, slack_value);
+                    qp_generator_.addFovLBConstraint(current_state, other_xy, slack_value);
+                    qp_generator_.addFovRBConstraint(current_state, other_xy, slack_value);
                 }
             } else if (iter > 0 && success) {
                 // pred the robot's position in the horizon, use for the CBF constraints
                 std::vector<State> pred_states;
-                for (size_t k = 0; k < 2; ++k) {
+                std::vector<T> slack_values;
+                int cbf_horizon = 2; // TODO pass in this argument
+                for (size_t k = 0; k < cbf_horizon; ++k) {
                     State pred_state;
                     pred_state.pos_ = result_curves.back().eval(h_samples_(k), 0);
                     pred_state.vel_ = result_curves.back().eval(h_samples_(k), 1);
@@ -91,15 +116,23 @@ namespace mpc_cbf {
                 for (size_t i = 0; i < other_robot_positions.size(); ++i) {
                     Vector other_xy(2);
                     other_xy << other_robot_positions.at(i)(0), other_robot_positions.at(i)(1);
+
+                    Matrix other_xy_cov(2, 2);
+                    other_xy_cov = other_robot_covs.at(i).block(0,0,2,2);
+                    // compute the slack value
+                    for (size_t k = 0; k < cbf_horizon; ++k) {
+                        T distance_to_ellipse = distanceToEllipse(pred_states.at(k).pos_, other_xy, other_xy_cov);
+                        slack_values.push_back(sigmoid(distance_to_ellipse - 3*0.3)); // TODO pass in param
+                    }
 //                    qp_generator_.addPredSafetyCBFConstraints(pred_states, other_xy);
-                    qp_generator_.addSafetyCBFConstraint(current_state, other_xy);
-                    qp_generator_.addPredFovLBConstraints(pred_states, other_xy);
-                    qp_generator_.addPredFovRBConstraints(pred_states, other_xy);
+                    qp_generator_.addSafetyCBFConstraint(current_state, other_xy, slack_values.at(0));
+                    qp_generator_.addPredFovLBConstraints(pred_states, other_xy, slack_values);
+                    qp_generator_.addPredFovRBConstraints(pred_states, other_xy, slack_values);
                 }
             }
 
             // dynamics constraints
-            T a_max = 5;
+            T a_max = 10;
             T v_max = 1;
             VectorDIM a_min_vec = {-a_max, -a_max, -a_max};
             VectorDIM a_max_vec = {a_max, a_max, a_max};
@@ -128,6 +161,78 @@ namespace mpc_cbf {
         }
 
         return success;
+    }
+
+    template <typename T, unsigned int DIM>
+    T BezierIMPCCBF<T, DIM>::sigmoid(T x) {
+        return 1 / (1 + exp(-2*x));
+    }
+
+    template <typename T, unsigned int DIM>
+    T BezierIMPCCBF<T, DIM>::distanceToEllipse(const VectorDIM &robot_pos,
+                                               const Vector &target_mean,
+                                               const Matrix &target_cov) {
+        assert(DIM == 3); // DIM other than 3 is not implemented yet.
+
+        if (!isinf(target_cov(0, 0))) {
+            Eigen::EigenSolver<Matrix> es(target_cov.block(0, 0, DIM-1, DIM-1));
+            Vector eigenvalues = es.eigenvalues().real();
+            Matrix eigenvectors = es.eigenvectors().real();
+
+            // s = 4.605 for 90% confidence interval
+            // s = 5.991 for 95% confidence interval
+            // s = 9.210 for 99% confidence interval
+            T s = 4.605;
+            T a = sqrt(s * eigenvalues(0)); // major axis
+            T b = sqrt(s * eigenvalues(1)); // minor axis
+
+            // a could be smaller than b, so swap them
+            if (a < b)
+            {
+                T temp = a;
+                a = b;
+                b = temp;
+            }
+
+            int m = 0; // higher eigenvalue index
+            int l = 1; // lower eigenvalue index
+            if (eigenvalues(1) > eigenvalues(0))
+            {
+                m = 1;
+                l = 0;
+            }
+
+            T theta = atan2(eigenvectors(1, m), eigenvectors(0, m)); // angle of the major axis wrt positive x-asis (ccw rotation)
+            if (theta < 0.0) {
+                theta += M_PI;
+            } // angle in [0, 2pi]
+
+            T slope = atan2(-target_mean(1) + robot_pos(1), -target_mean(0) + robot_pos(0));
+            T x_n = target_mean(0) + a * cos(slope - theta) * cos(theta) - b * sin(slope - theta) * sin(theta);
+            T y_n = target_mean(1) + a * cos(slope - theta) * sin(theta) + b * sin(slope - theta) * cos(theta);
+
+            Vector p_near(2);
+            p_near << x_n, y_n;
+
+            T dist = sqrt(pow(p_near(0) - robot_pos(0), 2) + pow(p_near(1) - robot_pos(1), 2));
+
+            if (isnan(dist)) {
+                dist = 5.0;
+                return dist;
+            }
+
+            // Check if robot is inside ellipse
+            T d = sqrt(pow(target_mean(0) - robot_pos(0), 2) + pow(target_mean(1) - robot_pos(1), 2));
+            T range = sqrt(pow(target_mean(0) - p_near(0), 2) + pow(target_mean(1) - p_near(1), 2));
+
+            if (d < range) {
+                return -dist;
+            } else {
+                return dist;
+            }
+        }
+
+        return -5.0;
     }
 
     template <typename T, unsigned int DIM>
