@@ -43,5 +43,12 @@
         "collision_shape": {
             "aligned_box": [0.3, 0.3, 0]
         }
+    },
+    "vision": {
+        "tags": [
+            [0, 1],
+            [2, 3],
+            [4, 5]
+        ]
     }
 }
