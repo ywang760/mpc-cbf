@@ -1,0 +1,8 @@
+<launch>
+
+    <arg name="config_file" default="$(find fovmpc_controller)/../../config/config.json"/>
+
+    <node name="ids_node" pkg="fovmpc_controller" type="ids_node">
+        <param name="CONFIG_FILENAME" value="$(arg config_file)"/>
+    </node>
+</launch>
