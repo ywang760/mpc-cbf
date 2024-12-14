@@ -1,0 +1,22 @@
+<launch>
+  <arg name="ROBOTS_ID" default="0"/>
+  <arg name="NUM_TARGETS" default="2"/>
+
+    <include file="$(find mavros)/launch/px4_multi.launch">
+        <arg name="ROBOT_ID" default="$(arg ROBOT_ID)" />
+    </include>
+
+    <include file="$(find realsense2_camera)/launch/rs_multi.launch">
+        <arg name="ROBOT_ID" default="$(arg ROBOT_ID)" />
+    </include>
+
+    <include file="$(find apriltag_ros)/launch/detection_node.launch">
+        <arg name="ROBOT_ID" default="$(arg ROBOT_ID)" />
+        <arg name="NUM_TARGETS" default="$(arg NUM_TARGETS)" />
+    </include>
+
+    <include file="$(find fovmpc_estimator)/launch/filter.launch">
+        <arg name="ROBOT_ID" default="$(arg ROBOT_ID)" />
+    </include>
+
+</launch>
