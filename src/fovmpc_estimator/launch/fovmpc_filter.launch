@@ -1,6 +1,6 @@
 <launch>
   <arg name="ROBOTS_ID" default="0"/>
-  <arg name="NUM_TARGETS" default="2"/>
+  <arg name="NUM_ROBOTS" default="3"/>
 
     <include file="$(find mavros)/launch/px4_multi.launch">
         <arg name="ROBOT_ID" default="$(arg ROBOT_ID)" />
@@ -12,7 +12,7 @@
 
     <include file="$(find apriltag_ros)/launch/detection_node.launch">
         <arg name="ROBOT_ID" default="$(arg ROBOT_ID)" />
-        <arg name="NUM_TARGETS" default="$(arg NUM_TARGETS)" />
+        <arg name="NUM_TARGETS" default="$(eval str(int(arg('NUM_ROBOTS')) - 1))" />
     </include>
 
     <include file="$(find fovmpc_estimator)/launch/filter.launch">
