@@ -15,4 +15,9 @@
         <arg name="NUM_TARGETS" default="$(eval str(int(arg('NUM_ROBOTS')) - 1))" />
     </include>
 
+    <include file="$(find fovmpc_estimator)/launch/filter.launch">
+        <arg name="ROBOT_ID" default="$(arg ROBOT_ID)" />
+        <arg name="NUM_ROBOTS" default="$(arg NUM_ROBOTS)" />
+    </include>
+
 </launch>
