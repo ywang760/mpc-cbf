@@ -30,7 +30,8 @@ sig_atomic_t volatile node_shutdown_request = 0;    //signal manually generated 
 double ctrl_freq = 20.0;
 geometry_msgs::PoseStamped current_pose;
 mavros_msgs::State current_state;
-double takeoff_time = 10;
+double takeoff_time = 15;
+//double mission_time = 20;
 
 constexpr unsigned int DIM = 3U;
 
@@ -153,9 +154,11 @@ public:
         takeoff_pose_.pose.position.y = experiment_config_json["tasks"]["so"][ROBOT_ID][1];
         takeoff_pose_.pose.position.z = z_;
         double yaw = experiment_config_json["tasks"]["so"][ROBOT_ID][2];
+//        std::cout << "init yaw: " << yaw << "\n";
         tf2::Quaternion q;
-        q.setEuler(yaw, 0, 0);
+        q.setEuler(0, 0, yaw);
         takeoff_pose_.pose.orientation = tf2::toMsg(q);
+//        std::cout << "init quaternion: " << q.x() << "," << q.y() << "," << q.z() << "," << q.w() << "\n";
 
         // create params
         PiecewiseBezierParams piecewise_bezier_params = {num_pieces, num_control_points, piece_max_parameter};
@@ -167,8 +170,8 @@ public:
         target_subs_.resize(NUM_TARGETS);
         for (size_t i = 0; i < NUM_TARGETS; ++i) {
             size_t target_id = neighbor_ids[i];
-//             target_subs_[i] = nh_.subscribe<geometry_msgs::PoseWithCovarianceStamped>("target_"+std::to_string(target_id)+"/estimate", 1, std::bind(&ControlNode::target_update_callback, this, std::placeholders::_1, i));
-            target_subs_[i] = nh_.subscribe<nav_msgs::Odometry>("/uav"+std::to_string(target_id)+"/mavros/local_position/odom", 1, std::bind(&ControlNode::target_odom_callback, this, std::placeholders::_1, i));
+            target_subs_[i] = nh_.subscribe<geometry_msgs::PoseWithCovarianceStamped>("target_"+std::to_string(target_id)+"/estimate", 1, std::bind(&ControlNode::target_update_callback, this, std::placeholders::_1, i));
+//            target_subs_[i] = nh_.subscribe<nav_msgs::Odometry>("/uav"+std::to_string(target_id)+"/mavros/local_position/odom", 1, std::bind(&ControlNode::target_odom_callback, this, std::placeholders::_1, i));
         }
         goal_sub_ = nh_.subscribe<geometry_msgs::Pose>("goal", 1, std::bind(&ControlNode::goal_update_callback, this, std::placeholders::_1));
 
@@ -206,6 +209,8 @@ public:
         std::cout << "successfully init the control core..." << "\n";
 
         last_request_ = ros::Time::now();
+//        std::cout << "in init, last request time: " << last_request_.toSec() << "\n";
+//        std::cout << "in init, now time: " << ros::Time::now().toSec() << "\n";
     }
 
     ~ControlNode()
@@ -245,7 +250,9 @@ private:
     double z_ = 1;
     std::unique_ptr<BezierIMPCCBF> bezier_impc_cbf_ptr_;
     bool taken_off_ = false;
+//    bool land_ = false;
     bool optim_done_ = false;
+    bool last_request_time_init = false;
 
     // ROS
     ros::NodeHandle nh_;
@@ -329,14 +336,14 @@ void ControlNode::optimization_callback() {
         // std::cout << "state pos: " << state_.pos_.transpose() << "\n";
         // std::cout << "state vel: " << state_.vel_.transpose() << "\n";
 //         std::cout << "target size: " << target_states_.size() << "\n";
-//         std::cout << "target 0: " << target_states_[0].transpose() << "\n";
-//         std::cout << "target 0 cov: " << target_covs_[0] << "\n";
+//         std::cout << "ROBOT_ID:" << ROBOT_ID << "target 0: " << target_states_[0].transpose() << "\n";
+//         std::cout << "ROBOT_ID:" << ROBOT_ID << "target 0 cov: " << target_covs_[0] << "\n";
         // std::cout << "target 1: " << target_states_[1].transpose() << "\n";
 //        std::cout << "target: " << target_states_.size() << "\n";
 
         std::vector <SingleParameterPiecewiseCurve> trajs;
         bool success = bezier_impc_cbf_ptr_->optimize(trajs, state_, target_states_, target_covs_, ref_positions);
-//        std::cout << "optimize finish\n";
+//        std::cout << "ROBOT_ID:" << ROBOT_ID << "optimize finish\n";
         if (!success) {
             std::cout << "QP not success" << "\n";
         }
@@ -375,6 +382,13 @@ void ControlNode::takeoff_callback() {
         offb_set_mode.request.custom_mode = "OFFBOARD";
         mavros_msgs::CommandBool arm_cmd;
         arm_cmd.request.value = true;
+
+        if (!last_request_time_init) {
+//            std::cout << "last request time: " << last_request_.toSec() << "\n";
+            last_request_time_init = true;
+            last_request_ = ros::Time::now();
+//            std::cout << "last request time: " << last_request_.toSec() << "\n";
+        }
 
         if (current_state.mode != "OFFBOARD" && ros::Time::now() - last_request_ > ros::Duration(2.0)) {
             if (set_mode_client_.call(offb_set_mode) && offb_set_mode.response.mode_sent) {
