@@ -96,7 +96,7 @@ namespace mpc_cbf {
                     other_xy_cov = other_robot_covs.at(i).block(0,0,2,2);
                     // compute the distance to target ellipse
                     T distance_to_ellipse = distanceToEllipse(current_pos, other_xy, other_xy_cov);
-                    T slack_value = sigmoid(distance_to_ellipse - 3*0.3); // TODO pass in param
+                    T slack_value = 0; // TODO pass in param
 
                     qp_generator_.addSafetyCBFConstraint(current_state, other_xy, slack_value);
                     qp_generator_.addFovLBConstraint(current_state, other_xy, slack_value);
@@ -122,7 +122,7 @@ namespace mpc_cbf {
                     // compute the slack value
                     for (size_t k = 0; k < cbf_horizon; ++k) {
                         T distance_to_ellipse = distanceToEllipse(pred_states.at(k).pos_, other_xy, other_xy_cov);
-                        slack_values.push_back(sigmoid(distance_to_ellipse - 3*0.3)); // TODO pass in param
+                        slack_values.push_back(0); // TODO pass in param
                     }
 //                    qp_generator_.addPredSafetyCBFConstraints(pred_states, other_xy);
                     qp_generator_.addSafetyCBFConstraint(current_state, other_xy, slack_values.at(0));
@@ -132,8 +132,8 @@ namespace mpc_cbf {
             }
 
             // dynamics constraints
-            T a_max = 10;
-            T v_max = 1;
+            T a_max = 5;
+            T v_max = 2;
             VectorDIM a_min_vec = {-a_max, -a_max, -a_max};
             VectorDIM a_max_vec = {a_max, a_max, a_max};
             VectorDIM v_min_vec = {-v_max, -v_max, -v_max};
