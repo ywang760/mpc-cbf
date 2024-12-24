@@ -1,60 +1,32 @@
 <launch>
 
-    <arg name="config_file" default="$(find fovmpc_controller)/../../config/config_multi.json"/>
-    <arg name="NUM_TARGETS" default="2"/>
+    <arg name="config_file" default="$(find fovmpc_controller)/../../config/config.json"/>
+    <arg name="NUM_TARGETS" default="1"/>
 
-    <node name="goal_0" pkg="fovmpc_controller" type="goal_node" output="screen">
-        <param name="ROBOT_ID" value="0"/>
-        <param name="CONFIG_FILENAME" type="string" value="$(arg config_file)"/>
-    </node>
+<!--     <group ns="uav0"> -->
+<!--     <node name="goal" pkg="fovmpc_controller" type="goal_node" output="screen"> -->
+<!--         <param name="ROBOT_ID" value="0"/> -->
+<!--         <param name="CONFIG_FILENAME" type="string" value="$(arg config_file)"/> -->
+<!--     </node> -->
 
-    <node name="control" pkg="fovmpc_controller" type="control_node" output="screen">
-        <param name="ROBOT_ID" value="0"/>
-        <param name="NUM_TARGETS" value="$(arg NUM_TARGETS)"/>
-        <param name="CONFIG_FILENAME" type="string" value="$(arg config_file)"/>
-        <remap from="mavros/state" to="/uav0/mavros/state"/>
-        <remap from="mavros/local_position/pose" to="/uav0/mavros/local_position/pose"/>
-        <remap from="mavros/cmd/arming" to="/uav0/mavros/cmd/arming"/>
-        <remap from="mavros/set_mode" to="/uav0/mavros/set_mode"/>
-        <remap from="mavros/setpoint_position/local" to="/uav0/mavros/setpoint_position/local"/>
-        <remap from="mavros/local_position/odom" to="/supervisor/uav0/odom"/>
-        <remap from="mavros/setpoint_raw/local" to="/uav0/mavros/setpoint_raw/local"/>
-    </node>
+<!--     <node name="control" pkg="fovmpc_controller" type="control_node" output="screen"> -->
+<!--         <param name="ROBOT_ID" value="0"/> -->
+<!--         <param name="NUM_TARGETS" value="$(arg NUM_TARGETS)"/> -->
+<!--         <param name="CONFIG_FILENAME" type="string" value="$(arg config_file)"/> -->
+<!--     </node> -->
+<!--     </group> -->
 
-    <node name="goal_1" pkg="fovmpc_controller" type="goal_node" output="screen">
-        <param name="ROBOT_ID" value="1"/>
-        <param name="CONFIG_FILENAME" type="string" value="$(arg config_file)"/>
-    </node>
+    <group ns="uav1">
+        <node name="goal" pkg="fovmpc_controller" type="goal_node" output="screen">
+            <param name="ROBOT_ID" value="1"/>
+            <param name="CONFIG_FILENAME" type="string" value="$(arg config_file)"/>
+        </node>
 
-    <node name="control_1" pkg="fovmpc_controller" type="control_node" output="screen">
-        <param name="ROBOT_ID" value="1"/>
-        <param name="NUM_TARGETS" value="$(arg NUM_TARGETS)"/>
-        <param name="CONFIG_FILENAME" type="string" value="$(arg config_file)"/>
-        <remap from="mavros/state" to="/uav1/mavros/state"/>
-        <remap from="mavros/local_position/pose" to="/uav1/mavros/local_position/pose"/>
-        <remap from="mavros/cmd/arming" to="/uav1/mavros/cmd/arming"/>
-        <remap from="mavros/set_mode" to="/uav1/mavros/set_mode"/>
-        <remap from="mavros/setpoint_position/local" to="/uav1/mavros/setpoint_position/local"/>
-        <remap from="mavros/local_position/odom" to="/supervisor/uav1/odom"/>
-        <remap from="mavros/setpoint_raw/local" to="/uav1/mavros/setpoint_raw/local"/>
-    </node>
-
-    <node name="goal_2" pkg="fovmpc_controller" type="goal_node" output="screen">
-        <param name="ROBOT_ID" value="2"/>
-        <param name="CONFIG_FILENAME" type="string" value="$(arg config_file)"/>
-    </node>
-
-    <node name="control_2" pkg="fovmpc_controller" type="control_node" output="screen">
-        <param name="ROBOT_ID" value="2"/>
-        <param name="NUM_TARGETS" value="$(arg NUM_TARGETS)"/>
-        <param name="CONFIG_FILENAME" type="string" value="$(arg config_file)"/>
-        <remap from="mavros/state" to="/uav2/mavros/state"/>
-        <remap from="mavros/local_position/pose" to="/uav2/mavros/local_position/pose"/>
-        <remap from="mavros/cmd/arming" to="/uav2/mavros/cmd/arming"/>
-        <remap from="mavros/set_mode" to="/uav2/mavros/set_mode"/>
-        <remap from="mavros/setpoint_position/local" to="/uav2/mavros/setpoint_position/local"/>
-        <remap from="mavros/local_position/odom" to="/supervisor/uav2/odom"/>
-        <remap from="mavros/setpoint_raw/local" to="/uav2/mavros/setpoint_raw/local"/>
-    </node>
+        <node name="control" pkg="fovmpc_controller" type="control_node" output="screen">
+            <param name="ROBOT_ID" value="1"/>
+            <param name="NUM_TARGETS" value="$(arg NUM_TARGETS)"/>
+            <param name="CONFIG_FILENAME" type="string" value="$(arg config_file)"/>
+        </node>
+    </group>
 
 </launch>
