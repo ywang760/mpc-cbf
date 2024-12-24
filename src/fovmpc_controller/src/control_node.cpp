@@ -31,7 +31,8 @@ double ctrl_freq = 20.0;
 geometry_msgs::PoseStamped current_pose;
 mavros_msgs::State current_state;
 double takeoff_time = 15;
-//double mission_time = 20;
+double mission_time = 40;
+double land_time = 5;
 
 constexpr unsigned int DIM = 3U;
 
@@ -201,7 +202,7 @@ public:
         // init cbf
         std::shared_ptr<FovCBF> fov_cbf = std::make_unique<FovCBF>(fov_beta, fov_Ds, fov_Rs);
         // init bezier mpc-cbf
-        uint64_t bezier_continuity_upto_degree = 4;
+        uint64_t bezier_continuity_upto_degree = 7;
         int impc_iter = 2;
         BezierMPCCBFParams bezier_impc_cbf_params = {piecewise_bezier_params, mpc_params, fov_cbf_params};
 
@@ -241,6 +242,7 @@ private:
 
 
     geometry_msgs::PoseStamped takeoff_pose_;
+    geometry_msgs::PoseStamped land_pose_;
     State state_;
     std::vector<VectorDIM> target_states_;
     std::vector<Matrix> target_covs_;
@@ -250,7 +252,7 @@ private:
     double z_ = 1;
     std::unique_ptr<BezierIMPCCBF> bezier_impc_cbf_ptr_;
     bool taken_off_ = false;
-//    bool land_ = false;
+    bool land_ = false;
     bool optim_done_ = false;
     bool last_request_time_init = false;
 
@@ -271,7 +273,10 @@ private:
     ros::ServiceClient arming_client_;
     ros::ServiceClient set_mode_client_;
     ros::Time last_request_;
+    ros::Time mission_start_time_;
+    ros::Time land_start_time_;
     ros::Time last_traj_optim_t_;
+    mavros_msgs::SetMode offb_set_mode_;
 
 };
 
@@ -378,8 +383,7 @@ void ControlNode::optimization_callback() {
 void ControlNode::takeoff_callback() {
     if (!taken_off_) {
         // arming and offboard
-        mavros_msgs::SetMode offb_set_mode;
-        offb_set_mode.request.custom_mode = "OFFBOARD";
+        offb_set_mode_.request.custom_mode = "OFFBOARD";
         mavros_msgs::CommandBool arm_cmd;
         arm_cmd.request.value = true;
 
@@ -391,7 +395,7 @@ void ControlNode::takeoff_callback() {
         }
 
         if (current_state.mode != "OFFBOARD" && ros::Time::now() - last_request_ > ros::Duration(2.0)) {
-            if (set_mode_client_.call(offb_set_mode) && offb_set_mode.response.mode_sent) {
+            if (set_mode_client_.call(offb_set_mode_) && offb_set_mode_.response.mode_sent) {
                 ROS_INFO("Offboard enabled.");
             }
             last_request_ = ros::Time::now();
@@ -409,12 +413,13 @@ void ControlNode::takeoff_callback() {
         } else {
             std::cout << "Finish take off, execute mission..." << "\n";
             taken_off_ = true;
+            mission_start_time_ = ros::Time::now();
         }
     }
 }
 
 void ControlNode::timer_callback() {
-     if (taken_off_ && optim_done_) {
+     if (taken_off_ && optim_done_ && !land_) {
         // std::cout << "Inside control loop\n";
         eval_t_ = (ros::Time::now() - last_traj_optim_t_).toSec();
 //        std::cout << "eval time: " << eval_t_ << "\n";
@@ -447,6 +452,34 @@ void ControlNode::timer_callback() {
         state_.vel_ << evals[1];
         // std::cout << "Desired vel: " << evals[1].transpose() << std::endl;
         // std::cout << "Desired acc: " << evals[2].transpose() << std::endl;
+        if (ros::Time::now() - mission_start_time_ > ros::Duration(mission_time)) {
+            land_pose_.header.frame_id = "map";
+            land_pose_.pose.position.x = state_.pos_(0);
+            land_pose_.pose.position.y = state_.pos_(1);
+            land_pose_.pose.position.z = 0.2;
+            double yaw = state_.pos_(2);
+            tf2::Quaternion q;
+            q.setEuler(0, 0, yaw);
+            land_pose_.pose.orientation = tf2::toMsg(q);
+            land_start_time_ = ros::Time::now();
+            land_ = true;
+            std::cout << "Mission finished, start landing...\n";
+        }
+     } else if (land_) {
+         offb_set_mode_.request.custom_mode = "AUTO.LAND";
+         // go to near ground, ready to land
+         if (ros::Time::now() - land_start_time_ < ros::Duration(land_time)) {
+             local_pos_pub_.publish(land_pose_);
+         }
+         // auto-land
+         if (ros::Time::now() - land_start_time_ >= ros::Duration(land_time) && current_state.mode != "AUTO.LAND" &&
+             ros::Time::now() - last_request_ > ros::Duration(2.0)) {
+             if( set_mode_client_.call(offb_set_mode_) &&
+             offb_set_mode_.response.mode_sent){
+                 ROS_INFO("Auto Land Triggered...");
+             }
+             last_request_ = ros::Time::now();
+         }
      }
 
 }
