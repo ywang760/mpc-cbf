@@ -38,7 +38,7 @@ namespace mpc_cbf {
         BezierIMPCCBF(Params &p, std::shared_ptr<DoubleIntegrator> model_ptr, std::shared_ptr<FovCBF> fov_cbf_ptr,
                       uint64_t bezier_continuity_upto_degree,
                       std::shared_ptr<const CollisionShape> collision_shape_ptr,
-                      int impc_iter);
+                      int impc_iter, int num_neighbors=0, bool slack_mode=false);
         ~BezierIMPCCBF()=default;
 
         bool optimize(std::vector<SingleParameterPiecewiseCurve> &result_curve,
@@ -68,6 +68,7 @@ namespace mpc_cbf {
         uint64_t bezier_continuity_upto_degree_;
         std::shared_ptr<const CollisionShape> collision_shape_ptr_;
         int impc_iter_;
+        bool slack_mode_;
     };
 
 } // mpc_cbf

@@ -16,6 +16,7 @@ namespace mpc_cbf {
         using DoubleIntegrator = typename PiecewiseBezierMPCQPOperations::DoubleIntegrator;
         using FovCBF = cbf::FovCBF;
         using QPOperation = qpcpp::QPOperations<T>;
+        using CostAddition = typename QPOperation::CostAddition;
         using LinearConstraint = typename QPOperation::LinearConstraint;
         using VectorDIM = math::VectorDIM<T, DIM>;
         using Vector = math::Vector<T>;
@@ -33,13 +34,14 @@ namespace mpc_cbf {
         PiecewiseBezierMPCCBFQPOperations(Params &p, std::shared_ptr<DoubleIntegrator> model_ptr, std::shared_ptr<FovCBF> fov_cbf_ptr);
         std::unique_ptr<PiecewiseBezierMPCQPOperations> piecewise_mpc_operations_ptr();
 
+        CostAddition slackCost(const std::vector<double>& slack_weights);
         LinearConstraint safetyCBFConstraint(const State& current_state, const Vector& other_pos, T slack_value=0);
         std::vector<LinearConstraint> fovLBConstraint(const State& current_state, const Vector& other_pos, T slack_value=0);
         std::vector<LinearConstraint> fovRBConstraint(const State& current_state, const Vector& other_pos, T slack_value=0);
 
-        std::vector<LinearConstraint> predSafetyCBFConstraints(const std::vector<State>& pred_states, const Vector& other_pos, const std::vector<T>& slack_values);
-        std::vector<LinearConstraint> predFovLBConstraints(const std::vector<State>& pred_states, const Vector& other_pos, const std::vector<T>& slack_values);
-        std::vector<LinearConstraint> predFovRBConstraints(const std::vector<State>& pred_states, const Vector& other_pos, const std::vector<T>& slack_values);
+        std::vector<LinearConstraint> predSafetyCBFConstraints(const std::vector<State>& pred_states, const Vector& other_pos);
+        std::vector<LinearConstraint> predFovLBConstraints(const std::vector<State>& pred_states, const Vector& other_pos);
+        std::vector<LinearConstraint> predFovRBConstraints(const std::vector<State>& pred_states, const Vector& other_pos);
 
     private:
         std::unique_ptr<PiecewiseBezierMPCQPOperations> piecewise_mpc_operations_ptr_;
