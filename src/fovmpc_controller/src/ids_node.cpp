@@ -56,7 +56,7 @@ class IDPub
 
 
     private:
-        std::string CONFIG_FILENAME = ;
+        std::string CONFIG_FILENAME;
         int ROBOTS_NUM = 3;
         Eigen::MatrixXd ids;
 
