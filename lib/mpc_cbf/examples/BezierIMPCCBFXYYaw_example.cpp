@@ -141,9 +141,12 @@ int main() {
     std::shared_ptr<FovCBF> fov_cbf = std::make_unique<FovCBF>(fov_beta, fov_Ds, fov_Rs);
     // init bezier mpc-cbf
     uint64_t bezier_continuity_upto_degree = 4;
-    int impc_iter = 5;
+    int impc_iter = 2;
+    int num_neighbors = experiment_config_json["tasks"]["so"].size() - 1;
+    std::cout << "neighbor size: " << num_neighbors << "\n";
+    bool slack_mode = true;
     BezierMPCCBFParams bezier_impc_cbf_params = {piecewise_bezier_params, mpc_params, fov_cbf_params};
-    BezierIMPCCBF bezier_impc_cbf(bezier_impc_cbf_params, pred_model_ptr, fov_cbf, bezier_continuity_upto_degree, aligned_box_collision_shape_ptr, impc_iter);
+    BezierIMPCCBF bezier_impc_cbf(bezier_impc_cbf_params, pred_model_ptr, fov_cbf, bezier_continuity_upto_degree, aligned_box_collision_shape_ptr, impc_iter, num_neighbors, slack_mode);
 
     // main loop
     // load the tasks
@@ -173,6 +176,9 @@ int main() {
     int loop_idx = 0;
     while (sim_t < sim_runtime) {
         for (int robot_idx = 0; robot_idx < num_robots; ++robot_idx) {
+//            if (robot_idx == 1) {
+//                continue;
+//            }
             std::vector<VectorDIM> other_robot_positions;
             std::vector<Matrix> other_robot_covs;
             for (int j = 0; j < num_robots; ++j) {
