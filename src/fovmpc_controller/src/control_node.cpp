@@ -353,7 +353,10 @@ void ControlNode::optimization_callback() {
             std::cout << "QP not success" << "\n";
         }
 
-        curve_ = std::make_shared<SingleParameterPiecewiseCurve>(std::move(trajs.back()));
+        // update the plan only if the traj_optim success
+        if (success) {
+            curve_ = std::make_shared<SingleParameterPiecewiseCurve>(std::move(trajs.back()));
+        }
 
         // reset the eval_t
         eval_t_ = 0;
@@ -422,6 +425,10 @@ void ControlNode::timer_callback() {
      if (taken_off_ && optim_done_ && !land_) {
         // std::cout << "Inside control loop\n";
         eval_t_ = (ros::Time::now() - last_traj_optim_t_).toSec();
+        // this could happen when optimization fails
+        if (eval_t_ > curve_->max_parameter()) {
+            eval_t_ = curve_->max_parameter();
+        }
 //        std::cout << "eval time: " << eval_t_ << "\n";
         std::vector<VectorDIM> evals;
         for (size_t d = 0; d <= 2; ++d) {
