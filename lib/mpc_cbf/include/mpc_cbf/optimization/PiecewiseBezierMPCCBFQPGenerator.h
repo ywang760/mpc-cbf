@@ -36,13 +36,13 @@ namespace mpc_cbf {
         void addPredFovLBConstraints(const std::vector<State>& pred_states, const Vector& other_pos, const std::vector<T>& slack_values);
         void addPredFovRBConstraints(const std::vector<State>& pred_states, const Vector& other_pos, const std::vector<T>& slack_values);
 
-        void addSafetyCBFConstraintWithSlackVariables(const State& current_state, const Vector& other_pos);
-        void addFovLBConstraintWithSlackVariables(const State& current_state, const Vector& other_pos);
-        void addFovRBConstraintWithSlackVariables(const State& current_state, const Vector& other_pos);
+        void addSafetyCBFConstraintWithSlackVariables(const State& current_state, const Vector& other_pos, std::size_t neighbor_idx);
+        void addFovLBConstraintWithSlackVariables(const State& current_state, const Vector& other_pos, std::size_t neighbor_idx);
+        void addFovRBConstraintWithSlackVariables(const State& current_state, const Vector& other_pos, std::size_t neighbor_idx);
 
-//        void addPredSafetyCBFConstraintsWithSlackVariables(const std::vector<State>& pred_states, const Vector& other_pos);
-        void addPredFovLBConstraintsWithSlackVariables(const std::vector<State>& pred_states, const Vector& other_pos);
-        void addPredFovRBConstraintsWithSlackVariables(const std::vector<State>& pred_states, const Vector& other_pos);
+//        void addPredSafetyCBFConstraintsWithSlackVariables(const std::vector<State>& pred_states, const Vector& other_pos, std::size_t neighbor_idx);
+        void addPredFovLBConstraintsWithSlackVariables(const std::vector<State>& pred_states, const Vector& other_pos, std::size_t neighbor_idx);
+        void addPredFovRBConstraintsWithSlackVariables(const std::vector<State>& pred_states, const Vector& other_pos, std::size_t neighbor_idx);
 
         // adds given cost_addition for piecewise to the generated qp.
         void addCostAdditionForSlackVariables(const CostAddition& cost_addition);
