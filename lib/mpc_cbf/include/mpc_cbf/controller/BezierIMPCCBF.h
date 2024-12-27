@@ -11,6 +11,7 @@
 #include <separating_hyperplanes/Voronoi.h>
 #include <qpcpp/Problem.h>
 #include <qpcpp/solvers/CPLEX.h>
+#include <numeric>
 
 namespace mpc_cbf {
     template <typename T, unsigned int DIM>
@@ -38,7 +39,7 @@ namespace mpc_cbf {
         BezierIMPCCBF(Params &p, std::shared_ptr<DoubleIntegrator> model_ptr, std::shared_ptr<FovCBF> fov_cbf_ptr,
                       uint64_t bezier_continuity_upto_degree,
                       std::shared_ptr<const CollisionShape> collision_shape_ptr,
-                      int impc_iter);
+                      int impc_iter, int num_neighbors=0, bool slack_mode=false);
         ~BezierIMPCCBF()=default;
 
         bool optimize(std::vector<SingleParameterPiecewiseCurve> &result_curve,
@@ -50,6 +51,8 @@ namespace mpc_cbf {
         T sigmoid(T x);
 
         T distanceToEllipse(const VectorDIM& robot_position, const Vector& target_mean, const Matrix& target_cov);
+
+        bool compareDist(const VectorDIM& p_current, const std::pair<VectorDIM, Matrix>& a, const std::pair<VectorDIM, Matrix>& b);
 
         void resetProblem();
 
@@ -68,6 +71,7 @@ namespace mpc_cbf {
         uint64_t bezier_continuity_upto_degree_;
         std::shared_ptr<const CollisionShape> collision_shape_ptr_;
         int impc_iter_;
+        bool slack_mode_;
     };
 
 } // mpc_cbf

@@ -9,14 +9,15 @@ namespace mpc_cbf {
     BezierIMPCCBF<T, DIM>::BezierIMPCCBF(Params &p, std::shared_ptr<DoubleIntegrator> model_ptr,
                                          std::shared_ptr<FovCBF> fov_cbf_ptr, uint64_t bezier_continuity_upto_degree,
                                          std::shared_ptr<const CollisionShape> collision_shape_ptr,
-                                         int impc_iter)
+                                         int impc_iter, int num_neighbors, bool slack_mode)
     : bezier_continuity_upto_degree_(bezier_continuity_upto_degree),
     collision_shape_ptr_(collision_shape_ptr),
-    impc_iter_(impc_iter) {
+    impc_iter_(impc_iter),
+    slack_mode_(slack_mode) {
         // Initiate the qp_generator
         std::unique_ptr<PiecewiseBezierMPCCBFQPOperations> piecewise_mpc_cbf_operations_ptr =
                 std::make_unique<PiecewiseBezierMPCCBFQPOperations>(p, model_ptr, fov_cbf_ptr);
-        qp_generator_.addPiecewise(std::move(piecewise_mpc_cbf_operations_ptr));
+        qp_generator_.addPiecewise(std::move(piecewise_mpc_cbf_operations_ptr), num_neighbors, slack_mode);
 
         // load mpc tuning params
         mpc_tuning_ = p.mpc_params.tuning_;
@@ -43,6 +44,31 @@ namespace mpc_cbf {
                                          const Vector &ref_positions) {
         bool success = true;
         assert(impc_iter_ >= 1);
+        VectorDIM current_pos = current_state.pos_;
+        VectorDIM current_vel = current_state.vel_;
+
+        // if slack_mode, compute the slack weights
+        int num_neighbors = other_robot_positions.size();
+        std::vector<double> slack_weights(num_neighbors);
+        if (slack_mode_) {
+            std::vector<std::pair<VectorDIM, Matrix>> other_pos_covs(num_neighbors);
+            for (size_t i = 0; i < num_neighbors; ++i) {
+                other_pos_covs[i] = std::make_pair(other_robot_positions.at(i), other_robot_covs.at(i));
+            }
+            std::vector<size_t> idx(num_neighbors);
+            std::iota(idx.begin(), idx.end(), 0);
+            // sort
+            std::sort(idx.begin(), idx.end(), [this, current_pos, other_pos_covs](size_t a_idx, size_t b_idx) {
+                return compareDist(current_pos, other_pos_covs.at(a_idx), other_pos_covs.at(b_idx));
+            });
+            // define slack weights
+            T w_init = 1000;
+            T decay_factor = 0.25;
+            for (size_t i = 0; i < num_neighbors; ++i) {
+                size_t sort_idx = idx.at(i);
+                slack_weights.at(i) = w_init * pow(decay_factor, sort_idx);
+            }
+        }
 
         for (size_t iter = 0; iter < impc_iter_; ++iter) {
             // reset the problem
@@ -58,9 +84,12 @@ namespace mpc_cbf {
                                                                                                    mpc_tuning_.w_u_eff_);
             }
 
+            // add the slack cost, to give priority to neighbors
+            if (slack_mode_) {
+                qp_generator_.addSlackCost(slack_weights);
+            }
+
             // add the current state constraints
-            VectorDIM current_pos = current_state.pos_;
-            VectorDIM current_vel = current_state.vel_;
             qp_generator_.piecewise_mpc_qp_generator_ptr()->addEvalConstraint(0, 0, current_pos);
             qp_generator_.piecewise_mpc_qp_generator_ptr()->addEvalConstraint(0, 1, current_vel);
 
@@ -96,11 +125,16 @@ namespace mpc_cbf {
                     other_xy_cov = other_robot_covs.at(i).block(0,0,2,2);
                     // compute the distance to target ellipse
                     T distance_to_ellipse = distanceToEllipse(current_pos, other_xy, other_xy_cov);
-                    T slack_value = sigmoid(distance_to_ellipse - 3*0.3); // TODO pass in param
-
-                    qp_generator_.addSafetyCBFConstraint(current_state, other_xy, slack_value);
-                    qp_generator_.addFovLBConstraint(current_state, other_xy, slack_value);
-                    qp_generator_.addFovRBConstraint(current_state, other_xy, slack_value);
+                    T slack_value = 0; // TODO pass in param
+                    if (!slack_mode_) {
+                        qp_generator_.addSafetyCBFConstraint(current_state, other_xy, slack_value);
+                        qp_generator_.addFovLBConstraint(current_state, other_xy, slack_value);
+                        qp_generator_.addFovRBConstraint(current_state, other_xy, slack_value);
+                    } else {
+                        qp_generator_.addSafetyCBFConstraintWithSlackVariables(current_state, other_xy, i);
+                        qp_generator_.addFovLBConstraintWithSlackVariables(current_state, other_xy, i);
+                        qp_generator_.addFovRBConstraintWithSlackVariables(current_state, other_xy, i);
+                    }
                 }
             } else if (iter > 0 && success) {
                 // pred the robot's position in the horizon, use for the CBF constraints
@@ -122,23 +156,29 @@ namespace mpc_cbf {
                     // compute the slack value
                     for (size_t k = 0; k < cbf_horizon; ++k) {
                         T distance_to_ellipse = distanceToEllipse(pred_states.at(k).pos_, other_xy, other_xy_cov);
-                        slack_values.push_back(sigmoid(distance_to_ellipse - 3*0.3)); // TODO pass in param
+                        slack_values.push_back(0); // TODO pass in param
                     }
 //                    qp_generator_.addPredSafetyCBFConstraints(pred_states, other_xy);
-                    qp_generator_.addSafetyCBFConstraint(current_state, other_xy, slack_values.at(0));
-                    qp_generator_.addPredFovLBConstraints(pred_states, other_xy, slack_values);
-                    qp_generator_.addPredFovRBConstraints(pred_states, other_xy, slack_values);
+                    if (!slack_mode_) {
+                        qp_generator_.addSafetyCBFConstraint(current_state, other_xy, slack_values.at(0));
+                        qp_generator_.addPredFovLBConstraints(pred_states, other_xy, slack_values);
+                        qp_generator_.addPredFovRBConstraints(pred_states, other_xy, slack_values);
+                    } else {
+                        qp_generator_.addSafetyCBFConstraintWithSlackVariables(current_state, other_xy, i);
+                        qp_generator_.addPredFovLBConstraintsWithSlackVariables(pred_states, other_xy, i);
+                        qp_generator_.addPredFovRBConstraintsWithSlackVariables(pred_states, other_xy, i);
+                    }
                 }
             }
 
             // dynamics constraints
             T a_max = 10;
-            T v_max = 1;
+            T v_max = 2;
             VectorDIM a_min_vec = {-a_max, -a_max, -a_max};
             VectorDIM a_max_vec = {a_max, a_max, a_max};
             VectorDIM v_min_vec = {-v_max, -v_max, -v_max};
             VectorDIM v_max_vec = {v_max, v_max, v_max};
-            qp_generator_.piecewise_mpc_qp_generator_ptr()->addEvalBoundConstraints(2, a_min_vec, a_max_vec);
+//            qp_generator_.piecewise_mpc_qp_generator_ptr()->addEvalBoundConstraints(2, a_min_vec, a_max_vec);
 //            qp_generator_.piecewise_mpc_qp_generator_ptr()->addEvalBoundConstraints(1, v_min_vec, v_max_vec);
 
 //            AlignedBox acc_derivative_bbox(a_min_vec, a_max_vec);
@@ -233,6 +273,13 @@ namespace mpc_cbf {
         }
 
         return -5.0;
+    }
+
+    template <typename T, unsigned int DIM>
+    bool BezierIMPCCBF<T, DIM>::compareDist(const VectorDIM& p_current,
+                                            const std::pair<VectorDIM, Matrix>& a,
+                                            const std::pair<VectorDIM, Matrix>& b) {
+        return distanceToEllipse(p_current, a.first, a.second) < distanceToEllipse(p_current, b.first, b.second);
     }
 
     template <typename T, unsigned int DIM>

@@ -49,6 +49,11 @@ namespace mpc {
     }
 
     template <typename T, unsigned int DIM>
+    std::vector<qpcpp::Variable<T>*>& PiecewiseBezierMPCQPGenerator<T, DIM>::variables() {
+        return variables_;
+    }
+
+    template <typename T, unsigned int DIM>
     typename PiecewiseBezierMPCQPGenerator<T, DIM>::SingleParameterPiecewiseCurve
     PiecewiseBezierMPCQPGenerator<T, DIM>::generateCurveFromSolution() const {
         SingleParameterPiecewiseCurve piecewise_curve;

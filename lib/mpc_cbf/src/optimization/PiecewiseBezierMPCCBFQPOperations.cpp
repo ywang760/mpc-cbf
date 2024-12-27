@@ -27,6 +27,20 @@ namespace mpc_cbf {
     PiecewiseBezierMPCCBFQPOperations<T, DIM>::piecewise_mpc_operations_ptr() {return std::move(piecewise_mpc_operations_ptr_);}
 
     template <typename T, unsigned int DIM>
+    typename PiecewiseBezierMPCCBFQPOperations<T, DIM>::CostAddition
+    PiecewiseBezierMPCCBFQPOperations<T, DIM>::slackCost(const std::vector<double> &slack_weights) {
+        Matrix quadratic_term(slack_weights.size(), slack_weights.size());
+        quadratic_term.setZero();
+        Vector linear_term(slack_weights.size());
+        linear_term.setZero();
+
+        for (std::size_t i = 0; i < slack_weights.size(); ++i) {
+            linear_term(i) = slack_weights.at(i);
+        }
+        return CostAddition(quadratic_term, linear_term, 0);
+    }
+
+    template <typename T, unsigned int DIM>
     typename PiecewiseBezierMPCCBFQPOperations<T, DIM>::LinearConstraint
     PiecewiseBezierMPCCBFQPOperations<T, DIM>::safetyCBFConstraint(const State &current_state,
                                                                    const Vector &other_pos,
@@ -105,10 +119,8 @@ namespace mpc_cbf {
     template <typename T, unsigned int DIM>
     std::vector<typename PiecewiseBezierMPCCBFQPOperations<T, DIM>::LinearConstraint>
     PiecewiseBezierMPCCBFQPOperations<T, DIM>::predSafetyCBFConstraints(const std::vector<State> &pred_states,
-                                                                        const Vector &other_pos,
-                                                                        const std::vector<T>& slack_values) {
+                                                                        const Vector &other_pos) {
 //        assert(pred_states.size() == k_hor_);
-        assert(pred_states.size() == slack_values.size());
         std::vector<LinearConstraint> linear_constraints;
         for (size_t k = 0; k < pred_states.size(); ++k) {
             const State& pred_state = pred_states.at(k);
@@ -122,7 +134,7 @@ namespace mpc_cbf {
             Vector Ak = Vector::Zero(DIM*k_hor_); // [3K, 1]
             Ak.segment(k*DIM, DIM) = ak;
             Row Ak_control_pts = -1.0 * Ak.transpose() * U_basis_; // [1, num_piece*dim*num_control_pts]
-            linear_constraints.push_back(LinearConstraint(Ak_control_pts, std::numeric_limits<T>::lowest(), bk+slack_values.at(k)));
+            linear_constraints.push_back(LinearConstraint(Ak_control_pts, std::numeric_limits<T>::lowest(), bk));
         }
         return linear_constraints;
     }
@@ -130,10 +142,8 @@ namespace mpc_cbf {
     template <typename T, unsigned int DIM>
     std::vector<typename PiecewiseBezierMPCCBFQPOperations<T, DIM>::LinearConstraint>
     PiecewiseBezierMPCCBFQPOperations<T, DIM>::predFovLBConstraints(const std::vector<State> &pred_states,
-                                                                    const Vector &other_pos,
-                                                                    const std::vector<T>& slack_values) {
+                                                                    const Vector &other_pos) {
 //        assert(pred_states.size() == k_hor_);
-        assert(pred_states.size() == slack_values.size());
         std::vector<LinearConstraint> linear_constraints;
         for (size_t k = 0; k < pred_states.size(); ++k) {
             const State& pred_state = pred_states.at(k);
@@ -147,7 +157,7 @@ namespace mpc_cbf {
             Vector Ak = Vector::Zero(DIM*k_hor_); // [3K, 1]
             Ak.segment(k*DIM, DIM) = ak;
             Row Ak_control_pts = -1.0 * Ak.transpose() * U_basis_; // [1, num_piece*dim*num_control_pts]
-            linear_constraints.push_back(LinearConstraint(Ak_control_pts, std::numeric_limits<T>::lowest(), bk+slack_values.at(k)));
+            linear_constraints.push_back(LinearConstraint(Ak_control_pts, std::numeric_limits<T>::lowest(), bk));
         }
         return linear_constraints;
     }
@@ -155,10 +165,8 @@ namespace mpc_cbf {
     template <typename T, unsigned int DIM>
     std::vector<typename PiecewiseBezierMPCCBFQPOperations<T, DIM>::LinearConstraint>
     PiecewiseBezierMPCCBFQPOperations<T, DIM>::predFovRBConstraints(const std::vector<State> &pred_states,
-                                                                    const Vector &other_pos,
-                                                                    const std::vector<T>& slack_values) {
+                                                                    const Vector &other_pos) {
 //        assert(pred_states.size() == k_hor_);
-        assert(pred_states.size() == slack_values.size());
         std::vector<LinearConstraint> linear_constraints;
         for (size_t k = 0; k < pred_states.size(); ++k) {
             const State& pred_state = pred_states.at(k);
@@ -171,7 +179,7 @@ namespace mpc_cbf {
             Vector Ak = Vector::Zero(DIM*k_hor_); // [3K, 1]
             Ak.segment(k*DIM, DIM) = ak;
             Row Ak_control_pts = -1.0 * Ak.transpose() * U_basis_; // [1, num_piece*dim*num_control_pts]
-            linear_constraints.push_back(LinearConstraint(Ak_control_pts, std::numeric_limits<T>::lowest(), bk+slack_values.at(k)));
+            linear_constraints.push_back(LinearConstraint(Ak_control_pts, std::numeric_limits<T>::lowest(), bk));
         }
         return linear_constraints;
     }

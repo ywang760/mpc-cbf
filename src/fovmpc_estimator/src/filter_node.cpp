@@ -45,9 +45,9 @@ class Node
 
 
             // ---------- Subs and Pubs -------------------
-            odom_sub_ = nh_.subscribe<nav_msgs::Odometry>("/supervisor/uav"+std::to_string(ROBOT_ID)+"/odom", 1, std::bind(&Node::odom_callback, this, std::placeholders::_1));
-            target_sub_ = nh_.subscribe<geometry_msgs::Pose>("/robot"+std::to_string(ROBOT_ID)+"/tag_"+std::to_string(TARGET_ID)+"/pose", 1, std::bind(&Node::target_callback, this, std::placeholders::_1));
-            est_pub_ = nh_.advertise<geometry_msgs::PoseWithCovarianceStamped>("/uav"+std::to_string(ROBOT_ID)+"/target_"+std::to_string(TARGET_ID)+"/estimate", 10);
+            odom_sub_ = nh_.subscribe<nav_msgs::Odometry>("mavros/local_position/odom", 1, std::bind(&Node::odom_callback, this, std::placeholders::_1));
+            target_sub_ = nh_.subscribe<geometry_msgs::PoseStamped>("detection"+std::to_string(TARGET_ID), 1, std::bind(&Node::target_callback, this, std::placeholders::_1));
+            est_pub_ = nh_.advertise<geometry_msgs::PoseWithCovarianceStamped>("target_"+std::to_string(TARGET_ID)+"/estimate", 10);
             timer_ = nh_.createTimer(ros::Duration(1/rate), std::bind(&Node::timer_callback, this));
 
             // Init params
@@ -86,7 +86,7 @@ class Node
 
     void stop();
     void timer_callback();
-    void target_callback(const geometry_msgs::Pose::ConstPtr& msg);
+    void target_callback(const geometry_msgs::PoseStamped::ConstPtr& msg);
     void odom_callback(const nav_msgs::Odometry::ConstPtr& msg);
     bool insideFOV(Eigen::VectorXd robot, Eigen::VectorXd target, double fov, double range);
     // std::vector<bool> insideFOV(Eigen::VectorXd robot, Eigen::MatrixXd targets, double fov, double range);
@@ -123,11 +123,11 @@ class Node
 
 };
 
-void Node::target_callback(const geometry_msgs::Pose::ConstPtr& msg)
+void Node::target_callback(const geometry_msgs::PoseStamped::ConstPtr& msg)
 {
-    meas_rel(0) = msg->position.x;
-    meas_rel(1) = msg->position.y;
-    meas_rel(2) = msg->position.z;
+    meas_rel(0) = msg->pose.position.x;
+    meas_rel(1) = msg->pose.position.y;
+    meas_rel(2) = msg->pose.position.z;
     std::cout << "Rel measurement: " << meas_rel.transpose() << std::endl;
     tf2::Quaternion q(p_i(3), p_i(4), p_i(5), p_i(6));
     tf2::Matrix3x3 m(q);

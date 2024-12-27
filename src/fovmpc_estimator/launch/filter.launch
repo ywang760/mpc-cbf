@@ -1,53 +1,22 @@
 <launch>
+    <arg name="ROBOT_ID" default="0"/>
+    <arg name="NUM_ROBOTS" default="3"/>
     <arg name="ROBOT_RANGE" default="8.0"/>
     <arg name="ROBOT_FOV" default="120.0"/>
    
-    <!-- UAV 0 -->
-    <node name="filter_node_01" anonymous="true" pkg="fovmpc_estimator" type="filter_node" output="screen">
-        <param name="ROBOT_ID" value="0"/>
-        <param name="TARGET_ID" value="1"/>
-        <param name="ROBOT_RANGE" value="$(arg ROBOT_RANGE)"/>
-        <param name="ROBOT_FOV" value="$(arg ROBOT_FOV)"/>
-        <!-- <remap from="/tag_0/pose" to="robot0/tag_0/pose"/> -->
-        <!-- <remap from="/tag_1/pose" to="robot0/tag_1/pose"/> -->
-    </node>
-    <node name="filter_node_02" anonymous="true" pkg="fovmpc_estimator" type="filter_node" output="screen">
-        <param name="ROBOT_ID" value="0"/>
-        <param name="TARGET_ID" value="2"/>
+    <group ns="uav$(arg ROBOT_ID)">
+    <node name="filter_node_1" anonymous="true" pkg="fovmpc_estimator" type="filter_node" output="screen">
+        <param name="ROBOT_ID" value="$(arg ROBOT_ID)"/>
+        <param name="TARGET_ID" value="$(eval str((int(arg('ROBOT_ID')) + 1) % int(arg('NUM_ROBOTS'))))"/>
         <param name="ROBOT_RANGE" value="$(arg ROBOT_RANGE)"/>
         <param name="ROBOT_FOV" value="$(arg ROBOT_FOV)"/>
     </node>
-
-    <!-- UAV 1 -->
-    <node name="filter_node_10" anonymous="true" pkg="fovmpc_estimator" type="filter_node" output="screen">
-        <param name="ROBOT_ID" value="1"/>
-        <param name="TARGET_ID" value="0"/>
+    <node name="filter_node_2" anonymous="true" pkg="fovmpc_estimator" type="filter_node" output="screen">
+        <param name="ROBOT_ID" value="$(arg ROBOT_ID)"/>
+        <param name="TARGET_ID" value="$(eval str((int(arg('ROBOT_ID')) + 2) % int(arg('NUM_ROBOTS'))))"/>
         <param name="ROBOT_RANGE" value="$(arg ROBOT_RANGE)"/>
         <param name="ROBOT_FOV" value="$(arg ROBOT_FOV)"/>
     </node>
-    <node name="filter_node_12" anonymous="true" pkg="fovmpc_estimator" type="filter_node" output="screen">
-        <param name="ROBOT_ID" value="1"/>
-        <param name="TARGET_ID" value="2"/>
-        <param name="ROBOT_RANGE" value="$(arg ROBOT_RANGE)"/>
-        <param name="ROBOT_FOV" value="$(arg ROBOT_FOV)"/>
-    </node>
-
-    <!-- UAV 2 -->
-    <node name="filter_node_20" anonymous="true" pkg="fovmpc_estimator" type="filter_node" output="screen">
-        <param name="ROBOT_ID" value="2"/>
-        <param name="TARGET_ID" value="0"/>
-        <param name="ROBOT_RANGE" value="$(arg ROBOT_RANGE)"/>
-        <param name="ROBOT_FOV" value="$(arg ROBOT_FOV)"/>
-    </node>
-    <node name="filter_node_21" anonymous="true" pkg="fovmpc_estimator" type="filter_node" output="screen">
-        <param name="ROBOT_ID" value="2"/>
-        <param name="TARGET_ID" value="1"/>
-        <param name="ROBOT_RANGE" value="$(arg ROBOT_RANGE)"/>
-        <param name="ROBOT_FOV" value="$(arg ROBOT_FOV)"/>
-    </node>
-
-	<!-- Visualization -->
-	<node type="rviz" name="rviz" pkg="rviz" args="-d $(find fovmpc_estimator)/rviz/estimator_multi.rviz" />
-
+    </group>
 
 </launch>

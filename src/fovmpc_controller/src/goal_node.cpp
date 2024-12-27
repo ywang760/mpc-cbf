@@ -40,7 +40,7 @@ public:
 
         // ---------- Subs and Pubs -------------------
         // control pub
-        goal_pub_ = nh_.advertise<geometry_msgs::Pose>("/uav" + std::to_string(ROBOT_ID) + "/goal", 10);
+        goal_pub_ = nh_.advertise<geometry_msgs::Pose>("goal", 10);
         timer_ = nh_.createTimer(ros::Duration(1/rate), std::bind(&GoalNode::timer_callback, this));
 
         // Read the goal
