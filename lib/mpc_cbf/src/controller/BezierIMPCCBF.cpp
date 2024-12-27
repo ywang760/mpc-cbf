@@ -44,6 +44,31 @@ namespace mpc_cbf {
                                          const Vector &ref_positions) {
         bool success = true;
         assert(impc_iter_ >= 1);
+        VectorDIM current_pos = current_state.pos_;
+        VectorDIM current_vel = current_state.vel_;
+
+        // if slack_mode, compute the slack weights
+        int num_neighbors = other_robot_positions.size();
+        std::vector<double> slack_weights(num_neighbors);
+        if (slack_mode_) {
+            std::vector<std::pair<VectorDIM, Matrix>> other_pos_covs(num_neighbors);
+            for (size_t i = 0; i < num_neighbors; ++i) {
+                other_pos_covs[i] = std::make_pair(other_robot_positions.at(i), other_robot_covs.at(i));
+            }
+            std::vector<size_t> idx(num_neighbors);
+            std::iota(idx.begin(), idx.end(), 0);
+            // sort
+            std::sort(idx.begin(), idx.end(), [this, current_pos, other_pos_covs](size_t a_idx, size_t b_idx) {
+                return compareDist(current_pos, other_pos_covs.at(a_idx), other_pos_covs.at(b_idx));
+            });
+            // define slack weights
+            T w_init = 1000;
+            T decay_factor = 0.25;
+            for (size_t i = 0; i < num_neighbors; ++i) {
+                size_t sort_idx = idx.at(i);
+                slack_weights.at(i) = w_init * pow(decay_factor, sort_idx);
+            }
+        }
 
         for (size_t iter = 0; iter < impc_iter_; ++iter) {
             // reset the problem
@@ -59,16 +84,12 @@ namespace mpc_cbf {
                                                                                                    mpc_tuning_.w_u_eff_);
             }
 
-            // generate slack variable weights
-            std::vector<double> slack_weights;
-            slack_weights.push_back(500); // TODO change this to function
+            // add the slack cost, to give priority to neighbors
             if (slack_mode_) {
                 qp_generator_.addSlackCost(slack_weights);
             }
 
             // add the current state constraints
-            VectorDIM current_pos = current_state.pos_;
-            VectorDIM current_vel = current_state.vel_;
             qp_generator_.piecewise_mpc_qp_generator_ptr()->addEvalConstraint(0, 0, current_pos);
             qp_generator_.piecewise_mpc_qp_generator_ptr()->addEvalConstraint(0, 1, current_vel);
 
@@ -110,9 +131,9 @@ namespace mpc_cbf {
                         qp_generator_.addFovLBConstraint(current_state, other_xy, slack_value);
                         qp_generator_.addFovRBConstraint(current_state, other_xy, slack_value);
                     } else {
-                        qp_generator_.addSafetyCBFConstraintWithSlackVariables(current_state, other_xy);
-                        qp_generator_.addFovLBConstraintWithSlackVariables(current_state, other_xy);
-                        qp_generator_.addFovRBConstraintWithSlackVariables(current_state, other_xy);
+                        qp_generator_.addSafetyCBFConstraintWithSlackVariables(current_state, other_xy, i);
+                        qp_generator_.addFovLBConstraintWithSlackVariables(current_state, other_xy, i);
+                        qp_generator_.addFovRBConstraintWithSlackVariables(current_state, other_xy, i);
                     }
                 }
             } else if (iter > 0 && success) {
@@ -143,9 +164,9 @@ namespace mpc_cbf {
                         qp_generator_.addPredFovLBConstraints(pred_states, other_xy, slack_values);
                         qp_generator_.addPredFovRBConstraints(pred_states, other_xy, slack_values);
                     } else {
-                        qp_generator_.addSafetyCBFConstraintWithSlackVariables(current_state, other_xy);
-                        qp_generator_.addPredFovLBConstraintsWithSlackVariables(pred_states, other_xy);
-                        qp_generator_.addPredFovRBConstraintsWithSlackVariables(pred_states, other_xy);
+                        qp_generator_.addSafetyCBFConstraintWithSlackVariables(current_state, other_xy, i);
+                        qp_generator_.addPredFovLBConstraintsWithSlackVariables(pred_states, other_xy, i);
+                        qp_generator_.addPredFovRBConstraintsWithSlackVariables(pred_states, other_xy, i);
                     }
                 }
             }
@@ -252,6 +273,13 @@ namespace mpc_cbf {
         }
 
         return -5.0;
+    }
+
+    template <typename T, unsigned int DIM>
+    bool BezierIMPCCBF<T, DIM>::compareDist(const VectorDIM& p_current,
+                                            const std::pair<VectorDIM, Matrix>& a,
+                                            const std::pair<VectorDIM, Matrix>& b) {
+        return distanceToEllipse(p_current, a.first, a.second) < distanceToEllipse(p_current, b.first, b.second);
     }
 
     template <typename T, unsigned int DIM>

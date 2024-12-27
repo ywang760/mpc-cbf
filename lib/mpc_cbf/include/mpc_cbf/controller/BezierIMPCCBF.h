@@ -11,6 +11,7 @@
 #include <separating_hyperplanes/Voronoi.h>
 #include <qpcpp/Problem.h>
 #include <qpcpp/solvers/CPLEX.h>
+#include <numeric>
 
 namespace mpc_cbf {
     template <typename T, unsigned int DIM>
@@ -50,6 +51,8 @@ namespace mpc_cbf {
         T sigmoid(T x);
 
         T distanceToEllipse(const VectorDIM& robot_position, const Vector& target_mean, const Matrix& target_cov);
+
+        bool compareDist(const VectorDIM& p_current, const std::pair<VectorDIM, Matrix>& a, const std::pair<VectorDIM, Matrix>& b);
 
         void resetProblem();
 

@@ -95,18 +95,22 @@ namespace mpc_cbf {
     template <typename T, unsigned int DIM>
     void PiecewiseBezierMPCCBFQPGenerator<T, DIM>::addSafetyCBFConstraintWithSlackVariables(
             const State &current_state,
-            const Vector &other_pos) {
+            const Vector &other_pos,
+            std::size_t neighbor_idx) {
         LinearConstraint linear_constraint = piecewise_mpc_cbf_operations_ptr_->safetyCBFConstraint(current_state, other_pos);
-        Row slack_coefficients = -Row::Ones(slack_variables_.size());
+        Row slack_coefficients = Row::Zero(slack_variables_.size());
+        slack_coefficients(neighbor_idx) = -1;
         addLinearConstraintForPiecewiseWithSlackVariables(linear_constraint, slack_coefficients);
     }
 
     template <typename T, unsigned int DIM>
     void PiecewiseBezierMPCCBFQPGenerator<T, DIM>::addFovLBConstraintWithSlackVariables(
             const State &current_state,
-            const Vector &other_pos) {
+            const Vector &other_pos,
+            std::size_t neighbor_idx) {
         std::vector<LinearConstraint> linear_constraints = piecewise_mpc_cbf_operations_ptr_->fovLBConstraint(current_state, other_pos);
-        Row slack_coefficients = -Row::Ones(slack_variables_.size());
+        Row slack_coefficients = Row::Zero(slack_variables_.size());
+        slack_coefficients(neighbor_idx) = -1;
         for (size_t i = 0; i < linear_constraints.size(); ++i) {
             addLinearConstraintForPiecewiseWithSlackVariables(linear_constraints.at(i), slack_coefficients);
         }
@@ -115,9 +119,11 @@ namespace mpc_cbf {
     template <typename T, unsigned int DIM>
     void PiecewiseBezierMPCCBFQPGenerator<T, DIM>::addFovRBConstraintWithSlackVariables(
             const State &current_state,
-            const Vector &other_pos) {
+            const Vector &other_pos,
+            std::size_t neighbor_idx) {
         std::vector<LinearConstraint> linear_constraints = piecewise_mpc_cbf_operations_ptr_->fovRBConstraint(current_state, other_pos);
-        Row slack_coefficients = -Row::Ones(slack_variables_.size());
+        Row slack_coefficients = Row::Zero(slack_variables_.size());
+        slack_coefficients(neighbor_idx) = -1;
         for (size_t i = 0; i < linear_constraints.size(); ++i) {
             addLinearConstraintForPiecewiseWithSlackVariables(linear_constraints.at(i), slack_coefficients);
         }
@@ -125,9 +131,10 @@ namespace mpc_cbf {
 
     template <typename T, unsigned int DIM>
     void PiecewiseBezierMPCCBFQPGenerator<T, DIM>::addPredFovLBConstraintsWithSlackVariables(
-            const std::vector<State> &pred_states, const Vector &other_pos) {
+            const std::vector<State> &pred_states, const Vector &other_pos, std::size_t neighbor_idx) {
         std::vector<LinearConstraint> linear_constraints = piecewise_mpc_cbf_operations_ptr_->predFovLBConstraints(pred_states, other_pos);
-        Row slack_coefficients = -Row::Ones(slack_variables_.size());
+        Row slack_coefficients = Row::Zero(slack_variables_.size());
+        slack_coefficients(neighbor_idx) = -1;
         for (size_t i = 0; i < linear_constraints.size(); ++i) {
             addLinearConstraintForPiecewiseWithSlackVariables(linear_constraints.at(i), slack_coefficients);
         }
@@ -135,9 +142,10 @@ namespace mpc_cbf {
 
     template <typename T, unsigned int DIM>
     void PiecewiseBezierMPCCBFQPGenerator<T, DIM>::addPredFovRBConstraintsWithSlackVariables(
-            const std::vector<State> &pred_states, const Vector &other_pos) {
+            const std::vector<State> &pred_states, const Vector &other_pos, std::size_t neighbor_idx) {
         std::vector<LinearConstraint> linear_constraints = piecewise_mpc_cbf_operations_ptr_->predFovRBConstraints(pred_states, other_pos);
-        Row slack_coefficients = -Row::Ones(slack_variables_.size());
+        Row slack_coefficients = Row::Zero(slack_variables_.size());
+        slack_coefficients(neighbor_idx) = -1;
         for (size_t i = 0; i < linear_constraints.size(); ++i) {
             addLinearConstraintForPiecewiseWithSlackVariables(linear_constraints.at(i), slack_coefficients);
         }
