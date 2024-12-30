@@ -84,5 +84,5 @@ if __name__ == '__main__':
     FoV_range = load_states("../../config/config.json")["fov_cbf_params"]["Rs"]
     avg_num_neighbor_in_fov = avg_neighbor_in_fov(traj, FoV_beta)
     mean_avg_num_neighbor_in_fov = np.mean(avg_num_neighbor_in_fov)
-    print()
+    print("avg_num_neighbor_in_fov: ", avg_num_neighbor_in_fov)
 

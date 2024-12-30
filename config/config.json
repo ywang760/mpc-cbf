@@ -22,7 +22,6 @@
     },
     "fov_cbf_params": {
         "beta": 45,
-        "Ds": 0.3,
         "Rs": 10
     },
     "tasks": {

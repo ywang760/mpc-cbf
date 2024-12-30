@@ -44,9 +44,48 @@ def plot_position(x, y, idx, c="r", ax=None):
     ax.text(x, y, str(idx), fontsize=10)
 
 if __name__ == '__main__':
+    # mpc params
+    mpc_params = {
+        "h": 0.1,
+        "Ts": 0.01,
+        "k_hor": 16,
+        "mpc_tuning": {
+            "w_pos_err": 10,
+            "w_u_eff": 1,
+            "spd_f": 3
+        },
+        "physical_limits": {
+            "p_min": [-10, -10],
+            "p_max": [10, 10],
+            "a_min": [-3.0, -3.0, -3.0],
+            "a_max": [3.0, 3.0, 3.0]
+        }
+    }
+
+    # bezier_params
+    bezier_params = {
+        "num_pieces": 3,
+        "num_control_points": 4,
+        "piece_max_parameter": 0.5
+    }
+
+    # fov cbf params
+    fov_cbf_params = {
+        "beta": 120,
+        "Rs": 10
+    }
+
+    # robot params
+    robot_params = {
+        "collision_shape": {
+            "aligned_box": [0.3, 0.3, 0]
+        }
+    }
+
+    # position config
     circle_radius = 4
     circle_center = np.array([0, 0])
-    num_robots = 8
+    num_robots = 5
     angle_bias = 0.1
 
     start_xs, start_ys = generate_points_on_circle(num_robots, circle_radius, angle_bias)  # [num_robots,], [num_robots,]
@@ -76,11 +115,17 @@ if __name__ == '__main__':
     # plt.plot()
     plt.show()
 
-
+    # generate the json config file
     data = {
-        "so": so,
-        "sf": sf
+        "mpc_params": mpc_params,
+        "bezier_params": bezier_params,
+        "fov_cbf_params": fov_cbf_params,
+        "tasks": {
+            "so": so,
+            "sf": sf
+        },
+        "robot_params": robot_params
     }
     # save to json
-    with open("output.json", "w") as file:
+    with open("circle%d_config.json"%(num_robots), "w") as file:
         json.dump(data, file, indent=4)

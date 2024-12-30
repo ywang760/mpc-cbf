@@ -80,7 +80,8 @@ int main() {
     using json = nlohmann::json;
 
     // load experiment config
-    std::string experiment_config_filename = "../../../config/config.json";
+//    std::string experiment_config_filename = "../../../config/config.json";
+    std::string experiment_config_filename = "../../../experiments/instances/circle4_config.json";
     std::fstream experiment_config_fc(experiment_config_filename.c_str(), std::ios_base::in);
     json experiment_config_json = json::parse(experiment_config_fc);
     // piecewise bezier params
@@ -102,7 +103,7 @@ int main() {
             experiment_config_json["mpc_params"]["physical_limits"]["p_max"][1];
     // fov cbf params
     double fov_beta = double(experiment_config_json["fov_cbf_params"]["beta"]) * M_PI / 180.0;
-    double fov_Ds = experiment_config_json["fov_cbf_params"]["Ds"];
+    double fov_Ds = experiment_config_json["robot_params"]["collision_shape"]["aligned_box"][0];
     double fov_Rs = experiment_config_json["fov_cbf_params"]["Rs"];
 
     VectorDIM a_min;
@@ -159,7 +160,7 @@ int main() {
     for (size_t i = 0; i < num_robots; ++i) {
         // load init states
         State init_state;
-        init_state.pos_ << so_json[i][0], so_json[i][1], so_json[i][2];
+        init_state.pos_ << so_json[i][0], so_json[i][1], convertYawInRange(so_json[i][2]);
         init_state.vel_ << VectorDIM::Zero();
         init_states.push_back(init_state);
         Vector current_state(6);
@@ -170,8 +171,12 @@ int main() {
         target_pos << sf_json[i][0], sf_json[i][1], sf_json[i][2];
         target_positions.push_back(target_pos);
     }
+    // planning results
+    std::vector<std::shared_ptr<SingleParameterPiecewiseCurve>> pred_traj_ptrs(num_robots);
+    std::vector<double> traj_eval_ts(num_robots, 0);
+    double pred_horizon = num_pieces * piece_max_parameter;
 
-    double sim_runtime = 20;
+    double sim_runtime = 10;
     double sim_t = 0;
     int loop_idx = 0;
     while (sim_t < sim_runtime) {
@@ -210,6 +215,53 @@ int main() {
             if (!success) {
                 std::cout << "QP failed at ts: " << sim_t << "\n";
             }
+
+//            /* continuous control
+            if (success) {
+//                SingleParameterPiecewiseCurve optim_traj = trajs.back();
+                pred_traj_ptrs.at(robot_idx) = std::make_shared<SingleParameterPiecewiseCurve>(std::move(trajs.back()));
+                traj_eval_ts.at(robot_idx) = 0;
+            }
+
+            // log down the prediction
+            double t = 0;
+            while (t <= pred_horizon) {
+                for (size_t traj_index = 0; traj_index < trajs.size(); ++traj_index) { // TODO log down iteration of predictions
+                    VectorDIM pred_pos;
+//                    if (success) {
+//                        pred_pos = trajs.at(traj_index).eval(t, 0);
+//                    } else {
+                    double pred_t = traj_eval_ts.at(robot_idx) + t;
+                    if (pred_t > pred_traj_ptrs.at(robot_idx)->max_parameter()) {
+                        pred_t = pred_traj_ptrs.at(robot_idx)->max_parameter();
+                    }
+                    pred_pos = pred_traj_ptrs.at(robot_idx)->eval(pred_t, 0);
+//                    }
+                    states["robots"][std::to_string(robot_idx)]["pred_curve"][loop_idx][traj_index].push_back({pred_pos(0), pred_pos(1), pred_pos(2)});
+                }
+                t += 0.05;
+            }
+
+            // log down the trajectory
+            double eval_t = 0;
+            for (int t_idx = 1; t_idx <= int(h / Ts); ++t_idx) {
+                eval_t = traj_eval_ts.at(robot_idx) + Ts*t_idx;
+                if (eval_t > pred_traj_ptrs.at(robot_idx)->max_parameter()) {
+                    eval_t = pred_traj_ptrs.at(robot_idx)->max_parameter();
+                }
+
+                Vector x_t_pos = pred_traj_ptrs.at(robot_idx)->eval(eval_t, 0);
+                x_t_pos(2) = convertYawInRange(x_t_pos(2));
+                Vector x_t_vel = pred_traj_ptrs.at(robot_idx)->eval(eval_t, 1);
+                Vector x_t(6);
+                x_t << x_t_pos, x_t_vel;
+                states["robots"][std::to_string(robot_idx)]["states"].push_back({x_t[0], x_t[1], x_t[2], x_t[3], x_t[4], x_t[5]});
+                current_states.at(robot_idx) = x_t;
+            }
+            traj_eval_ts.at(robot_idx) = eval_t;
+//             */
+
+            /* discrete control
             Vector U = bezier_impc_cbf.generatorDerivativeControlInputs(2);
 //            std::cout << "curve eval: " << traj.eval(1.5, 0) << "\n";
 
@@ -224,13 +276,13 @@ int main() {
             }
             //
 
-
             Matrix x_pos_pred = exe_A0.pos_ * current_states.at(robot_idx) + exe_Lambda.pos_ * U;
             Matrix x_vel_pred = exe_A0.vel_ * current_states.at(robot_idx) + exe_Lambda.vel_ * U;
             assert(int(h/Ts)*DIM == x_pos_pred.rows());
             int ts_idx = 0;
             for (size_t i = 0; i < int(h / Ts); ++i) {
                 Vector x_t_pos = x_pos_pred.middleRows(ts_idx, 3);
+                x_t_pos(2) = convertYawInRange(x_t_pos(2));
                 Vector x_t_vel = x_vel_pred.middleRows(ts_idx, 3);
                 Vector x_t(6);
                 x_t << x_t_pos, x_t_vel;
@@ -238,6 +290,11 @@ int main() {
                 ts_idx += 3;
                 current_states.at(robot_idx) = x_t;
             }
+             */
+
+        }
+        // update the init_states
+        for (size_t robot_idx = 0; robot_idx < num_robots; ++robot_idx) {
             init_states.at(robot_idx).pos_(0) = current_states.at(robot_idx)(0);
             init_states.at(robot_idx).pos_(1) = current_states.at(robot_idx)(1);
             init_states.at(robot_idx).pos_(2) = convertYawInRange(current_states.at(robot_idx)(2));

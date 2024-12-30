@@ -190,14 +190,15 @@ def plot2D_XYYaw(traj, obs_time=None, save_name="./test.jpg"):
 
 
 if __name__ == "__main__":
+    config_json = "../experiments/instances/circle4_config.json"
     states_json = load_states("CBFXYYawStates.json")
     num_robots = len(states_json["robots"])
     traj = np.array([states_json["robots"][str(_)]["states"] for _ in range(num_robots)])  # [n_robot, ts, dim]
     dt = states_json["dt"]
     Ts = states_json["Ts"]
-    bbox = load_states("../config/config.json")["robot_params"]["collision_shape"]["aligned_box"][:2]
+    bbox = load_states(config_json)["robot_params"]["collision_shape"]["aligned_box"][:2]
     pred_curve = np.array([states_json["robots"][str(_)]["pred_curve"] for _ in range(num_robots)])  # [n, h_samples, impc_iter, horizon, dim]
     # plot2D_XYYaw(traj)
-    FoV_beta = load_states("../config/config.json")["fov_cbf_params"]["beta"] * np.pi/180
-    FoV_range = load_states("../config/config.json")["fov_cbf_params"]["Rs"]
+    FoV_beta = load_states(config_json)["fov_cbf_params"]["beta"] * np.pi/180
+    FoV_range = load_states(config_json)["fov_cbf_params"]["Rs"]
     animation2D_XYYaw(traj, dt, Ts, bbox, pred_curve, FoV_beta, FoV_range)
