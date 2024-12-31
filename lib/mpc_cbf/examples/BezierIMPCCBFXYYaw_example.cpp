@@ -8,6 +8,7 @@
 #include <math/collision_shapes/AlignedBoxCollisionShape.h>
 #include <nlohmann/json.hpp>
 #include <fstream>
+#include <random>
 
 double convertYawInRange(double yaw) {
     assert(yaw < 2 * M_PI && yaw > -2 * M_PI);
@@ -58,6 +59,24 @@ math::VectorDIM<double, 3U> convertToClosestYaw(model::State<double, 3U>& state,
 
 }
 
+math::Vector<double> addRandomNoise(const math::Vector<double>& xt, double pos_std, double vel_std, unsigned int dim=3U) {
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    math::Vector<double> result_xt = xt;
+    double sample = 0.0;
+    std::normal_distribution<double> distribution_position(0.0, pos_std);
+    std::normal_distribution<double> distribution_velocity(0.0, vel_std);
+    for (int i = 0; i < 2*dim; ++i) {
+        if (i < dim) {
+            sample = distribution_position(gen);
+        } else {
+            sample = distribution_velocity(gen);
+        }
+        result_xt(i) += sample;
+    }
+    return result_xt;
+}
+
 int main() {
     constexpr unsigned int DIM = 3U;
     using FovCBF = cbf::FovCBF;
@@ -81,7 +100,8 @@ int main() {
 
     // load experiment config
 //    std::string experiment_config_filename = "../../../config/config.json";
-    std::string experiment_config_filename = "../../../experiments/instances/circle4_config.json";
+    std::string instance_type = "circle";
+    std::string experiment_config_filename = "../../../experiments/instances/"+instance_type+"8_config.json";
     std::fstream experiment_config_fc(experiment_config_filename.c_str(), std::ios_base::in);
     json experiment_config_json = json::parse(experiment_config_fc);
     // piecewise bezier params
@@ -106,6 +126,7 @@ int main() {
     double fov_Ds = experiment_config_json["robot_params"]["collision_shape"]["aligned_box"][0];
     double fov_Rs = experiment_config_json["fov_cbf_params"]["Rs"];
 
+    // robot physical params
     VectorDIM a_min;
     a_min << experiment_config_json["mpc_params"]["physical_limits"]["a_min"][0],
             experiment_config_json["mpc_params"]["physical_limits"]["a_min"][1],
@@ -123,13 +144,17 @@ int main() {
     AlignedBox robot_bbox_at_zero = {-aligned_box_collision_vec, aligned_box_collision_vec};
     std::shared_ptr<const AlignedBoxCollisionShape> aligned_box_collision_shape_ptr =
             std::make_shared<const AlignedBoxCollisionShape>(robot_bbox_at_zero);
+
+    double pos_std = experiment_config_json["mpc_params"]["physical_limits"]["pos_std"];
+    double vel_std = experiment_config_json["mpc_params"]["physical_limits"]["vel_std"];
+
     // create params
     PiecewiseBezierParams piecewise_bezier_params = {num_pieces, num_control_points, piece_max_parameter};
     MPCParams mpc_params = {h, Ts, k_hor, {w_pos_err, w_u_eff, spd_f}, {p_min, p_max, a_min, a_max}};
     FoVCBFParams fov_cbf_params = {fov_beta, fov_Ds, fov_Rs};
 
     // json for record
-    std::string JSON_FILENAME = "../../../tools/CBFXYYawStates.json";
+    std::string JSON_FILENAME = "../../../experiments/instances/results/"+instance_type+"States.json";
     json states;
     states["dt"] = h;
     states["Ts"] = Ts;
@@ -176,7 +201,7 @@ int main() {
     std::vector<double> traj_eval_ts(num_robots, 0);
     double pred_horizon = num_pieces * piece_max_parameter;
 
-    double sim_runtime = 10;
+    double sim_runtime = 40;
     double sim_t = 0;
     int loop_idx = 0;
     while (sim_t < sim_runtime) {
@@ -255,6 +280,7 @@ int main() {
                 Vector x_t_vel = pred_traj_ptrs.at(robot_idx)->eval(eval_t, 1);
                 Vector x_t(6);
                 x_t << x_t_pos, x_t_vel;
+                x_t = addRandomNoise(x_t, pos_std, vel_std);
                 states["robots"][std::to_string(robot_idx)]["states"].push_back({x_t[0], x_t[1], x_t[2], x_t[3], x_t[4], x_t[5]});
                 current_states.at(robot_idx) = x_t;
             }

@@ -59,7 +59,9 @@ if __name__ == '__main__':
             "p_max": [10, 10],
             "a_min": [-3.0, -3.0, -3.0],
             "a_max": [3.0, 3.0, 3.0]
-        }
+        },
+        "pos_std": 0.001,
+        "vel_std": 0.01
     }
 
     # bezier_params
@@ -85,7 +87,7 @@ if __name__ == '__main__':
     # position config
     circle_radius = 4
     circle_center = np.array([0, 0])
-    num_robots = 5
+    num_robots = 8
     angle_bias = 0.1
 
     start_xs, start_ys = generate_points_on_circle(num_robots, circle_radius, angle_bias)  # [num_robots,], [num_robots,]
@@ -93,6 +95,8 @@ if __name__ == '__main__':
 
     start_yaws = compute_yaw(start_xs, start_ys, circle_center)
     goal_yaws = compute_yaw(goal_xs, goal_ys, circle_center)
+    # print("start_yaws: ", start_yaws)
+    # print("goal_yaws: ", goal_yaws)
 
     so = []
     sf = []
