@@ -43,6 +43,7 @@ build/
 dist/
 *.egg-info/
 lib/spawner/config_json/
+experiments/instances/results/
 
 # CMake .gitignore template
 CMakeLists.txt.user
