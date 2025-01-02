@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import json
+import argparse
 
 def generate_points_on_circle(num_points, radius, angle_bias):
     """
@@ -87,9 +88,15 @@ if __name__ == '__main__':
     }
 
     # position config
+    parser = argparse.ArgumentParser(
+        description="argparse to read the number of robots"
+    )
+    parser.add_argument("-n", "--num_robots", type=int, default=2, help="number of robots in simulation")
+    args = parser.parse_args()
+
     circle_radius = 4
     circle_center = np.array([0, 0])
-    num_robots = 8
+    num_robots = args.num_robots
     angle_bias = 0.1
 
     start_xs, start_ys = generate_points_on_circle(num_robots, circle_radius, angle_bias)  # [num_robots,], [num_robots,]
@@ -118,8 +125,7 @@ if __name__ == '__main__':
         plot_position(goal_xs[i], goal_ys[i], i, "b", ax)
         plot_fov(goal_xs[i], goal_ys[i], fov_beta, fov_range, goal_yaws[i], "b", ax)
 
-    # plt.plot()
-    plt.show()
+    # plt.show()
 
     # generate the json config file
     data = {

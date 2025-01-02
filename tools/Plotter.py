@@ -9,6 +9,7 @@ matplotlib.use("Qt5Agg")
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 from matplotlib import animation, rc, rcParams
+import argparse
 
 # visualization parameters
 preview_fov_range = 0.5
@@ -190,8 +191,18 @@ def plot2D_XYYaw(traj, obs_time=None, save_name="./test.jpg"):
 
 
 if __name__ == "__main__":
-    config_json = "../experiments/instances/circle4_config.json"
-    states_json = load_states("CBFXYYawStates.json")
+    parser = argparse.ArgumentParser(
+        description="argparse to read the config, states and output filenames"
+    )
+    parser.add_argument("-c", "--config_filename", type=str, default="../experiments/instances/circle4_config.json", help="path to config json file")
+    parser.add_argument("-s", "--states_filename", type=str, default="../experiments/instances/results/log01012025/circle4States_0.json", help="path to simulation state json file")
+    parser.add_argument("-o", "--output_filename", type=str, default="../experiments/instances/results/log01012025/circle4.mp4", help="path to simulation animation file")
+    args = parser.parse_args()
+
+    config_json = args.config_filename
+    states_json = load_states(args.states_filename)
+    output_filename = args.output_filename
+
     num_robots = len(states_json["robots"])
     traj = np.array([states_json["robots"][str(_)]["states"] for _ in range(num_robots)])  # [n_robot, ts, dim]
     dt = states_json["dt"]
@@ -201,4 +212,4 @@ if __name__ == "__main__":
     # plot2D_XYYaw(traj)
     FoV_beta = load_states(config_json)["fov_cbf_params"]["beta"] * np.pi/180
     FoV_range = load_states(config_json)["fov_cbf_params"]["Rs"]
-    animation2D_XYYaw(traj, dt, Ts, bbox, pred_curve, FoV_beta, FoV_range)
+    animation2D_XYYaw(traj, dt, Ts, bbox, pred_curve, FoV_beta, FoV_range, save_name=output_filename)
