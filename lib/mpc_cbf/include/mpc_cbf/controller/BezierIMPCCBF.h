@@ -60,6 +60,11 @@ namespace mpc_cbf {
 
     private:
         TuningParams mpc_tuning_;
+        VectorDIM v_min_;
+        VectorDIM v_max_;
+        VectorDIM a_min_;
+        VectorDIM a_max_;
+
         Vector ts_samples_;
         T h_;
         int k_hor_;

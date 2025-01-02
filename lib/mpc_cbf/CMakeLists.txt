@@ -15,6 +15,11 @@ if(NOT is_cbf_ADDED)
     add_subdirectory(../cbf ${CMAKE_CURRENT_BINARY_DIR}/cbf)
 endif()
 
+if(NOT TARGET cxxopts)
+    add_subdirectory(../../third_party/cxxopts
+            ${CMAKE_CURRENT_BINARY_DIR}/cxxopts)
+endif()
+
 # add libraries
 add_library(mpc_cbf_optimization_PiecewiseBezierMPCCBFQPOperations SHARED src/optimization/PiecewiseBezierMPCCBFQPOperations.cpp)
 target_include_directories(mpc_cbf_optimization_PiecewiseBezierMPCCBFQPOperations PUBLIC include)
@@ -54,4 +59,5 @@ target_include_directories(mpc_cbf_examples_BezierIMPCCBFXYYaw_example PUBLIC in
 target_link_libraries(mpc_cbf_examples_BezierIMPCCBFXYYaw_example PUBLIC
         mpc_cbf_controller_BezierIMPCCBF
         model_DoubleIntegratorXYYaw
-        math_collision_shapes_AlignedBoxCollisionShape)
+        math_collision_shapes_AlignedBoxCollisionShape
+        cxxopts)

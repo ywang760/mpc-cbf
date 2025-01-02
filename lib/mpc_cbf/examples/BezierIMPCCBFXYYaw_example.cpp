@@ -7,6 +7,7 @@
 #include <mpc_cbf/controller/BezierIMPCCBF.h>
 #include <math/collision_shapes/AlignedBoxCollisionShape.h>
 #include <nlohmann/json.hpp>
+#include <cxxopts.hpp>
 #include <fstream>
 #include <random>
 
@@ -77,7 +78,7 @@ math::Vector<double> addRandomNoise(const math::Vector<double>& xt, double pos_s
     return result_xt;
 }
 
-int main() {
+int main(int argc, char* argv[]) {
     constexpr unsigned int DIM = 3U;
     using FovCBF = cbf::FovCBF;
     using DoubleIntegratorXYYaw = model::DoubleIntegratorXYYaw<double>;
@@ -98,10 +99,24 @@ int main() {
 
     using json = nlohmann::json;
 
+    // cxxopt
+    cxxopts::Options options(
+            "simulation",
+            "fovmpc simulation");
+    options.add_options()
+            ("instance_type", "instance type for simulations",
+             cxxopts::value<std::string>()->default_value("circle"))
+            ("num_robots", "number of robots in the simulation",
+             cxxopts::value<int>()->default_value(std::to_string(2)))
+            ("write_filename", "write to json filename",
+             cxxopts::value<std::string>()->default_value("../../../experiments/instances/results/circle2States.json"));
+    auto option_parse = options.parse(argc, argv);
+
     // load experiment config
 //    std::string experiment_config_filename = "../../../config/config.json";
-    std::string instance_type = "circle";
-    std::string experiment_config_filename = "../../../experiments/instances/"+instance_type+"8_config.json";
+    std::string instance_type = option_parse["instance_type"].as<std::string>();
+    const int num_robots_parse = option_parse["num_robots"].as<int>();
+    std::string experiment_config_filename = "../../../experiments/instances/"+instance_type+std::to_string(num_robots_parse)+"_config.json";
     std::fstream experiment_config_fc(experiment_config_filename.c_str(), std::ios_base::in);
     json experiment_config_json = json::parse(experiment_config_fc);
     // piecewise bezier params
@@ -127,6 +142,14 @@ int main() {
     double fov_Rs = experiment_config_json["fov_cbf_params"]["Rs"];
 
     // robot physical params
+    VectorDIM v_min;
+    v_min << experiment_config_json["mpc_params"]["physical_limits"]["v_min"][0],
+            experiment_config_json["mpc_params"]["physical_limits"]["v_min"][1],
+            experiment_config_json["mpc_params"]["physical_limits"]["v_min"][2];
+    VectorDIM v_max;
+    v_max << experiment_config_json["mpc_params"]["physical_limits"]["v_max"][0],
+            experiment_config_json["mpc_params"]["physical_limits"]["v_max"][1],
+            experiment_config_json["mpc_params"]["physical_limits"]["v_max"][2];
     VectorDIM a_min;
     a_min << experiment_config_json["mpc_params"]["physical_limits"]["a_min"][0],
             experiment_config_json["mpc_params"]["physical_limits"]["a_min"][1],
@@ -150,11 +173,11 @@ int main() {
 
     // create params
     PiecewiseBezierParams piecewise_bezier_params = {num_pieces, num_control_points, piece_max_parameter};
-    MPCParams mpc_params = {h, Ts, k_hor, {w_pos_err, w_u_eff, spd_f}, {p_min, p_max, a_min, a_max}};
+    MPCParams mpc_params = {h, Ts, k_hor, {w_pos_err, w_u_eff, spd_f}, {p_min, p_max, v_min, v_max, a_min, a_max}};
     FoVCBFParams fov_cbf_params = {fov_beta, fov_Ds, fov_Rs};
 
     // json for record
-    std::string JSON_FILENAME = "../../../experiments/instances/results/"+instance_type+"States.json";
+    std::string JSON_FILENAME = option_parse["write_filename"].as<std::string>();
     json states;
     states["dt"] = h;
     states["Ts"] = Ts;
@@ -180,6 +203,7 @@ int main() {
     std::vector<Vector> current_states;
     std::vector<VectorDIM> target_positions;
     size_t num_robots = experiment_config_json["tasks"]["so"].size();
+    assert(num_robots_parse==num_robots);
     json so_json = experiment_config_json["tasks"]["so"];
     json sf_json = experiment_config_json["tasks"]["sf"];
     for (size_t i = 0; i < num_robots; ++i) {

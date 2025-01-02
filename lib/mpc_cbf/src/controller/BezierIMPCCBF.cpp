@@ -21,6 +21,10 @@ namespace mpc_cbf {
 
         // load mpc tuning params
         mpc_tuning_ = p.mpc_params.tuning_;
+        v_min_ = p.mpc_params.limits_.v_min_;
+        v_max_ = p.mpc_params.limits_.v_max_;
+        a_min_ = p.mpc_params.limits_.a_min_;
+        a_max_ = p.mpc_params.limits_.a_max_;
 
         T h = p.mpc_params.h_;
         T Ts = p.mpc_params.Ts_;
@@ -172,14 +176,8 @@ namespace mpc_cbf {
             }
 
             // dynamics constraints
-            T a_max = 10;
-            T v_max = 1;
-            VectorDIM a_min_vec = {-a_max, -a_max, -a_max};
-            VectorDIM a_max_vec = {a_max, a_max, a_max};
-            VectorDIM v_min_vec = {-v_max, -v_max, -v_max};
-            VectorDIM v_max_vec = {v_max, v_max, v_max};
-//            qp_generator_.piecewise_mpc_qp_generator_ptr()->addEvalBoundConstraints(2, a_min_vec, a_max_vec);
-            qp_generator_.piecewise_mpc_qp_generator_ptr()->addEvalBoundConstraints(1, v_min_vec, v_max_vec);
+//            qp_generator_.piecewise_mpc_qp_generator_ptr()->addEvalBoundConstraints(2, a_min_, a_max_);
+            qp_generator_.piecewise_mpc_qp_generator_ptr()->addEvalBoundConstraints(1, v_min_, v_max_);
 
 //            AlignedBox acc_derivative_bbox(a_min_vec, a_max_vec);
 //            AlignedBox vel_derivative_bbox(v_min_vec, v_max_vec);
