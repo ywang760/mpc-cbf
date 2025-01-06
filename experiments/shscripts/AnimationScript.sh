@@ -1,7 +1,7 @@
 cd ../../tools/
-date="01012025"
+date="01052025"
 instances="circle"
-max_r=8
+max_r=10
 exp_id=0
 for (( num_r = 2; num_r <= ${max_r}; num_r++ )); do
   echo Animating simulation of ${num_r} robots...
