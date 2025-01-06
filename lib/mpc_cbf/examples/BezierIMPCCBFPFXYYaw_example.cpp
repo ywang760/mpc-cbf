@@ -12,6 +12,75 @@
 #include <fstream>
 #include <random>
 
+math::Vector<double> closestPointOnEllipse(const math::VectorDIM<double, 3U> &robot_pos,
+                         const math::Vector<double> &target_mean,
+                         const math::Matrix<double> &target_cov) {
+    if (!isinf(target_cov(0, 0))) {
+        Eigen::EigenSolver<math::Matrix<double>> es(target_cov.block(0, 0, 3U-1, 3U-1));
+        math::Vector<double> eigenvalues = es.eigenvalues().real();
+        math::Matrix<double> eigenvectors = es.eigenvectors().real();
+
+        // s = 4.605 for 90% confidence interval
+        // s = 5.991 for 95% confidence interval
+        // s = 9.210 for 99% confidence interval
+        double s = 4.605;
+        double a = sqrt(s * eigenvalues(0)); // major axis
+        double b = sqrt(s * eigenvalues(1)); // minor axis
+
+        // a could be smaller than b, so swap them
+        if (a < b)
+        {
+            double temp = a;
+            a = b;
+            b = temp;
+        }
+
+        int m = 0; // higher eigenvalue index
+        int l = 1; // lower eigenvalue index
+        if (eigenvalues(1) > eigenvalues(0))
+        {
+            m = 1;
+            l = 0;
+        }
+
+        double theta = atan2(eigenvectors(1, m), eigenvectors(0, m)); // angle of the major axis wrt positive x-asis (ccw rotation)
+        if (theta < 0.0) {
+            theta += M_PI;
+        } // angle in [0, 2pi]
+
+        double slope = atan2(-target_mean(1) + robot_pos(1), -target_mean(0) + robot_pos(0));
+        double x_n = target_mean(0) + a * cos(slope - theta) * cos(theta) - b * sin(slope - theta) * sin(theta);
+        double y_n = target_mean(1) + a * cos(slope - theta) * sin(theta) + b * sin(slope - theta) * cos(theta);
+
+        math::Vector<double> p_near(2);
+        p_near << x_n, y_n;
+        return p_near;
+//        double dist = sqrt(pow(p_near(0) - robot_pos(0), 2) + pow(p_near(1) - robot_pos(1), 2));
+//
+//        if (isnan(dist)) {
+//            dist = 5.0;
+//            return dist;
+//        }
+//
+//        // Check if robot is inside ellipse
+//        double d = sqrt(pow(target_mean(0) - robot_pos(0), 2) + pow(target_mean(1) - robot_pos(1), 2));
+//        double range = sqrt(pow(target_mean(0) - p_near(0), 2) + pow(target_mean(1) - p_near(1), 2));
+//
+//        if (d < range) {
+//            return -dist;
+//        } else {
+//            return dist;
+//        }
+    } else {
+        math::Vector<double> p_near(2);
+        p_near << 0, 0;
+        return p_near;
+    }
+
+//    return -5.0;
+}
+
+
 double convertYawInRange(double yaw) {
     assert(yaw < 2 * M_PI && yaw > -2 * M_PI);
     if (yaw > M_PI) {
@@ -323,6 +392,10 @@ int main(int argc, char* argv[]) {
                 states["robots"][std::to_string(robot_idx)]["estimates_cov"][std::to_string(neighbor_id)].push_back({cov(0), cov(1), cov(2),
                                                                                                                      cov(3), cov(4), cov(5),
                                                                                                                      cov(6), cov(7), cov(8)});
+
+                // for the closest point on ellipse visualization
+                Vector p_near = closestPointOnEllipse(ego_pos, estimate, cov);
+                states["robots"][std::to_string(robot_idx)]["p_near_ellipse"][std::to_string(neighbor_id)].push_back({p_near(0), p_near(1)});
 
 //                // for debug: fixed estimate
 //                other_robot_positions.push_back(init_states.at(neighbor_id).pos_);
