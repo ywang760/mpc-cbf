@@ -58,8 +58,8 @@ if __name__ == '__main__':
         "physical_limits": {
             "p_min": [-10, -10],
             "p_max": [10, 10],
-            "v_min": [-0.5, -0.5, -0.5],
-            "v_max": [0.5, 0.5, 0.5],
+            "v_min": [-0.5, -0.5, -2.0],
+            "v_max": [0.5, 0.5, 2.0],
             "a_min": [-10.0, -10.0, -10.0],
             "a_max": [10.0, 10.0, 10.0],
             "pos_std": 0.001,
@@ -77,7 +77,7 @@ if __name__ == '__main__':
     # fov cbf params
     fov_cbf_params = {
         "beta": 120,
-        "Rs": 10
+        "Rs": 1000
     }
 
     # robot params
