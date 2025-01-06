@@ -67,7 +67,7 @@ namespace mpc_cbf {
             });
             // define slack weights
             T w_init = 1000;
-            T decay_factor = 0.25;
+            T decay_factor = 0.1;
             for (size_t i = 0; i < num_neighbors; ++i) {
                 size_t sort_idx = idx.at(i);
                 slack_weights.at(i) = w_init * pow(decay_factor, sort_idx);
