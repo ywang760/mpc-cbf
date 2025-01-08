@@ -45,6 +45,17 @@ def plot_position(x, y, idx, c="r", ax=None):
     ax.text(x, y, str(idx), fontsize=10)
 
 if __name__ == '__main__':
+    # take argument in
+    parser = argparse.ArgumentParser(
+        description="argparse to read the number of robots"
+    )
+    parser.add_argument("-n", "--num_robots", type=int, default=2, help="number of robots in simulation")
+    parser.add_argument("-f", "--fov", type=int, default=120, help="degree of fov")
+    args = parser.parse_args()
+
+    # fov config
+    fov = args.fov
+
     # mpc params
     mpc_params = {
         "h": 0.1,
@@ -76,7 +87,7 @@ if __name__ == '__main__':
 
     # fov cbf params
     fov_cbf_params = {
-        "beta": 120,
+        "beta": fov,
         "Rs": 1000
     }
 
@@ -88,12 +99,6 @@ if __name__ == '__main__':
     }
 
     # position config
-    parser = argparse.ArgumentParser(
-        description="argparse to read the number of robots"
-    )
-    parser.add_argument("-n", "--num_robots", type=int, default=2, help="number of robots in simulation")
-    args = parser.parse_args()
-
     circle_radius = 4
     circle_center = np.array([0, 0])
     num_robots = args.num_robots
@@ -139,5 +144,5 @@ if __name__ == '__main__':
         "robot_params": robot_params
     }
     # save to json
-    with open("circle%d_config.json"%(num_robots), "w") as file:
+    with open("circle_instances/"+"circle%d_fov%d_config.json"%(num_robots, fov), "w") as file:
         json.dump(data, file, indent=4)

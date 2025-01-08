@@ -199,15 +199,20 @@ int main(int argc, char* argv[]) {
              cxxopts::value<std::string>()->default_value("circle"))
             ("num_robots", "number of robots in the simulation",
              cxxopts::value<int>()->default_value(std::to_string(2)))
+            ("fov", "fov degree",
+             cxxopts::value<int>()->default_value(std::to_string(120)))
             ("write_filename", "write to json filename",
              cxxopts::value<std::string>()->default_value("../../../experiments/instances/results/circle2States.json"));
     auto option_parse = options.parse(argc, argv);
 
     // load experiment config
+    std::cout << "loading experiment settings...\n";
 //    std::string experiment_config_filename = "../../../config/config.json";
     std::string instance_type = option_parse["instance_type"].as<std::string>();
+    std::string instance_path = instance_type+"_instances/";
     const int num_robots_parse = option_parse["num_robots"].as<int>();
-    std::string experiment_config_filename = "../../../experiments/instances/"+instance_type+std::to_string(num_robots_parse)+"_config.json";
+    const int fov_beta_parse = option_parse["fov"].as<int>();
+    std::string experiment_config_filename = "../../../experiments/instances/"+instance_path+instance_type+std::to_string(num_robots_parse)+"_fov"+std::to_string(fov_beta_parse)+"_config.json";
     std::fstream experiment_config_fc(experiment_config_filename.c_str(), std::ios_base::in);
     json experiment_config_json = json::parse(experiment_config_fc);
     // piecewise bezier params
@@ -229,6 +234,8 @@ int main(int argc, char* argv[]) {
             experiment_config_json["mpc_params"]["physical_limits"]["p_max"][1];
     // fov cbf params
     double fov_beta = double(experiment_config_json["fov_cbf_params"]["beta"]) * M_PI / 180.0;
+    assert(fov_beta==fov_beta_parse);
+    std::cout << "fov_beta: " << double(experiment_config_json["fov_cbf_params"]["beta"]) << "\n";
     double fov_Ds = experiment_config_json["robot_params"]["collision_shape"]["aligned_box"][0];
     double fov_Rs = experiment_config_json["fov_cbf_params"]["Rs"];
 
