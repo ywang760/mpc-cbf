@@ -55,6 +55,41 @@ def CI_plot(x, mean_arr, ci, save_name="./ci_plot.png", xlabel="entry", ylabel="
     ax.set_ylabel(ylabel)
     plt.savefig(save_name, bbox_inches='tight')
 
+def list_CI_plot(x, mean_arr_list, ci_arr_list, label_list, colors, xlabel="entry", ylabel="value", save_name="./ci_plot.png"):
+    '''
+    plot the confident interval for the reward curve across the training epochs.
+    :param
+    x: [entries,],
+    mean_arr: [entries,], entries of properties of curve.
+    ci: [entries,]
+    :return: confidence interval plot for value v.s. entries.
+    '''
+    assert x.shape == mean_arr_list[0].shape
+    # create canvas
+    fig, ax = plt.subplots()
+    for i in range(len(mean_arr_list)):
+    # plot
+        ax.plot(x, mean_arr_list[i][:], c=colors[i], label=label_list[i])
+        ax.fill_between(x,
+                        mean_arr_list[i][:] - ci_arr_list[i][:],
+                        mean_arr_list[i][:] + ci_arr_list[i][:],
+                        color=colors[i] ,alpha=0.1)
+    plt.xticks(x)
+
+    ####################################################
+    # # assistant plot
+    # assistant_x = np.linspace(1, 10, 100)
+    # assistant_y = 0.13/assistant_x
+    # ax.plot(assistant_x, assistant_y, ls = "--")
+    ####################################################
+
+
+    # legend and label, save the figure
+    plt.legend()
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
+    plt.savefig(save_name, bbox_inches='tight')
+
 
 def Multi_CI_plot(x_axis_list, mu_list, ci_list, metric_names, xlabel=None, save_name="./NumberScale/NumberScaleMultiPlot"):
     assert len(metric_names) == 2  # TODO change this number for different number of CI plots
