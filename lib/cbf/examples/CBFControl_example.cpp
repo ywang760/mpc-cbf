@@ -51,7 +51,7 @@ int main() {
     double h = experiment_config_json["mpc_params"]["h"];
 
     double fov_beta = double(experiment_config_json["fov_cbf_params"]["beta"]) * M_PI / 180.0;
-    double fov_Ds = experiment_config_json["fov_cbf_params"]["Ds"];
+    double fov_Ds = experiment_config_json["robot_params"]["collision_shape"]["aligned_box"][0];
     double fov_Rs = experiment_config_json["fov_cbf_params"]["Rs"];
     double vmax = 2.0;
 
