@@ -9,25 +9,29 @@ namespace mpc_cbf {
     BezierIMPCCBF<T, DIM>::BezierIMPCCBF(Params &p, std::shared_ptr<DoubleIntegrator> model_ptr,
                                          std::shared_ptr<FovCBF> fov_cbf_ptr, uint64_t bezier_continuity_upto_degree,
                                          std::shared_ptr<const CollisionShape> collision_shape_ptr,
-                                         int impc_iter, int num_neighbors, bool slack_mode)
+                                         int num_neighbors)
     : bezier_continuity_upto_degree_(bezier_continuity_upto_degree),
-    collision_shape_ptr_(collision_shape_ptr),
-    impc_iter_(impc_iter),
-    slack_mode_(slack_mode) {
+    collision_shape_ptr_(collision_shape_ptr) {
+        // impc params
+        impc_iter_ = p.impc_params.impc_iter_;
+        cbf_horizon_ = p.impc_params.cbf_horizon_;
+        slack_cost_ = p.impc_params.slack_cost_;
+        slack_decay_rate_ = p.impc_params.slack_decay_rate_;
+        slack_mode_ = p.impc_params.slack_mode_;
         // Initiate the qp_generator
         std::unique_ptr<PiecewiseBezierMPCCBFQPOperations> piecewise_mpc_cbf_operations_ptr =
-                std::make_unique<PiecewiseBezierMPCCBFQPOperations>(p, model_ptr, fov_cbf_ptr);
-        qp_generator_.addPiecewise(std::move(piecewise_mpc_cbf_operations_ptr), num_neighbors, slack_mode);
+                std::make_unique<PiecewiseBezierMPCCBFQPOperations>(p.mpc_cbf_params, model_ptr, fov_cbf_ptr);
+        qp_generator_.addPiecewise(std::move(piecewise_mpc_cbf_operations_ptr), num_neighbors, slack_mode_);
 
         // load mpc tuning params
-        mpc_tuning_ = p.mpc_params.tuning_;
-        v_min_ = p.mpc_params.limits_.v_min_;
-        v_max_ = p.mpc_params.limits_.v_max_;
-        a_min_ = p.mpc_params.limits_.a_min_;
-        a_max_ = p.mpc_params.limits_.a_max_;
+        mpc_tuning_ = p.mpc_cbf_params.mpc_params.tuning_;
+        v_min_ = p.mpc_cbf_params.mpc_params.limits_.v_min_;
+        v_max_ = p.mpc_cbf_params.mpc_params.limits_.v_max_;
+        a_min_ = p.mpc_cbf_params.mpc_params.limits_.a_min_;
+        a_max_ = p.mpc_cbf_params.mpc_params.limits_.a_max_;
 
-        T h = p.mpc_params.h_;
-        T Ts = p.mpc_params.Ts_;
+        T h = p.mpc_cbf_params.mpc_params.h_;
+        T Ts = p.mpc_cbf_params.mpc_params.Ts_;
         assert(Ts <= h);
         assert((h - (int)(h/Ts) * Ts) == 0);
         // control sequence U control point coefficient
@@ -35,8 +39,8 @@ namespace mpc_cbf {
         ts_samples_ = Vector::LinSpaced(u_interp, 0, h - Ts); // [I,1]
 
         // for position pred
-        h_ = p.mpc_params.h_;
-        k_hor_ = p.mpc_params.k_hor_;
+        h_ = p.mpc_cbf_params.mpc_params.h_;
+        k_hor_ = p.mpc_cbf_params.mpc_params.k_hor_;
         h_samples_ = Vector::LinSpaced(k_hor_, 0, (k_hor_-1)*h_);
     }
 
@@ -66,8 +70,8 @@ namespace mpc_cbf {
                 return compareDist(current_pos, other_pos_covs.at(a_idx), other_pos_covs.at(b_idx));
             });
             // define slack weights
-            T w_init = 1000;
-            T decay_factor = 0.1;
+            T w_init = slack_cost_;
+            T decay_factor = slack_decay_rate_;
             for (size_t i = 0; i < num_neighbors; ++i) {
                 size_t sort_idx = idx.at(i);
                 slack_weights.at(i) = w_init * pow(decay_factor, sort_idx);
@@ -144,8 +148,7 @@ namespace mpc_cbf {
                 // pred the robot's position in the horizon, use for the CBF constraints
                 std::vector<State> pred_states;
                 std::vector<T> slack_values;
-                int cbf_horizon = 2; // TODO pass in this argument
-                for (size_t k = 0; k < cbf_horizon; ++k) {
+                for (size_t k = 0; k < cbf_horizon_; ++k) {
                     State pred_state;
                     pred_state.pos_ = result_curves.back().eval(h_samples_(k), 0);
                     pred_state.vel_ = result_curves.back().eval(h_samples_(k), 1);
@@ -158,7 +161,7 @@ namespace mpc_cbf {
                     Matrix other_xy_cov(2, 2);
                     other_xy_cov = other_robot_covs.at(i).block(0,0,2,2);
                     // compute the slack value
-                    for (size_t k = 0; k < cbf_horizon; ++k) {
+                    for (size_t k = 0; k < cbf_horizon_; ++k) {
                         T distance_to_ellipse = distanceToEllipse(pred_states.at(k).pos_, other_xy, other_xy_cov);
                         slack_values.push_back(0); // TODO pass in param
                     }

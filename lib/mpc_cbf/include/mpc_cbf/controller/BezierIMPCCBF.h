@@ -17,7 +17,7 @@ namespace mpc_cbf {
     template <typename T, unsigned int DIM>
     class BezierIMPCCBF {
     public:
-        using Params = typename mpc_cbf::PiecewiseBezierMPCCBFQPOperations<T, DIM>::Params;
+        using MPCCBFParams = typename mpc_cbf::PiecewiseBezierMPCCBFQPOperations<T, DIM>::Params;
         using DoubleIntegrator = typename mpc_cbf::PiecewiseBezierMPCCBFQPOperations<T, DIM>::DoubleIntegrator;
         using PiecewiseBezierMPCCBFQPOperations = mpc_cbf::PiecewiseBezierMPCCBFQPOperations<T, DIM>;
         using PiecewiseBezierMPCCBFQPGenerator = mpc_cbf::PiecewiseBezierMPCCBFQPGenerator<T, DIM>;
@@ -36,10 +36,23 @@ namespace mpc_cbf {
         using CPLEXSolver = qpcpp::CPLEXSolver<T>;
         using SolveStatus = qpcpp::SolveStatus;
 
+        struct IMPCParams {
+            int cbf_horizon_;
+            int impc_iter_;
+            T slack_cost_;
+            T slack_decay_rate_;
+            bool slack_mode_;
+        };
+
+        struct Params {
+            MPCCBFParams &mpc_cbf_params;
+            IMPCParams &impc_params;
+        };
+
         BezierIMPCCBF(Params &p, std::shared_ptr<DoubleIntegrator> model_ptr, std::shared_ptr<FovCBF> fov_cbf_ptr,
                       uint64_t bezier_continuity_upto_degree,
                       std::shared_ptr<const CollisionShape> collision_shape_ptr,
-                      int impc_iter, int num_neighbors=0, bool slack_mode=false);
+                      int num_neighbors=0);
         ~BezierIMPCCBF()=default;
 
         bool optimize(std::vector<SingleParameterPiecewiseCurve> &result_curve,
@@ -76,6 +89,9 @@ namespace mpc_cbf {
         uint64_t bezier_continuity_upto_degree_;
         std::shared_ptr<const CollisionShape> collision_shape_ptr_;
         int impc_iter_;
+        int cbf_horizon_;
+        T slack_cost_;
+        T slack_decay_rate_;
         bool slack_mode_;
     };
 
