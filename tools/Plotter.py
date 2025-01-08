@@ -8,17 +8,71 @@ import matplotlib
 matplotlib.use("Qt5Agg")
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
+from matplotlib.patches import Ellipse, Circle
 from matplotlib import animation, rc, rcParams
+import colorsys
+import argparse
 
 # visualization parameters
 preview_fov_range = 0.5
 preview_skip_step = 5
 enable_preview = True
 
+def generate_rgb_colors(num_colors):
+    output = []
+    num_colors += 1 # to avoid the first color
+    for index in range(1, num_colors):
+        incremented_value = 1.0 * index / num_colors
+        output.append(colorsys.hsv_to_rgb(incremented_value, 0.75, 0.75))
+    return np.asarray(output)
+
 def load_states(json_filename):
     f = open(json_filename)
     data = json.load(f)
     return data
+
+def compute_ellipse(pos, cov, nstd=2):
+    def eigsorted(cov):
+        vals, vecs = np.linalg.eigh(cov)
+        order = vals.argsort()[::-1]
+        return vals[order], vecs[:, order]
+
+    vals, vecs = eigsorted(cov)
+    theta = np.degrees(np.arctan2(*vecs[:, 0][::-1]))
+
+    # Width and height are "full" widths, not radius
+    width, height = 2 * nstd * np.sqrt(vals)
+    return pos, width, height, theta
+
+def plot_cov_ellipse_2d(pos, cov, nstd=2, ax=None, **kwargs):
+    """
+    Plots an `nstd` sigma error ellipse based on the specified covariance
+    matrix (`cov`). Additional keyword arguments are passed on to the
+    ellipse patch artist.
+
+    Parameters
+    ----------
+        pos : The location of the center of the ellipse. Expects a 2-element
+            sequence of [x0, y0].
+        cov : The 2x2 covariance matrix to base the ellipse on
+        nstd : The radius of the ellipse in numbers of standard deviations.
+            Defaults to 2 standard deviations.
+        ax : The axis that the ellipse will be plotted on. Defaults to the
+            current axis.
+        Additional keyword arguments are pass on to the ellipse patch.
+
+    Returns
+    -------
+        A matplotlib ellipse artist
+    """
+    if ax is None:
+        ax = plt.gca()
+
+    pos, width, height, theta = compute_ellipse(pos, cov)
+    ellip = Ellipse(xy=pos, width=width, height=height, angle=theta, **kwargs)
+
+    ax.add_artist(ellip)
+    return ellip
 
 def fov_xy(pos, radian, fov_beta, fov_range, num_points=100):
     pos_x = pos[0]
@@ -29,10 +83,10 @@ def fov_xy(pos, radian, fov_beta, fov_range, num_points=100):
     y = fov_range * np.sin(angles) + pos_y
     return x,y
 
-def animation2D_XYYaw(traj, dt, Ts, bbox, pred_curve=None, fov_beta=None, fov_range=None, Trailing=True, PredCurve=True, save_name= "./test.mp4"):
+def animation2D_XYYaw(traj, estimate_mean, estimate_cov, p_near, dt, Ts, bbox, pred_curve=None, fov_beta=None, fov_range=None, Trailing=True, Estimation=True, PredCurve=True, colors="r", save_name= "./test.mp4"):
     # animation settings
     n_agent, total_frame, _ = traj.shape
-    trailing_buf_size = 1000
+    trailing_buf_size = 1000000
     dir_len = 0.1  # length for orientation tick
 
     # load traj
@@ -43,6 +97,8 @@ def animation2D_XYYaw(traj, dt, Ts, bbox, pred_curve=None, fov_beta=None, fov_ra
     x_v = traj[:, :, 3]
     y_v = traj[:, :, 4]
     yaw_v = traj[:, :, 5]
+    est_x = estimate_mean[:, :, :, 0]  # [n, n-1, ts]
+    est_y = estimate_mean[:, :, :, 1]
 
     # set frame scale
     x_min = np.min(x)-3
@@ -58,7 +114,8 @@ def animation2D_XYYaw(traj, dt, Ts, bbox, pred_curve=None, fov_beta=None, fov_ra
     ax.set_aspect('equal')
 
     # plot the init frame
-    p, = ax.plot(x[0], y[0], c='dodgerblue', marker='o', markersize=5, linestyle='None', alpha=0.6)
+    p = [ax.plot(x[0], y[0], c=colors[i], marker='o', markersize=6, linestyle='None', alpha=0.6) for i in range(n_agent)]
+
     vel_line = [Line2D([x[0][0], dir_len * x_v[0][0] + x[0][0]],
                        [y[0][0], dir_len * y_v[0][0] + y[0][0]]) for _ in range(n_agent)]
     for i in range(n_agent):
@@ -70,7 +127,7 @@ def animation2D_XYYaw(traj, dt, Ts, bbox, pred_curve=None, fov_beta=None, fov_ra
     for i in range(n_agent):
         pos = [x[i, 0], y[i, 0]]
         fov_x, fov_y = fov_xy(pos, yaw[i, 0], fov_beta, fov_range)
-        fov.append(ax.fill(np.concatenate(([pos[0]], fov_x, [pos[0]])), np.concatenate(([pos[1]], fov_y, [pos[1]])), color='lightblue', alpha=0.5))
+        fov.append(ax.fill(np.concatenate(([pos[0]], fov_x, [pos[0]])), np.concatenate(([pos[1]], fov_y, [pos[1]])), color=colors[i], alpha=0.5))
 
     # Add the rectangles (boxes)
     boxes = []
@@ -83,7 +140,29 @@ def animation2D_XYYaw(traj, dt, Ts, bbox, pred_curve=None, fov_beta=None, fov_ra
     if Trailing:
         trail = [Line2D([x[0][0]], [y[0][0]]) for i in range(n_agent)]
         for i in range(n_agent):
-            trail[i], = ax.plot([x[i, 0]], [y[i, 0]], c='dodgerblue', marker=None, alpha=0.2)
+            trail[i], = ax.plot([x[i, 0]], [y[i, 0]], c=colors[i], marker=None, linewidth=3, alpha=0.4)
+
+    if Estimation:
+        est_mean = [[Line2D([x[i][j]], [y[i][j]]) for j in range(n_agent-1)] for i in range(n_agent)]
+        for i in range(n_agent):
+            for j in range(n_agent-1):
+                est_mean[i][j], = ax.plot([est_x[i, j, 0], est_y[i, j, 0]], c=colors[i], marker=None, alpha=0.2)
+
+        ellipses = []
+        for i in range(n_agent):
+            ellipses.append([])
+            for j in range(n_agent-1):
+                est_pos = estimate_mean[i, j, 0, :2]  # [2, ]
+                est_cov_arr = estimate_cov[i, j, 0, :]  # [9, ]
+                est_cov = np.array([est_cov_arr[0], est_cov_arr[1], est_cov_arr[3], est_cov_arr[4]]).reshape(2,2)
+                ellipse_ij = plot_cov_ellipse_2d(est_pos, est_cov, edgecolor=colors[i], facecolor=colors[i], alpha=0.3, ax=ax)
+                ellipses[i].append(ellipse_ij)
+
+        p_near_ellipse = []
+        for i in range(n_agent):
+            p_near_ellipse.append([])
+            for j in range(n_agent-1):
+                p_near_ellipse[i].append(ax.plot(p_near[i,j,0,0], p_near[i,j,0,1], c=colors[i], marker='x', markersize=5, linestyle='None', alpha=0.6))
 
     if PredCurve:
         fov_preview_plot_step = list(range(0, pred_curve.shape[-2], preview_skip_step))+list([pred_curve.shape[-2]-1])
@@ -118,7 +197,9 @@ def animation2D_XYYaw(traj, dt, Ts, bbox, pred_curve=None, fov_beta=None, fov_ra
         if ts % 100 == 0:
             print("Animating frame {0}/{1}".format(ts, total_frame))
 
-        p.set_data(x[:, ts], y[:, ts])
+        for i in range(n_agent):
+            p_i = p[i][0]
+            p_i.set_data([x[i, ts]], [y[i, ts]])
         for i in range(n_agent):
             vel_line[i].set_data([x[i][ts], dir_len * x_v[i][ts] + x[i][ts]],
                                  [y[i][ts], dir_len * y_v[i][ts] + y[i][ts]])
@@ -138,6 +219,28 @@ def animation2D_XYYaw(traj, dt, Ts, bbox, pred_curve=None, fov_beta=None, fov_ra
                 trail[i].set_data(x[i, ts - trail_offset:ts], y[i, ts - trail_offset:ts])
 
         pred_index = int(ts//int(dt/Ts))
+        if Estimation:
+            for i in range(n_agent):
+                for j in range(n_agent-1):
+                    est_mean[i][j].set_data([est_x[i, j, :pred_index], est_y[i, j, :pred_index]])
+
+            for i in range(n_agent):
+                for j in range(n_agent-1):
+                    est_pos = estimate_mean[i, j, pred_index, :2]  # [2, ]
+                    est_cov_arr = estimate_cov[i, j, pred_index, :]  # [9, ]
+                    est_cov = np.array([est_cov_arr[0], est_cov_arr[1], est_cov_arr[3], est_cov_arr[4]]).reshape(2,2)
+
+                    _, ellipse_width, ellipse_height, ellipse_theta = compute_ellipse(est_pos, est_cov)
+                    ellipses[i][j].center = (est_pos[0], est_pos[1])
+                    ellipses[i][j].width = ellipse_width
+                    ellipses[i][j].height = ellipse_height
+                    ellipses[i][j].angle = ellipse_theta
+
+            for i in range(n_agent):
+                for j in range(n_agent-1):
+                    p_near_ellipse[i][j][0].set_data([p_near[i,j,pred_index,0]], [p_near[i,j,pred_index,1]])
+
+
         if PredCurve:
             for i in range(n_agent):
                 for impc_it in range(impc_iters):
@@ -153,7 +256,7 @@ def animation2D_XYYaw(traj, dt, Ts, bbox, pred_curve=None, fov_beta=None, fov_ra
                                     pred_fovs[i][index_i][index][0].set_xy(np.column_stack((np.concatenate(([pos[0]], fov_x, [pos[0]])),
                                                                                             np.concatenate(([pos[1]], fov_y, [pos[1]])))))
 
-        return p,
+        return p[0][0],
 
     # call the animator.  blit=True means only re-draw the parts that have changed.
     anim = animation.FuncAnimation(fig, animate, frames=total_frame, interval=Ts*1e+3, blit=True)
@@ -190,14 +293,52 @@ def plot2D_XYYaw(traj, obs_time=None, save_name="./test.jpg"):
 
 
 if __name__ == "__main__":
-    states_json = load_states("CBFXYYawStates.json")
+    parser = argparse.ArgumentParser(
+        description="argparse to read the config, states and output filenames"
+    )
+    parser.add_argument("-c", "--config_filename", type=str, default="../experiments/instances/circle2_config.json", help="path to config json file")
+    parser.add_argument("-s", "--states_filename", type=str, default="../experiments/instances/results/log01012025/circle2States_0.json", help="path to simulation state json file")
+    parser.add_argument("-o", "--output_filename", type=str, default="../experiments/instances/results/log01012025/circle2.mp4", help="path to simulation animation file")
+    args = parser.parse_args()
+
+    config_json = args.config_filename
+    states_json = load_states(args.states_filename)
+    output_filename = args.output_filename
+
     num_robots = len(states_json["robots"])
     traj = np.array([states_json["robots"][str(_)]["states"] for _ in range(num_robots)])  # [n_robot, ts, dim]
+    neighbor_ids = []
+    for i in range(num_robots):
+        neighbor_ids.append([])
+        for j in range(num_robots):
+            if i!=j:
+                neighbor_ids[i].append(j)
+
+    estimate_mean = []
+    estimate_cov = []
+    p_near = []
+    for i in range(num_robots):
+        i_neighbor_ids = neighbor_ids[i]
+        estimate_mean.append([])
+        estimate_cov.append([])
+        p_near.append([])
+        for j in i_neighbor_ids:
+            estimate_mean[i].append(states_json["robots"][str(i)]["estimates_mean"][str(j)])
+            estimate_cov[i].append(states_json["robots"][str(i)]["estimates_cov"][str(j)])
+            p_near[i].append(states_json["robots"][str(i)]["p_near_ellipse"][str(j)])
+
+    estimate_mean = np.array(estimate_mean)  # [n_robot, n_robot-1, ts, dim]
+    estimate_cov = np.array(estimate_cov)  # [n_robot, n_robot-1, ts, dimxdim]
+    p_near = np.array(p_near)  # [n_robot, n_robot-1, ts, 2]
+
+    # estimate_mean = [[states_json["robots"][str(_)]["estimates_mean"][neighbor_id] for neighbor_id in neighbor_ids[_]] for _ in range(num_robots)]]  # [n_robot, n_robot-1, ts, dim]
     dt = states_json["dt"]
     Ts = states_json["Ts"]
-    bbox = load_states("../config/config.json")["robot_params"]["collision_shape"]["aligned_box"][:2]
+    bbox = load_states(config_json)["robot_params"]["collision_shape"]["aligned_box"][:2]
     pred_curve = np.array([states_json["robots"][str(_)]["pred_curve"] for _ in range(num_robots)])  # [n, h_samples, impc_iter, horizon, dim]
     # plot2D_XYYaw(traj)
-    FoV_beta = load_states("../config/config.json")["fov_cbf_params"]["beta"] * np.pi/180
-    FoV_range = load_states("../config/config.json")["fov_cbf_params"]["Rs"]
-    animation2D_XYYaw(traj, dt, Ts, bbox, pred_curve, FoV_beta, FoV_range)
+    FoV_beta = load_states(config_json)["fov_cbf_params"]["beta"] * np.pi/180
+    FoV_range = load_states(config_json)["fov_cbf_params"]["Rs"]
+
+    colors = generate_rgb_colors(num_robots)
+    animation2D_XYYaw(traj, estimate_mean, estimate_cov, p_near, dt, Ts, bbox, pred_curve, FoV_beta, FoV_range, colors=colors, save_name=output_filename)

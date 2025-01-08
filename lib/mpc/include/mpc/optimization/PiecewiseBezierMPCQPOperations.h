@@ -22,7 +22,7 @@ namespace mpc {
     // params for MPC
     template <typename T>
     struct PhysicalLimits {
-        math::Vector<T> p_max_, p_min_, a_max_, a_min_;
+        math::Vector<T> p_min_, p_max_, v_min_, v_max_, a_min_, a_max_;
     };
 
     template <typename T>

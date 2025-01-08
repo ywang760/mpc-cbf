@@ -6,10 +6,80 @@
 #include <model/DoubleIntegratorXYYaw.h>
 #include <mpc_cbf/controller/BezierIMPCCBF.h>
 #include <math/collision_shapes/AlignedBoxCollisionShape.h>
+#include <particle_filter/detail/particle_filter.h>
 #include <nlohmann/json.hpp>
 #include <cxxopts.hpp>
 #include <fstream>
 #include <random>
+
+math::Vector<double> closestPointOnEllipse(const math::VectorDIM<double, 3U> &robot_pos,
+                         const math::Vector<double> &target_mean,
+                         const math::Matrix<double> &target_cov) {
+    if (!isinf(target_cov(0, 0))) {
+        Eigen::EigenSolver<math::Matrix<double>> es(target_cov.block(0, 0, 3U-1, 3U-1));
+        math::Vector<double> eigenvalues = es.eigenvalues().real();
+        math::Matrix<double> eigenvectors = es.eigenvectors().real();
+
+        // s = 4.605 for 90% confidence interval
+        // s = 5.991 for 95% confidence interval
+        // s = 9.210 for 99% confidence interval
+        double s = 4.605;
+        double a = sqrt(s * eigenvalues(0)); // major axis
+        double b = sqrt(s * eigenvalues(1)); // minor axis
+
+        // a could be smaller than b, so swap them
+        if (a < b)
+        {
+            double temp = a;
+            a = b;
+            b = temp;
+        }
+
+        int m = 0; // higher eigenvalue index
+        int l = 1; // lower eigenvalue index
+        if (eigenvalues(1) > eigenvalues(0))
+        {
+            m = 1;
+            l = 0;
+        }
+
+        double theta = atan2(eigenvectors(1, m), eigenvectors(0, m)); // angle of the major axis wrt positive x-asis (ccw rotation)
+        if (theta < 0.0) {
+            theta += M_PI;
+        } // angle in [0, 2pi]
+
+        double slope = atan2(-target_mean(1) + robot_pos(1), -target_mean(0) + robot_pos(0));
+        double x_n = target_mean(0) + a * cos(slope - theta) * cos(theta) - b * sin(slope - theta) * sin(theta);
+        double y_n = target_mean(1) + a * cos(slope - theta) * sin(theta) + b * sin(slope - theta) * cos(theta);
+
+        math::Vector<double> p_near(2);
+        p_near << x_n, y_n;
+        return p_near;
+//        double dist = sqrt(pow(p_near(0) - robot_pos(0), 2) + pow(p_near(1) - robot_pos(1), 2));
+//
+//        if (isnan(dist)) {
+//            dist = 5.0;
+//            return dist;
+//        }
+//
+//        // Check if robot is inside ellipse
+//        double d = sqrt(pow(target_mean(0) - robot_pos(0), 2) + pow(target_mean(1) - robot_pos(1), 2));
+//        double range = sqrt(pow(target_mean(0) - p_near(0), 2) + pow(target_mean(1) - p_near(1), 2));
+//
+//        if (d < range) {
+//            return -dist;
+//        } else {
+//            return dist;
+//        }
+    } else {
+        math::Vector<double> p_near(2);
+        p_near << 0, 0;
+        return p_near;
+    }
+
+//    return -5.0;
+}
+
 
 double convertYawInRange(double yaw) {
     assert(yaw < 2 * M_PI && yaw > -2 * M_PI);
@@ -19,6 +89,26 @@ double convertYawInRange(double yaw) {
         return yaw + 2 * M_PI;
     } else {
         return yaw;
+    }
+}
+
+bool insideFOV(Eigen::VectorXd robot, Eigen::VectorXd target, double fov, double range)
+{
+    double yaw = robot(2);
+
+    Eigen::Matrix3d R;
+    R << cos(yaw), sin(yaw), 0.0,
+            -sin(yaw), cos(yaw), 0.0,
+            0.0, 0.0, 1.0;
+    Eigen::VectorXd t_local = R.block<2,2>(0,0) * (target.head(2) - robot.head(2));
+    double dist = t_local.norm();
+    double angle = abs(atan2(t_local(1), t_local(0)));
+    if (angle <= 0.5*fov && dist <= range)
+    {
+        return true;
+    } else
+    {
+        return false;
     }
 }
 
@@ -90,6 +180,7 @@ int main(int argc, char* argv[]) {
     using Matrix = math::Matrix<double>;
     using AlignedBox = math::AlignedBox<double, DIM>;
     using AlignedBoxCollisionShape = math::AlignedBoxCollisionShape<double, DIM>;
+    using ParticleFilter = pf::ParticleFilter;
 
     using PiecewiseBezierParams = mpc::PiecewiseBezierParams<double, DIM>;
     using MPCParams = mpc::MPCParams<double>;
@@ -108,15 +199,20 @@ int main(int argc, char* argv[]) {
              cxxopts::value<std::string>()->default_value("circle"))
             ("num_robots", "number of robots in the simulation",
              cxxopts::value<int>()->default_value(std::to_string(2)))
+            ("fov", "fov degree",
+             cxxopts::value<int>()->default_value(std::to_string(120)))
             ("write_filename", "write to json filename",
              cxxopts::value<std::string>()->default_value("../../../experiments/instances/results/circle2States.json"));
     auto option_parse = options.parse(argc, argv);
 
     // load experiment config
+    std::cout << "loading experiment settings...\n";
 //    std::string experiment_config_filename = "../../../config/config.json";
     std::string instance_type = option_parse["instance_type"].as<std::string>();
+    std::string instance_path = instance_type+"_instances/";
     const int num_robots_parse = option_parse["num_robots"].as<int>();
-    std::string experiment_config_filename = "../../../experiments/instances/"+instance_type+std::to_string(num_robots_parse)+"_config.json";
+    const int fov_beta_parse = option_parse["fov"].as<int>();
+    std::string experiment_config_filename = "../../../experiments/instances/"+instance_path+instance_type+std::to_string(num_robots_parse)+"_fov"+std::to_string(fov_beta_parse)+"_config.json";
     std::fstream experiment_config_fc(experiment_config_filename.c_str(), std::ios_base::in);
     json experiment_config_json = json::parse(experiment_config_fc);
     // piecewise bezier params
@@ -138,6 +234,8 @@ int main(int argc, char* argv[]) {
             experiment_config_json["mpc_params"]["physical_limits"]["p_max"][1];
     // fov cbf params
     double fov_beta = double(experiment_config_json["fov_cbf_params"]["beta"]) * M_PI / 180.0;
+    assert(fov_beta==fov_beta_parse);
+    std::cout << "fov_beta: " << double(experiment_config_json["fov_cbf_params"]["beta"]) << "\n";
     double fov_Ds = experiment_config_json["robot_params"]["collision_shape"]["aligned_box"][0];
     double fov_Rs = experiment_config_json["fov_cbf_params"]["Rs"];
 
@@ -175,6 +273,12 @@ int main(int argc, char* argv[]) {
     PiecewiseBezierParams piecewise_bezier_params = {num_pieces, num_control_points, piece_max_parameter};
     MPCParams mpc_params = {h, Ts, k_hor, {w_pos_err, w_u_eff, spd_f}, {p_min, p_max, v_min, v_max, a_min, a_max}};
     FoVCBFParams fov_cbf_params = {fov_beta, fov_Ds, fov_Rs};
+
+    // filter params
+    int num_particles = 100;
+    Matrix initCov = 1.0*Eigen::MatrixXd::Identity(DIM, DIM);
+    Matrix processCov = 0.25*Eigen::MatrixXd::Identity(DIM, DIM);
+    Matrix measCov = 0.05*Eigen::MatrixXd::Identity(DIM, DIM);
 
     // json for record
     std::string JSON_FILENAME = option_parse["write_filename"].as<std::string>();
@@ -220,6 +324,31 @@ int main(int argc, char* argv[]) {
         target_pos << sf_json[i][0], sf_json[i][1], sf_json[i][2];
         target_positions.push_back(target_pos);
     }
+    // init filters
+    std::vector<std::vector<ParticleFilter>> filters;
+    std::vector<std::vector<size_t>> neighbor_ids(num_robots, std::vector<size_t>(num_robots-1));
+    for (size_t i = 0; i < num_robots; ++i) {
+        size_t neighbor_idx = 0;
+        for (size_t j = 0; j < num_robots; ++j) {
+            if (i == j) {
+                continue;
+            }
+            neighbor_ids[i][neighbor_idx] = j;
+            neighbor_idx += 1;
+        }
+    }
+
+    for (size_t i = 0; i < num_robots; ++i){
+        filters.emplace_back(num_robots-1);
+        for (size_t j = 0; j < num_robots-1; ++j) {
+            size_t neighbor_id = neighbor_ids.at(i).at(j);
+            // init particle filter
+            filters[i][j].init(num_particles, init_states.at(neighbor_id).pos_, initCov, processCov, measCov);
+        }
+        assert(filters[i].size() == num_robots-1);
+    }
+    assert(filters.size() == num_robots);
+
     // planning results
     std::vector<std::shared_ptr<SingleParameterPiecewiseCurve>> pred_traj_ptrs(num_robots);
     std::vector<double> traj_eval_ts(num_robots, 0);
@@ -235,17 +364,54 @@ int main(int argc, char* argv[]) {
 //            }
             std::vector<VectorDIM> other_robot_positions;
             std::vector<Matrix> other_robot_covs;
-            for (int j = 0; j < num_robots; ++j) {
-                if (j==robot_idx) {
-                    continue;
+            for (int j = 0; j < num_robots-1; ++j) {
+                size_t neighbor_id = neighbor_ids.at(robot_idx).at(j);
+                const VectorDIM& ego_pos = init_states.at(robot_idx).pos_;
+                const VectorDIM& neighbor_pos = init_states.at(neighbor_id).pos_;
+                ParticleFilter &filter = filters.at(robot_idx).at(j);
+                // update filter estimate
+                filter.predict();
+                Vector weights = filter.getWeights();
+                Matrix samples = filter.getParticles();
+                for (int s = 0; s < num_particles; ++s) {
+                    if (insideFOV(ego_pos, samples.col(s), fov_beta, fov_Rs)) {
+                        weights[s] /= 10.0;
+                    }
                 }
-                other_robot_positions.push_back(init_states.at(j).pos_);
+                filter.setWeights(weights);
 
-                Matrix other_robot_cov(DIM, DIM);
-                other_robot_cov << 0.1, 0, 0,
-                                   0, 0.1, 0,
-                                   0, 0, 0.1;
-                other_robot_covs.push_back(other_robot_cov);
+                // emulate vision
+                if (insideFOV(ego_pos, neighbor_pos, fov_beta, fov_Rs)) {
+                    filter.update(neighbor_pos);
+                }
+
+                filter.resample();
+                filter.estimateState();
+
+                // update variables
+                VectorDIM estimate = filter.getState();
+                Matrix cov(DIM, DIM);
+                cov = filter.getDistribution();
+                other_robot_positions.push_back(estimate);
+                other_robot_covs.push_back(cov);
+                // log estimate
+                states["robots"][std::to_string(robot_idx)]["estimates_mean"][std::to_string(neighbor_id)].push_back({estimate(0), estimate(1), estimate(2)});
+                states["robots"][std::to_string(robot_idx)]["estimates_cov"][std::to_string(neighbor_id)].push_back({cov(0), cov(1), cov(2),
+                                                                                                                     cov(3), cov(4), cov(5),
+                                                                                                                     cov(6), cov(7), cov(8)});
+
+                // for the closest point on ellipse visualization
+                Vector p_near = closestPointOnEllipse(ego_pos, estimate, cov);
+                states["robots"][std::to_string(robot_idx)]["p_near_ellipse"][std::to_string(neighbor_id)].push_back({p_near(0), p_near(1)});
+
+//                // for debug: fixed estimate
+//                other_robot_positions.push_back(init_states.at(neighbor_id).pos_);
+//
+//                Matrix other_robot_cov(DIM, DIM);
+//                other_robot_cov << 0.1, 0, 0,
+//                                   0, 0.1, 0,
+//                                   0, 0, 0.1;
+//                other_robot_covs.push_back(other_robot_cov);
             }
 //            BezierIMPCCBF bezier_impc_cbf(bezier_impc_cbf_params, pred_model_ptr, fov_cbf, bezier_continuity_upto_degree, aligned_box_collision_shape_ptr, impc_iter);
             bezier_impc_cbf.resetProblem();
