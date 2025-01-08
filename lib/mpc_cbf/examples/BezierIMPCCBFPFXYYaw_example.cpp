@@ -186,6 +186,8 @@ int main(int argc, char* argv[]) {
     using MPCParams = mpc::MPCParams<double>;
     using FoVCBFParams = cbf::FoVCBFParams<double>;
     using BezierMPCCBFParams = mpc_cbf::PiecewiseBezierMPCCBFQPOperations<double, DIM>::Params;
+    using IMPCParams = mpc_cbf::BezierIMPCCBF<double, DIM>::IMPCParams;
+    using IMPCCBFParams = mpc_cbf::BezierIMPCCBF<double, DIM>::Params;
     using SingleParameterPiecewiseCurve = splines::SingleParameterPiecewiseCurve<double, DIM>;
 
     using json = nlohmann::json;
@@ -201,6 +203,8 @@ int main(int argc, char* argv[]) {
              cxxopts::value<int>()->default_value(std::to_string(2)))
             ("fov", "fov degree",
              cxxopts::value<int>()->default_value(std::to_string(120)))
+            ("slack_decay", "slack variable cost decay rate",
+             cxxopts::value<double>()->default_value(std::to_string(0.1)))
             ("write_filename", "write to json filename",
              cxxopts::value<std::string>()->default_value("../../../experiments/instances/results/circle2States.json"));
     auto option_parse = options.parse(argc, argv);
@@ -294,12 +298,18 @@ int main(int argc, char* argv[]) {
     std::shared_ptr<FovCBF> fov_cbf = std::make_unique<FovCBF>(fov_beta, fov_Ds, fov_Rs);
     // init bezier mpc-cbf
     uint64_t bezier_continuity_upto_degree = 4;
-    int impc_iter = 2;
     int num_neighbors = experiment_config_json["tasks"]["so"].size() - 1;
     std::cout << "neighbor size: " << num_neighbors << "\n";
+    BezierMPCCBFParams bezier_mpc_cbf_params = {piecewise_bezier_params, mpc_params, fov_cbf_params};
+    int cbf_horizon = 2;
+    int impc_iter = 2;
+    double slack_cost = 1000;
+    double slack_decay_rate = option_parse["slack_decay"].as<double>();
+    std::cout << "slack_decay_rate: " << slack_decay_rate << "\n";
     bool slack_mode = true;
-    BezierMPCCBFParams bezier_impc_cbf_params = {piecewise_bezier_params, mpc_params, fov_cbf_params};
-    BezierIMPCCBF bezier_impc_cbf(bezier_impc_cbf_params, pred_model_ptr, fov_cbf, bezier_continuity_upto_degree, aligned_box_collision_shape_ptr, impc_iter, num_neighbors, slack_mode);
+    IMPCParams impc_params = {cbf_horizon, impc_iter, slack_cost, slack_decay_rate, slack_mode};
+    IMPCCBFParams impc_cbf_params = {bezier_mpc_cbf_params, impc_params};
+    BezierIMPCCBF bezier_impc_cbf(impc_cbf_params, pred_model_ptr, fov_cbf, bezier_continuity_upto_degree, aligned_box_collision_shape_ptr, num_neighbors);
 
     // main loop
     // load the tasks

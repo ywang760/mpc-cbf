@@ -31,7 +31,11 @@ def collision_check(x1, y1, x2, y2, collision_shape):
     heightB = 2*collision_y
     return rectangles_collide(xA, yA, widthA, heightA, xB, yB, widthB, heightB)
 
-def instance_success(traj, collision_shape):
+def reach_goal_area(pos, goal, radius=1):
+    dist = np.linalg.norm(pos - goal)
+    return dist <= radius
+
+def instance_success(traj, goals, radius, collision_shape):
     """traj: [n_robot, ts, dim]"""
     n_robot = traj.shape[0]
     ts = traj.shape[1]
@@ -42,6 +46,12 @@ def instance_success(traj, collision_shape):
                 pos_2 = traj[j, t, :3]  # [3, ]
                 if collision_check(pos_1[0], pos_1[1], pos_2[0], pos_2[1], collision_shape):
                     return False
+    for i in range(n_robot):
+        pos = traj[i, -1, :2]
+        goal = goals[i][:2]
+        if not reach_goal_area(pos, goal, radius):
+            return False
+
     return True
 
 def in_fov(x1, y1, yaw1, x2, y2, fov_beta):
@@ -77,8 +87,9 @@ if __name__ == '__main__':
     num_robots = len(states_json["robots"])
     traj = np.array([states_json["robots"][str(_)]["states"] for _ in range(num_robots)])  # [n_robot, ts, dim]
     collision_shape = load_states("../../config/config.json")["robot_params"]["collision_shape"]["aligned_box"][:2]
+    goals = np.array(load_states("../../config/config.json")["tasks"]["sf"])
     # Metric1: success rate
-    success = instance_success(traj, collision_shape)
+    success = instance_success(traj, goals, collision_shape)
     # Metric2: avg number of neighbor in FoV
     FoV_beta = load_states("../../config/config.json")["fov_cbf_params"]["beta"] * np.pi/180
     FoV_range = load_states("../../config/config.json")["fov_cbf_params"]["Rs"]
