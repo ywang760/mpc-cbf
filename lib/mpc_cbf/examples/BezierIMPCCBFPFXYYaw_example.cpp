@@ -186,6 +186,8 @@ int main(int argc, char* argv[]) {
     using MPCParams = mpc::MPCParams<double>;
     using FoVCBFParams = cbf::FoVCBFParams<double>;
     using BezierMPCCBFParams = mpc_cbf::PiecewiseBezierMPCCBFQPOperations<double, DIM>::Params;
+    using IMPCParams = mpc_cbf::BezierIMPCCBF<double, DIM>::IMPCParams;
+    using IMPCCBFParams = mpc_cbf::BezierIMPCCBF<double, DIM>::Params;
     using SingleParameterPiecewiseCurve = splines::SingleParameterPiecewiseCurve<double, DIM>;
 
     using json = nlohmann::json;
@@ -201,6 +203,8 @@ int main(int argc, char* argv[]) {
              cxxopts::value<int>()->default_value(std::to_string(2)))
             ("fov", "fov degree",
              cxxopts::value<int>()->default_value(std::to_string(120)))
+            ("slack_decay", "slack variable cost decay rate",
+             cxxopts::value<double>()->default_value(std::to_string(0.1)))
             ("write_filename", "write to json filename",
              cxxopts::value<std::string>()->default_value("../../../experiments/instances/results/circle2States.json"));
     auto option_parse = options.parse(argc, argv);
@@ -212,7 +216,7 @@ int main(int argc, char* argv[]) {
     std::string instance_path = instance_type+"_instances/";
     const int num_robots_parse = option_parse["num_robots"].as<int>();
     const int fov_beta_parse = option_parse["fov"].as<int>();
-    std::string experiment_config_filename = "../../../experiments/instances/"+instance_path+instance_type+std::to_string(num_robots_parse)+"_fov"+std::to_string(fov_beta_parse)+"_config.json";
+    std::string experiment_config_filename = "../../../experiments/instances/"+instance_path+instance_type+std::to_string(num_robots_parse)+"_config.json";
     std::fstream experiment_config_fc(experiment_config_filename.c_str(), std::ios_base::in);
     json experiment_config_json = json::parse(experiment_config_fc);
     // piecewise bezier params
@@ -233,9 +237,8 @@ int main(int argc, char* argv[]) {
     p_max << experiment_config_json["mpc_params"]["physical_limits"]["p_max"][0],
             experiment_config_json["mpc_params"]["physical_limits"]["p_max"][1];
     // fov cbf params
-    double fov_beta = double(experiment_config_json["fov_cbf_params"]["beta"]) * M_PI / 180.0;
-    assert(fov_beta==fov_beta_parse);
-    std::cout << "fov_beta: " << double(experiment_config_json["fov_cbf_params"]["beta"]) << "\n";
+    double fov_beta = double(fov_beta_parse) * M_PI / 180.0;
+    std::cout << "fov_beta: " << double(fov_beta_parse) << "\n";
     double fov_Ds = experiment_config_json["robot_params"]["collision_shape"]["aligned_box"][0];
     double fov_Rs = experiment_config_json["fov_cbf_params"]["Rs"];
 
@@ -276,9 +279,9 @@ int main(int argc, char* argv[]) {
 
     // filter params
     int num_particles = 100;
-    Matrix initCov = 1.0*Eigen::MatrixXd::Identity(DIM, DIM);
-    Matrix processCov = 0.25*Eigen::MatrixXd::Identity(DIM, DIM);
-    Matrix measCov = 0.05*Eigen::MatrixXd::Identity(DIM, DIM);
+    Matrix initCov = 1.0*Eigen::MatrixXd::Identity(DIM-1, DIM-1);
+    Matrix processCov = 0.25*Eigen::MatrixXd::Identity(DIM-1, DIM-1);
+    Matrix measCov = 0.05*Eigen::MatrixXd::Identity(DIM-1, DIM-1);
 
     // json for record
     std::string JSON_FILENAME = option_parse["write_filename"].as<std::string>();
@@ -294,12 +297,18 @@ int main(int argc, char* argv[]) {
     std::shared_ptr<FovCBF> fov_cbf = std::make_unique<FovCBF>(fov_beta, fov_Ds, fov_Rs);
     // init bezier mpc-cbf
     uint64_t bezier_continuity_upto_degree = 4;
-    int impc_iter = 2;
     int num_neighbors = experiment_config_json["tasks"]["so"].size() - 1;
     std::cout << "neighbor size: " << num_neighbors << "\n";
+    BezierMPCCBFParams bezier_mpc_cbf_params = {piecewise_bezier_params, mpc_params, fov_cbf_params};
+    int cbf_horizon = 2;
+    int impc_iter = 2;
+    double slack_cost = 1000;
+    double slack_decay_rate = option_parse["slack_decay"].as<double>();
+    std::cout << "slack_decay_rate: " << slack_decay_rate << "\n";
     bool slack_mode = true;
-    BezierMPCCBFParams bezier_impc_cbf_params = {piecewise_bezier_params, mpc_params, fov_cbf_params};
-    BezierIMPCCBF bezier_impc_cbf(bezier_impc_cbf_params, pred_model_ptr, fov_cbf, bezier_continuity_upto_degree, aligned_box_collision_shape_ptr, impc_iter, num_neighbors, slack_mode);
+    IMPCParams impc_params = {cbf_horizon, impc_iter, slack_cost, slack_decay_rate, slack_mode};
+    IMPCCBFParams impc_cbf_params = {bezier_mpc_cbf_params, impc_params};
+    BezierIMPCCBF bezier_impc_cbf(impc_cbf_params, pred_model_ptr, fov_cbf, bezier_continuity_upto_degree, aligned_box_collision_shape_ptr, num_neighbors);
 
     // main loop
     // load the tasks
@@ -343,7 +352,9 @@ int main(int argc, char* argv[]) {
         for (size_t j = 0; j < num_robots-1; ++j) {
             size_t neighbor_id = neighbor_ids.at(i).at(j);
             // init particle filter
-            filters[i][j].init(num_particles, init_states.at(neighbor_id).pos_, initCov, processCov, measCov);
+            Vector neighbor_xy(DIM-1);
+            neighbor_xy << init_states.at(neighbor_id).pos_(0), init_states.at(neighbor_id).pos_(1);
+            filters[i][j].init(num_particles, neighbor_xy, initCov, processCov, measCov);
         }
         assert(filters[i].size() == num_robots-1);
     }
@@ -382,23 +393,31 @@ int main(int argc, char* argv[]) {
 
                 // emulate vision
                 if (insideFOV(ego_pos, neighbor_pos, fov_beta, fov_Rs)) {
-                    filter.update(neighbor_pos);
+                    Vector neighbor_xy(DIM-1);
+                    neighbor_xy << neighbor_pos(0), neighbor_pos(1);
+                    filter.update(neighbor_xy);
                 }
 
                 filter.resample();
                 filter.estimateState();
 
                 // update variables
-                VectorDIM estimate = filter.getState();
-                Matrix cov(DIM, DIM);
+                Vector estimate = filter.getState();
+                VectorDIM extended_estimate;
+                extended_estimate << estimate(0), estimate(1), 0;
+                Matrix cov(DIM-1, DIM-1);
                 cov = filter.getDistribution();
-                other_robot_positions.push_back(estimate);
-                other_robot_covs.push_back(cov);
+                other_robot_positions.push_back(extended_estimate);
+                Matrix extended_cov(DIM, DIM);
+                extended_cov << cov(0), cov(1), 0,
+                                cov(2), cov(3), 0,
+                                0,      0,      0;
+                other_robot_covs.push_back(extended_cov);
                 // log estimate
-                states["robots"][std::to_string(robot_idx)]["estimates_mean"][std::to_string(neighbor_id)].push_back({estimate(0), estimate(1), estimate(2)});
-                states["robots"][std::to_string(robot_idx)]["estimates_cov"][std::to_string(neighbor_id)].push_back({cov(0), cov(1), cov(2),
-                                                                                                                     cov(3), cov(4), cov(5),
-                                                                                                                     cov(6), cov(7), cov(8)});
+                states["robots"][std::to_string(robot_idx)]["estimates_mean"][std::to_string(neighbor_id)].push_back({extended_estimate(0), extended_estimate(1), extended_estimate(2)});
+                states["robots"][std::to_string(robot_idx)]["estimates_cov"][std::to_string(neighbor_id)].push_back({extended_cov(0), extended_cov(1), extended_cov(2),
+                                                                                                                     extended_cov(3), extended_cov(4), extended_cov(5),
+                                                                                                                     extended_cov(6), extended_cov(7), extended_cov(8)});
 
                 // for the closest point on ellipse visualization
                 Vector p_near = closestPointOnEllipse(ego_pos, estimate, cov);

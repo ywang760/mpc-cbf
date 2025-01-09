@@ -2,16 +2,32 @@ cd ../../lib/mpc_cbf/cmake-build-release
 cmake --build ./ --target mpc_cbf_examples_BezierIMPCCBFPFXYYaw_example
 date="01062025"
 instances="circle"
+min_r=2
 max_r=10
 max_exp=10
 min_fov=120
 max_fov=160
 fov_step=20
-for (( num_r = 2; num_r <= ${max_r}; num_r++ )); do
+min_slack_decay=0.2
+max_slack_decay=0.3
+slack_decay_step=0.1
+default_slack_decay=0.1
+for (( num_r = ${min_r}; num_r <= ${max_r}; num_r++ )); do
   for fov in $(seq ${min_fov} ${fov_step} ${max_fov}); do
     for (( exp_idx = 0; exp_idx < ${max_exp}; exp_idx++ )); do
         echo experiment instance type:${instances} num_robot:${num_r}, exp_idx:${exp_idx}
-        ./mpc_cbf_examples_BezierIMPCCBFPFXYYaw_example --instance_type ${instances} --num_robots ${num_r} --fov ${fov} --write_filename "../../../experiments/instances/results/log${date}/${instances}${num_r}_fov${fov}_States_${exp_idx}.json"
+        ./mpc_cbf_examples_BezierIMPCCBFPFXYYaw_example --instance_type ${instances} --num_robots ${num_r} --fov ${fov} --slack_decay ${default_slack_decay} --write_filename "../../../experiments/instances/results/log${date}/${instances}${num_r}_fov${fov}_decay${default_slack_decay}_States_${exp_idx}.json"
+    done
+  done
+done
+
+for (( num_r = ${min_r}; num_r <= ${max_r}; num_r++ )); do
+  for fov in 120 140; do
+    for slack_decay in $(seq ${min_slack_decay} ${slack_decay_step} ${max_slack_decay}); do
+      for (( exp_idx = 0; exp_idx < ${max_exp}; exp_idx++ )); do
+          echo experiment instance type:${instances} num_robot:${num_r}, exp_idx:${exp_idx}
+          ./mpc_cbf_examples_BezierIMPCCBFPFXYYaw_example --instance_type ${instances} --num_robots ${num_r} --fov ${fov} --slack_decay ${slack_decay} --write_filename "../../../experiments/instances/results/log${date}/${instances}${num_r}_fov${fov}_decay${slack_decay}_States_${exp_idx}.json"
+      done
     done
   done
 done
