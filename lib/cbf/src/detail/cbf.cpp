@@ -198,7 +198,23 @@ namespace cbf
                             {-GiNaC::sin(th), GiNaC::cos(th)}};
         GiNaC::matrix xt_rel = R.mul(d2);
 
-        GiNaC::ex b2 = GiNaC::tan(fov/2)*xt_rel(0,0) + xt_rel(1,0);
+        GiNaC::ex b2;
+        if (fov < M_PI) {
+            b2 = GiNaC::tan(fov/2)*xt_rel(0,0) + xt_rel(1,0);
+        } else if (fov == M_PI) {
+            b2 = xt_rel(0,0);
+        } else {
+            if (py >= 0) {
+                GiNaC::matrix Ac = GiNaC::matrix(1, CONTROL_VARS);
+                for (int j = 0; j < CONTROL_VARS; j++) {
+                    Ac(0, j) = 0;
+                }
+                GiNaC::ex Bc = std::numeric_limits<double>::max();
+                return std::make_pair(Ac, Bc);
+            } else {
+                b2 = GiNaC::tan((2*M_PI-fov)/2)*xt_rel(0,0) - xt_rel(1,0);
+            }
+        }
         GiNaC::matrix grad_b2 = GiNaC::matrix(STATE_VARS, 1);
         grad_b2(0, 0) = GiNaC::diff(b2, px);
         grad_b2(1, 0) = GiNaC::diff(b2, py);
@@ -264,7 +280,24 @@ namespace cbf
         GiNaC::matrix R = {{GiNaC::cos(th), GiNaC::sin(th)},
                             {-GiNaC::sin(th), GiNaC::cos(th)}};
         GiNaC::matrix xt_rel = R.mul(d2);
-        GiNaC::ex b3 = GiNaC::tan(fov/2)*xt_rel(0,0) - xt_rel(1,0);
+
+        GiNaC::ex b3;
+        if (fov < M_PI) {
+            b3 = GiNaC::tan(fov / 2) * xt_rel(0, 0) - xt_rel(1, 0);
+        } else if (fov == M_PI) {
+            b3 = xt_rel(0,0);
+        } else {
+            if (py >= 0) {
+                b3 = GiNaC::tan((2*M_PI-fov) / 2) * xt_rel(0, 0) + xt_rel(1, 0);
+            } else {
+                GiNaC::matrix Ac = GiNaC::matrix(1, CONTROL_VARS);
+                for (int j = 0; j < CONTROL_VARS; j++) {
+                    Ac(0, j) = 0;
+                }
+                GiNaC::ex Bc = std::numeric_limits<double>::max();
+                return std::make_pair(Ac, Bc);
+            }
+        }
         GiNaC::matrix grad_b3 = GiNaC::matrix(STATE_VARS, 1);
         grad_b3(0, 0) = GiNaC::diff(b3, px);
         grad_b3(1, 0) = GiNaC::diff(b3, py);
