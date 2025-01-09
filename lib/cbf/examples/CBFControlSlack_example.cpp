@@ -7,6 +7,7 @@
 #include <cbf/controller/CBFControl.h>
 #include <particle_filter/detail/particle_filter.h>
 #include <nlohmann/json.hpp>
+#include <cxxopts.hpp>
 #include <fstream>
 #include <cmath>
 
@@ -204,22 +205,43 @@ bool insideFOV(Eigen::VectorXd robot, Eigen::VectorXd target, double fov, double
     }
 }
 
-int main() {
+int main(int argc, char* argv[]) {
     using FovCBF = cbf::FovCBF;
     using DoubleIntegratorXYYaw = model::DoubleIntegratorXYYaw<double>;
     using CBFControl = cbf::CBFControl<double, DIM>;
     using json = nlohmann::json;
     using ParticleFilter = pf::ParticleFilter;
 
+    // cxxopt
+    cxxopts::Options options(
+            "simulation",
+            "fovmpc simulation");
+    options.add_options()
+            ("instance_type", "instance type for simulations",
+             cxxopts::value<std::string>()->default_value("circle"))
+            ("num_robots", "number of robots in the simulation",
+             cxxopts::value<int>()->default_value(std::to_string(2)))
+            ("fov", "fov degree",
+             cxxopts::value<int>()->default_value(std::to_string(120)))
+            ("write_filename", "write to json filename",
+             cxxopts::value<std::string>()->default_value("../../../experiments/instances/results/circle2States.json"));
+    auto option_parse = options.parse(argc, argv);
+
     // load experiment config
+    std::cout << "loading experiment settings...\n";
     // std::string experiment_config_filename = "../../../config/config.json";
-    std::string experiment_config_filename = "/home/user/catkin_ws/src/fovmpc/config/config.json";
+    std::string instance_type = option_parse["instance_type"].as<std::string>();
+    std::string instance_path = instance_type+"_instances/";
+    const int num_robots_parse = option_parse["num_robots"].as<int>();
+    const int fov_beta_parse = option_parse["fov"].as<int>();
+    std::string experiment_config_filename = "../../../experiments/instances/"+instance_path+instance_type+std::to_string(num_robots_parse)+"_config.json";
     std::fstream experiment_config_fc(experiment_config_filename.c_str(), std::ios_base::in);
     json experiment_config_json = json::parse(experiment_config_fc);
     double h = experiment_config_json["mpc_params"]["h"];
 
-    double fov_beta = double(experiment_config_json["fov_cbf_params"]["beta"]) * M_PI / 180.0;
-    double fov_Ds = experiment_config_json["fov_cbf_params"]["Ds"];
+    double fov_beta = double(fov_beta_parse) * M_PI / 180.0;
+    std::cout << "fov_beta: " << double(fov_beta_parse) << "\n";
+    double fov_Ds = experiment_config_json["robot_params"]["collision_shape"]["aligned_box"][0];
     double fov_Rs = experiment_config_json["fov_cbf_params"]["Rs"];
     double vmax = 2.0;
 
@@ -233,7 +255,7 @@ int main() {
             experiment_config_json["mpc_params"]["physical_limits"]["a_max"][2];
     double VMAX = 1.;
     // json for record
-    std::string JSON_FILENAME = "/home/user/catkin_ws/src/fovmpc/tools/CBFXYYawStates.json";
+    std::string JSON_FILENAME = option_parse["write_filename"].as<std::string>();
     json states;
     states["dt"] = h;
     // init model
@@ -246,6 +268,7 @@ int main() {
     std::vector<Vector> current_states;
     std::vector<VectorDIM> target_positions;
     size_t num_robots = experiment_config_json["tasks"]["so"].size();
+    assert(num_robots == num_robots_parse);
     json so_json = experiment_config_json["tasks"]["so"];
     json sf_json = experiment_config_json["tasks"]["sf"];
 

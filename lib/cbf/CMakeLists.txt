@@ -20,6 +20,11 @@ if(NOT is_pf_ADDED)
     add_subdirectory(../particle_filter ${CMAKE_CURRENT_BINARY_DIR}/particle_filter)
 endif()
 
+if(NOT TARGET cxxopts)
+    add_subdirectory(../../third_party/cxxopts
+            ${CMAKE_CURRENT_BINARY_DIR}/cxxopts)
+endif()
+
 # add libraries
 add_library(cbf_detail_FovCBF SHARED src/detail/cbf.cpp)
 target_include_directories(cbf_detail_FovCBF PUBLIC include)
@@ -70,4 +75,5 @@ target_include_directories(cbf_examples_CBFControlSlack_example PUBLIC include .
 target_link_libraries(cbf_examples_CBFControlSlack_example PUBLIC
         model_DoubleIntegratorXYYaw
         cbf_controller_CBFControl
-        ParticleFilter)
+        ParticleFilter
+        cxxopts)
