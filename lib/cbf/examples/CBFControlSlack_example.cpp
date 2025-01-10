@@ -359,8 +359,8 @@ int main(int argc, char* argv[]) {
                 other_robot_covs.push_back(cov);
                 // calculate slack var
                 double dist_to_ellipse = distanceToEllipse(init_states.at(robot_idx).pos_, estimate, cov);
-                // double slack = sigmoid(dist_to_ellipse - 3*fov_Ds);
-                double slack = 0.0;
+                double slack = sigmoid(dist_to_ellipse - 3*fov_Ds);
+                // double slack = 0.0;
                 std::cout << "Neighbor id: " << neighbor_id << " | pos: " << estimate.transpose() << " | real: " << neighbor_pos.transpose() << std::endl;
                 slack_vars.push_back(slack);
                 // log estimate
@@ -393,6 +393,7 @@ int main(int argc, char* argv[]) {
             current_states.at(robot_idx)(3) = init_states.at(robot_idx).vel_(0);
             current_states.at(robot_idx)(4) = init_states.at(robot_idx).vel_(1);
             current_states.at(robot_idx)(5) = init_states.at(robot_idx).vel_(2);
+            current_states.at(robot_idx) = current_states.at(robot_idx).unaryExpr([](double x) { return (x > -0.001 && x < 0.001) ? 0.0 : x; });
 
             // log the state
             Vector x_t(6);
