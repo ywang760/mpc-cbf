@@ -19,6 +19,31 @@ def CI_compute(sample_arr):
     ci = 1.96 * (std_arr / np.sqrt(M))  # [T,]
     return mean_arr, ci
 
+def CI_compute_with_inf(sample_arr):
+    # constants
+    T, M = sample_arr.shape
+    valid_sample_arr = [[] for i in range(T)]
+    mean_arr = []
+    ci = []
+    for i in range(T):
+        for j in range(M):
+            if sample_arr[i, j] != float("inf"):
+                valid_sample_arr[i].append(sample_arr[i, j])
+
+    for i in range(T):
+        valid_size = len(valid_sample_arr[i])
+        if valid_size > 0:
+            mean = np.mean(valid_sample_arr[i])
+            mean_arr.append(mean)
+            std = np.std(valid_sample_arr[i])  # [T,]
+            c = 1.96 * (std / np.sqrt(valid_size))
+            ci.append(c)
+        else:
+            mean_arr.append(np.nan)
+            ci.append(np.nan)
+
+    return np.array(mean_arr), np.array(ci)
+
 def CI_plot(x, mean_arr, ci, save_name="./ci_plot.png", xlabel="entry", ylabel="value", label = ""):
     '''
     plot the confident interval for the reward curve across the training epochs.
