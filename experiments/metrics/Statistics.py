@@ -11,23 +11,24 @@ def generate_rgb_colors(num_colors):
     return np.asarray(output)
 
 instance_type = "circle"
+# instance_type = "formation"
 config_path = "../instances/"+instance_type+"_instances/"
-result_path = "../instances/results/log"
-date = "01062025"
+result_path = "/media/lishuo/ssd/RSS2025_results/log"
+date = "01102025"
 num_exp = 10
 min_r = 2
 max_r = 10
 min_fov=120
-max_fov=160
-fov_step=20
+max_fov=360
+fov_step=60
 min_slack_decay=0.2
 max_slack_decay=0.3
 slack_decay_step=0.1
-default_slack_decay=0.1
-decay_exp_fovs = [120, 140]
+default_slack_decay=0.2
+decay_exp_fovs = [120, 180, 240]
 num_robot = range(min_r, max_r+1)
 fovs = range(min_fov, max_fov+fov_step, fov_step)
-slack_decays = np.linspace(min_slack_decay, max_slack_decay, round((max_slack_decay-min_slack_decay)/slack_decay_step)+1)
+slack_decays = [0.1, 0.3, 0.4]
 print("slack decays: ", slack_decays)
 
 experiment_key=[]
@@ -67,18 +68,19 @@ for i in range(len(experiment_key)):
         print("r_idx: ", r_idx, "num_r: ", num_r)
         for exp_idx in range(num_exp):
             state_json = result_path+date+"/"+instance_type+str(num_r)+"_fov"+str(fov)+"_decay"+str(slack_decay)+"_States_"+str(exp_idx)+".json"
-            config_json = config_path+instance_type+str(num_r)+"_fov"+str(fov)+"_config.json"
+            config_json = config_path+instance_type+str(num_r)+"_config.json"
             states = load_states(state_json)
             goals = np.array(load_states(config_json)["tasks"]["sf"])
             num_robots = len(states["robots"])
             traj = np.array([states["robots"][str(_)]["states"] for _ in range(num_robots)])  # [n_robot, ts, dim]
             collision_shape = np.array(load_states(config_json)["robot_params"]["collision_shape"]["aligned_box"][:2])
-            FoV_beta = load_states(config_json)["fov_cbf_params"]["beta"] * np.pi/180
+            FoV_beta = fov * np.pi/180
             FoV_range = load_states(config_json)["fov_cbf_params"]["Rs"]
 
             # Metric1: success rate
-            goal_radius = 1
+            goal_radius = 1.6
             success = instance_success(traj, goals, goal_radius, collision_shape)
+            print("success: ", success)
             success_rate_dict[key][r_idx].append(float(success))
 
             # Metric2: avg number of neighbor in FoV
