@@ -179,7 +179,7 @@ namespace mpc_cbf {
             }
 
             // dynamics constraints
-//            qp_generator_.piecewise_mpc_qp_generator_ptr()->addEvalBoundConstraints(2, a_min_, a_max_);
+            qp_generator_.piecewise_mpc_qp_generator_ptr()->addEvalBoundConstraints(2, a_min_, a_max_);
             qp_generator_.piecewise_mpc_qp_generator_ptr()->addEvalBoundConstraints(1, v_min_, v_max_);
 
 //            AlignedBox acc_derivative_bbox(a_min_vec, a_max_vec);

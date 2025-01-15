@@ -190,7 +190,7 @@ def snapshots2D_XYYaw(traj, goals, goal_radius, estimate_mean, estimate_cov, p_n
             # Add the circle patch to the axes
             ax.add_patch(circle)
 
-    plt.savefig(pre_save_name+"_frame"+str(frame_idx)+".png", bbox_inches='tight')
+    plt.savefig(pre_save_name+"_frame"+str(frame_idx)+".pdf", bbox_inches='tight')
     # plt.show()
 
 
