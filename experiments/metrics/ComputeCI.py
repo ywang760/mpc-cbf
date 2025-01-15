@@ -91,7 +91,7 @@ def list_CI_plot(x, mean_arr_list, ci_arr_list, label_list, colors, xlabel="entr
     '''
     assert x.shape == mean_arr_list[0].shape
     # create canvas
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(figsize=(10, 3))
     for i in range(len(mean_arr_list)):
     # plot
         ax.plot(x, mean_arr_list[i][:], c=colors[i], label=label_list[i])
@@ -113,6 +113,76 @@ def list_CI_plot(x, mean_arr_list, ci_arr_list, label_list, colors, xlabel="entr
     plt.legend()
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
+    plt.savefig(save_name, bbox_inches='tight')
+
+def histogram_list_CI_plot(categories, samples_arr_list, mean_arr_list, ci_arr_list, label_list, colors, xlabel="entry", ylabel="value", legend=False, save_name="./hist_plot.png"):
+    n_category = len(categories)
+    n_subgroup = len(mean_arr_list)
+    values = mean_arr_list
+    cis = ci_arr_list
+    samples = samples_arr_list
+
+
+    # values = [[] for i in range(n_category)]
+    # cis = [[] for i in range(n_category)]
+    # samples = [[] for i in range(n_category)]
+    # for i in range(n_category):
+    #     for j in range(n_subgroup):
+    #         values[i].append(mean_arr_list[j][i])
+    #         cis[i].append(ci_arr_list[j][i])
+    #         samples[i].append(samples_arr_list[j][i])
+
+    subgroups = label_list
+
+    # Parameters for the bar chart
+    num_categories = len(categories)
+    num_subgroups = len(subgroups)
+    width = 0.1  # Width of each bar
+
+    # create canvas
+    fig, ax = plt.subplots(figsize=(10, 3))
+    x = np.arange(len(categories)) + categories[0]
+    for i in range(num_subgroups):
+        # Bar plot
+        bar_positions = x + i * width - width * (num_subgroups - 1) / 2
+        ax.bar(
+            bar_positions,
+            values[i],
+            width,
+            yerr=cis[i],
+            capsize=2,
+            label=subgroups[i],
+            color=colors[i],
+            edgecolor="k",
+            alpha=0.7
+        )
+        # Add scatter points with hollow circles
+        for j, pos in enumerate(bar_positions):
+            ax.scatter(
+                [pos] * len(samples[i][j]),
+                samples[i][j],
+                facecolors='none',  # Hollow center
+                edgecolors='black',  # Black border
+                alpha=0.8,
+                s=5  # Point size
+            )
+
+    # legend and label, save the figure
+    # plt.legend()
+    if legend:
+        ax.legend(
+            fontsize=10,
+            bbox_to_anchor=(0.5, 1.15),  # Center it above the plot
+            loc='lower center',          # Place it at the bottom of the legend box
+            ncol=3,                      # Display the legend in a single row
+            borderaxespad=-2              # Remove padding between the axes and the legend
+        )
+
+    ax.set_xlabel(xlabel, fontsize=12)
+    ax.set_ylabel(ylabel, fontsize=12)
+    ax.set_xticks(categories)
+    ax.set_xticklabels(categories, fontsize=10)
+    ax.yaxis.grid(True, linestyle='--', alpha=0.6)
     plt.savefig(save_name, bbox_inches='tight')
 
 
