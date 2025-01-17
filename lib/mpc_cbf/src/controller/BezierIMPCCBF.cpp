@@ -138,10 +138,12 @@ namespace mpc_cbf {
                         qp_generator_.addSafetyCBFConstraint(current_state, other_xy, slack_value);
                         qp_generator_.addFovLBConstraint(current_state, other_xy, slack_value);
                         qp_generator_.addFovRBConstraint(current_state, other_xy, slack_value);
+                        qp_generator_.addRangeCBFConstraint(current_state, other_xy, slack_value);
                     } else {
                         qp_generator_.addSafetyCBFConstraintWithSlackVariables(current_state, other_xy, i);
                         qp_generator_.addFovLBConstraintWithSlackVariables(current_state, other_xy, i);
                         qp_generator_.addFovRBConstraintWithSlackVariables(current_state, other_xy, i);
+                        qp_generator_.addRangeCBFConstraintWithSlackVariables(current_state, other_xy, i);
                     }
                 }
             } else if (iter > 0 && success) {
@@ -167,13 +169,15 @@ namespace mpc_cbf {
                     }
 //                    qp_generator_.addPredSafetyCBFConstraints(pred_states, other_xy);
                     if (!slack_mode_) {
-                        qp_generator_.addSafetyCBFConstraint(current_state, other_xy, slack_values.at(0));
+                        qp_generator_.addPredSafetyCBFConstraints(pred_states, other_xy, slack_values);
                         qp_generator_.addPredFovLBConstraints(pred_states, other_xy, slack_values);
                         qp_generator_.addPredFovRBConstraints(pred_states, other_xy, slack_values);
+                        qp_generator_.addPredRangeCBFConstraints(pred_states, other_xy, slack_values);
                     } else {
-                        qp_generator_.addSafetyCBFConstraintWithSlackVariables(current_state, other_xy, i);
+                        qp_generator_.addPredSafetyCBFConstraintsWithSlackVariables(pred_states, other_xy, i);
                         qp_generator_.addPredFovLBConstraintsWithSlackVariables(pred_states, other_xy, i);
                         qp_generator_.addPredFovRBConstraintsWithSlackVariables(pred_states, other_xy, i);
+                        qp_generator_.addPredRangeCBFConstraintsWithSlackVariables(pred_states, other_xy, i);
                     }
                 }
             }

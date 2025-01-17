@@ -31,18 +31,22 @@ namespace mpc_cbf {
         void addSafetyCBFConstraint(const State& current_state, const Vector& other_pos, T slack_value=0);
         void addFovLBConstraint(const State& current_state, const Vector& other_pos, T slack_value=0);
         void addFovRBConstraint(const State& current_state, const Vector& other_pos, T slack_value=0);
+        void addRangeCBFConstraint(const State& current_state, const Vector& other_pos, T slack_value=0);
 
         void addPredSafetyCBFConstraints(const std::vector<State>& pred_states, const Vector& other_pos, const std::vector<T>& slack_values);
         void addPredFovLBConstraints(const std::vector<State>& pred_states, const Vector& other_pos, const std::vector<T>& slack_values);
         void addPredFovRBConstraints(const std::vector<State>& pred_states, const Vector& other_pos, const std::vector<T>& slack_values);
+        void addPredRangeCBFConstraints(const std::vector<State>& pred_states, const Vector& other_pos, const std::vector<T>& slack_values);
 
         void addSafetyCBFConstraintWithSlackVariables(const State& current_state, const Vector& other_pos, std::size_t neighbor_idx);
         void addFovLBConstraintWithSlackVariables(const State& current_state, const Vector& other_pos, std::size_t neighbor_idx);
         void addFovRBConstraintWithSlackVariables(const State& current_state, const Vector& other_pos, std::size_t neighbor_idx);
+        void addRangeCBFConstraintWithSlackVariables(const State& current_state, const Vector& other_pos, std::size_t neighbor_idx);
 
-//        void addPredSafetyCBFConstraintsWithSlackVariables(const std::vector<State>& pred_states, const Vector& other_pos, std::size_t neighbor_idx);
+        void addPredSafetyCBFConstraintsWithSlackVariables(const std::vector<State>& pred_states, const Vector& other_pos, std::size_t neighbor_idx);
         void addPredFovLBConstraintsWithSlackVariables(const std::vector<State>& pred_states, const Vector& other_pos, std::size_t neighbor_idx);
         void addPredFovRBConstraintsWithSlackVariables(const std::vector<State>& pred_states, const Vector& other_pos, std::size_t neighbor_idx);
+        void addPredRangeCBFConstraintsWithSlackVariables(const std::vector<State>& pred_states, const Vector& other_pos, std::size_t neighbor_idx);
 
         // adds given cost_addition for piecewise to the generated qp.
         void addCostAdditionForSlackVariables(const CostAddition& cost_addition);

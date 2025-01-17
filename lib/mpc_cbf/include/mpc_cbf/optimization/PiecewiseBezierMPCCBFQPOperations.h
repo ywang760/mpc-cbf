@@ -38,10 +38,12 @@ namespace mpc_cbf {
         LinearConstraint safetyCBFConstraint(const State& current_state, const Vector& other_pos, T slack_value=0);
         std::vector<LinearConstraint> fovLBConstraint(const State& current_state, const Vector& other_pos, T slack_value=0);
         std::vector<LinearConstraint> fovRBConstraint(const State& current_state, const Vector& other_pos, T slack_value=0);
+        LinearConstraint rangeCBFConstraint(const State& current_state, const Vector& other_pos, T slack_value=0);
 
         std::vector<LinearConstraint> predSafetyCBFConstraints(const std::vector<State>& pred_states, const Vector& other_pos);
         std::vector<LinearConstraint> predFovLBConstraints(const std::vector<State>& pred_states, const Vector& other_pos);
         std::vector<LinearConstraint> predFovRBConstraints(const std::vector<State>& pred_states, const Vector& other_pos);
+        std::vector<LinearConstraint> predRangeCBFConstraints(const std::vector<State>& pred_states, const Vector& other_pos);
 
     private:
         std::unique_ptr<PiecewiseBezierMPCQPOperations> piecewise_mpc_operations_ptr_;
