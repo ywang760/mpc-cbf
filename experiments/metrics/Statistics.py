@@ -1,6 +1,8 @@
 from Metrics import *
 from ComputeCI import *
 import colorsys
+plt.rcParams['font.family'] = 'serif'
+plt.rcParams['font.serif'] = ['DejaVu Serif']
 
 def generate_rgb_colors(num_colors):
     output = []
@@ -14,7 +16,7 @@ def generate_rgb_colors(num_colors):
 instance_type = "formation"
 config_path = "../instances/"+instance_type+"_instances/"
 result_path = "/media/lishuo/ssd/RSS2025_results/log"
-date = "01112025"
+date = "01142025"
 num_exp = 10
 min_r = 2
 max_r = 10
@@ -35,12 +37,12 @@ experiment_key=[]
 experiment_slack_decay_key=[]
 experiment_fov_key=[]
 for fov in fovs:
-    experiment_key.append("fov"+str(fov)+"decay"+str(default_slack_decay))
+    experiment_key.append(r"\beta_{H}="+str(fov)+r", \gamma_{s}="+str(default_slack_decay))
     experiment_slack_decay_key.append(default_slack_decay)
     experiment_fov_key.append(fov)
 for fov in decay_exp_fovs:
     for decay in slack_decays:
-        experiment_key.append("fov"+str(fov)+"decay"+str(decay))
+        experiment_key.append(r"\beta_{H}="+str(fov)+r", \gamma_{s}="+str(decay))
         experiment_slack_decay_key.append(decay)
         experiment_fov_key.append(fov)
 
@@ -163,7 +165,7 @@ colors = generate_rgb_colors(num_colors)
 assert len(colors) == len(success_rate_mean_arr_list)
 list_CI_plot(num_robot_arr, success_rate_mean_arr_list, success_rate_ci_arr_list, success_rate_label_list, colors, xlabel="Number of Robots", ylabel="Success Rate", save_name="./multi_success_rate_ci.pdf")
 list_CI_plot(num_robot_arr, num_neighbor_in_fov_mean_arr_list, num_neighbor_in_fov_ci_arr_list, num_neighbor_in_fov_label_list, colors, xlabel="Number of Robots", ylabel="Number of Neighbors in FoV", save_name="./multi_nnif_ci.pdf")
-list_CI_plot(num_robot_arr, percent_neighbor_in_fov_mean_arr_list, percent_neighbor_in_fov_ci_arr_list, percent_neighbor_in_fov_label_list, colors, xlabel="Number of Robots", ylabel="Percentage of Neighbors in FoV", save_name="./multi_pnif_ci.pdf")
+list_CI_plot(num_robot_arr, percent_neighbor_in_fov_mean_arr_list, percent_neighbor_in_fov_ci_arr_list, percent_neighbor_in_fov_label_list, colors, xlabel="Number of Robots", ylabel="Percentage of\n Neighbors in FoV", save_name="./multi_pnif_ci.pdf")
 list_CI_plot(num_robot_arr, makespan_mean_arr_list, makespan_ci_arr_list, makespan_label_list, colors, xlabel="Number of Robots", ylabel="Makespan", save_name="./multi_makespan_ci.pdf")
 
 histogram_list_CI_plot(num_robot_arr, success_samples, success_rate_mean_arr_list, success_rate_ci_arr_list, success_rate_label_list, colors, xlabel="Number of Robots", ylabel="Success Rate", legend=True, save_name="./hist_success_rate_ci.pdf")

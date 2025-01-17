@@ -94,12 +94,13 @@ def list_CI_plot(x, mean_arr_list, ci_arr_list, label_list, colors, xlabel="entr
     fig, ax = plt.subplots(figsize=(10, 3))
     for i in range(len(mean_arr_list)):
     # plot
-        ax.plot(x, mean_arr_list[i][:], c=colors[i], label=label_list[i])
+        ax.plot(x, mean_arr_list[i][:], c=colors[i], label=f"${label_list[i]}$")
         ax.fill_between(x,
                         mean_arr_list[i][:] - ci_arr_list[i][:],
                         mean_arr_list[i][:] + ci_arr_list[i][:],
                         color=colors[i] ,alpha=0.1)
-    plt.xticks(x)
+    plt.xticks(x, fontsize=13)
+    plt.yticks(fontsize=13)
 
     ####################################################
     # # assistant plot
@@ -110,9 +111,9 @@ def list_CI_plot(x, mean_arr_list, ci_arr_list, label_list, colors, xlabel="entr
 
 
     # legend and label, save the figure
-    plt.legend()
-    ax.set_xlabel(xlabel)
-    ax.set_ylabel(ylabel)
+    plt.legend(fontsize=11)
+    ax.set_xlabel(xlabel, fontsize=16)
+    ax.set_ylabel(ylabel, fontsize=16)
     plt.savefig(save_name, bbox_inches='tight')
 
 def histogram_list_CI_plot(categories, samples_arr_list, mean_arr_list, ci_arr_list, label_list, colors, xlabel="entry", ylabel="value", legend=False, save_name="./hist_plot.png"):
@@ -151,7 +152,7 @@ def histogram_list_CI_plot(categories, samples_arr_list, mean_arr_list, ci_arr_l
             width,
             yerr=cis[i],
             capsize=2,
-            label=subgroups[i],
+            label=f"${subgroups[i]}$",
             color=colors[i],
             edgecolor="k",
             alpha=0.7
@@ -171,17 +172,18 @@ def histogram_list_CI_plot(categories, samples_arr_list, mean_arr_list, ci_arr_l
     # plt.legend()
     if legend:
         ax.legend(
-            fontsize=10,
-            bbox_to_anchor=(0.5, 1.15),  # Center it above the plot
+            fontsize=15,
+            bbox_to_anchor=(0.47, 1.15),  # Center it above the plot
             loc='lower center',          # Place it at the bottom of the legend box
             ncol=3,                      # Display the legend in a single row
-            borderaxespad=-2              # Remove padding between the axes and the legend
+            borderaxespad=-1              # Remove padding between the axes and the legend
         )
 
-    ax.set_xlabel(xlabel, fontsize=12)
-    ax.set_ylabel(ylabel, fontsize=12)
+    ax.set_xlabel(xlabel, fontsize=16)
+    ax.set_ylabel(ylabel, fontsize=16)
     ax.set_xticks(categories)
-    ax.set_xticklabels(categories, fontsize=10)
+    ax.set_xticklabels(categories, fontsize=13)
+    plt.yticks(fontsize=13)
     ax.yaxis.grid(True, linestyle='--', alpha=0.6)
     plt.savefig(save_name, bbox_inches='tight')
 
