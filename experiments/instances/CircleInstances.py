@@ -117,7 +117,7 @@ if __name__ == '__main__':
     # fov cbf params
     fov_cbf_params = {
         "beta": default_fov,
-        "Rs": 1000
+        "Rs": 20
     }
 
     # robot params
