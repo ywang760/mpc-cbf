@@ -220,12 +220,14 @@ int main(int argc, char* argv[]) {
     VectorDIM v_min;
     v_min << experiment_config_json["mpc_params"]["physical_limits"]["v_min"][0],
             experiment_config_json["mpc_params"]["physical_limits"]["v_min"][1],
-            -0.2;
+            experiment_config_json["mpc_params"]["physical_limits"]["v_min"][2];
+//            -0.2;
 //    v_min << -20, -20, -20;
     VectorDIM v_max;
     v_max << experiment_config_json["mpc_params"]["physical_limits"]["v_max"][0],
             experiment_config_json["mpc_params"]["physical_limits"]["v_max"][1],
-            0.2;
+            experiment_config_json["mpc_params"]["physical_limits"]["v_max"][2];
+//            0.2;
 
 //    v_max << 20, 20, 20;
 
@@ -256,6 +258,12 @@ int main(int argc, char* argv[]) {
     std::shared_ptr<DoubleIntegratorXYYaw> pred_model_ptr = std::make_shared<DoubleIntegratorXYYaw>(Ts);
     // init cbf
     std::shared_ptr<FovCBF> fov_cbf = std::make_unique<FovCBF>(fov_beta, fov_Ds, fov_Rs, v_min, v_max);
+    // cbf controller setting
+    bool slack_mode = true;
+    int num_neighbors = experiment_config_json["tasks"]["so"].size() - 1;
+    double slack_cost = 1000;
+    double slack_decay_rate = 0.2;
+
 
     // main loop
     // load the tasks
@@ -380,7 +388,7 @@ int main(int argc, char* argv[]) {
 
             VectorDIM desired_u = criticallyDampedSpringControl(init_states.at(robot_idx), target_pos, 1.);
             // cbf control
-            CBFControl cbf_control(fov_cbf);
+            CBFControl cbf_control(fov_cbf, num_neighbors, slack_mode, slack_cost, slack_decay_rate);
             VectorDIM cbf_u;
             std::cout << "robot id: " + std::to_string(robot_idx) +", state: " << init_states.at(robot_idx).pos_.transpose() << " " << init_states.at(robot_idx).vel_.transpose() << "\n";
             std::cout << "neighbor state: \n";
@@ -389,7 +397,7 @@ int main(int argc, char* argv[]) {
             }
             std::cout << "\n";
 //            << init_states.at(robot_idx).pos_.transpose() << " " << init_states.at(robot_idx).vel_.transpose() << "\n";
-            bool success = cbf_control.optimize(cbf_u, desired_u, init_states.at(robot_idx), other_robot_positions, a_min, a_max);
+            bool success = cbf_control.optimize(cbf_u, desired_u, init_states.at(robot_idx), other_robot_positions, other_robot_covs, a_min, a_max);
             if (!success) {
                 std::cout << "optimization failed\n";
 //                cbf_u = desired_u;

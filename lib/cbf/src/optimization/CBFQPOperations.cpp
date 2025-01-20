@@ -27,6 +27,20 @@ namespace cbf {
     }
 
     template <typename T, unsigned int DIM>
+    typename CBFQPOperations<T, DIM>::CostAddition
+    CBFQPOperations<T, DIM>::slackCost(const std::vector<T> &slack_weights) {
+        Matrix quadratic_term(slack_weights.size(), slack_weights.size());
+        quadratic_term.setZero();
+        Vector linear_term(slack_weights.size());
+        linear_term.setZero();
+
+        for (std::size_t i = 0; i < slack_weights.size(); ++i) {
+            linear_term(i) = slack_weights.at(i);
+        }
+        return CostAddition(quadratic_term, linear_term, 0);
+    }
+
+    template <typename T, unsigned int DIM>
     typename CBFQPOperations<T, DIM>::LinearConstraint
     CBFQPOperations<T, DIM>::safetyConstraint(const Vector &state,
                                               const Vector &target_state) {
