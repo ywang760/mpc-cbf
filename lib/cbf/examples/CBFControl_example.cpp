@@ -176,6 +176,24 @@ bool insideFOV(Eigen::VectorXd robot, Eigen::VectorXd target, double fov, double
     }
 }
 
+math::Vector<double> addRandomNoise(const math::Vector<double>& xt, double pos_std, double vel_std, unsigned int dim=3U) {
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    math::Vector<double> result_xt = xt;
+    double sample = 0.0;
+    std::normal_distribution<double> distribution_position(0.0, pos_std);
+    std::normal_distribution<double> distribution_velocity(0.0, vel_std);
+    for (int i = 0; i < 2*dim; ++i) {
+        if (i < dim) {
+            sample = distribution_position(gen);
+        } else {
+            sample = distribution_velocity(gen);
+        }
+        result_xt(i) += sample;
+    }
+    return result_xt;
+}
+
 int main(int argc, char* argv[]) {
     using FovCBF = cbf::FovCBF;
     using DoubleIntegratorXYYaw = model::DoubleIntegratorXYYaw<double>;
@@ -197,6 +215,8 @@ int main(int argc, char* argv[]) {
              cxxopts::value<int>()->default_value(std::to_string(2)))
             ("fov", "fov degree",
              cxxopts::value<int>()->default_value(std::to_string(120)))
+            ("slack_decay", "slack variable cost decay rate",
+             cxxopts::value<double>()->default_value(std::to_string(0.1)))
             ("write_filename", "write to json filename",
              cxxopts::value<std::string>()->default_value("../../../experiments/instances/results/circle2States.json"));
     auto option_parse = options.parse(argc, argv);
@@ -214,7 +234,8 @@ int main(int argc, char* argv[]) {
 //    double h = experiment_config_json["mpc_params"]["h"];
     double Ts = experiment_config_json["mpc_params"]["h"];
 
-    double fov_beta = double(experiment_config_json["fov_cbf_params"]["beta"]) * M_PI / 180.0;
+    double fov_beta = double(fov_beta_parse) * M_PI / 180.0;
+    std::cout << "fov_beta: " << double(fov_beta_parse) << "\n";
     double fov_Ds = experiment_config_json["robot_params"]["collision_shape"]["aligned_box"][0];
     double fov_Rs = experiment_config_json["fov_cbf_params"]["Rs"];
     VectorDIM v_min;
@@ -250,7 +271,7 @@ int main(int argc, char* argv[]) {
     Matrix measCov = 0.05*Eigen::MatrixXd::Identity(DIM-1, DIM-1);
 
     // json for record
-    std::string JSON_FILENAME = "../../../tools/CBFXYYawStates.json";
+    std::string JSON_FILENAME = option_parse["write_filename"].as<std::string>();
     json states;
     states["dt"] = Ts;
     states["Ts"] = Ts;
@@ -262,7 +283,11 @@ int main(int argc, char* argv[]) {
     bool slack_mode = true;
     int num_neighbors = experiment_config_json["tasks"]["so"].size() - 1;
     double slack_cost = 1000;
-    double slack_decay_rate = 0.2;
+    double slack_decay_rate = option_parse["slack_decay"].as<double>();
+    std::cout << "slack_decay: " << slack_decay_rate << "\n";
+    // physical settings
+    double pos_std = experiment_config_json["mpc_params"]["physical_limits"]["pos_std"];
+    double vel_std = experiment_config_json["mpc_params"]["physical_limits"]["vel_std"];
 
 
     // main loop
@@ -390,12 +415,12 @@ int main(int argc, char* argv[]) {
             // cbf control
             CBFControl cbf_control(fov_cbf, num_neighbors, slack_mode, slack_cost, slack_decay_rate);
             VectorDIM cbf_u;
-            std::cout << "robot id: " + std::to_string(robot_idx) +", state: " << init_states.at(robot_idx).pos_.transpose() << " " << init_states.at(robot_idx).vel_.transpose() << "\n";
-            std::cout << "neighbor state: \n";
-            for (size_t j = 0; j < other_robot_positions.size(); ++j) {
-                std::cout << other_robot_positions.at(j).transpose() << "; ";
-            }
-            std::cout << "\n";
+//            std::cout << "robot id: " + std::to_string(robot_idx) +", state: " << init_states.at(robot_idx).pos_.transpose() << " " << init_states.at(robot_idx).vel_.transpose() << "\n";
+//            std::cout << "neighbor state: \n";
+//            for (size_t j = 0; j < other_robot_positions.size(); ++j) {
+//                std::cout << other_robot_positions.at(j).transpose() << "; ";
+//            }
+//            std::cout << "\n";
 //            << init_states.at(robot_idx).pos_.transpose() << " " << init_states.at(robot_idx).vel_.transpose() << "\n";
             bool success = cbf_control.optimize(cbf_u, desired_u, init_states.at(robot_idx), other_robot_positions, other_robot_covs, a_min, a_max);
             if (!success) {
@@ -403,13 +428,14 @@ int main(int argc, char* argv[]) {
 //                cbf_u = desired_u;
                 cbf_u = VectorDIM::Zero();
             }
-            std::cout << "optimized control: " << cbf_u.transpose() << "\n";
+//            std::cout << "optimized control: " << cbf_u.transpose() << "\n";
             State next_state = pred_model_ptr->applyInput(init_states.at(robot_idx), cbf_u);
             Vector x_t_pos = next_state.pos_;
             x_t_pos(2) = convertYawInRange(x_t_pos(2));
             Vector x_t_vel = next_state.vel_;
             Vector x_t(6);
             x_t << x_t_pos, x_t_vel;
+            x_t = addRandomNoise(x_t, pos_std, vel_std);
             current_states.at(robot_idx) = x_t;
 
 //            init_states.at(robot_idx) = next_init_state;
