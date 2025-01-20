@@ -8,6 +8,7 @@
 #include <cbf/detail/cbf.h>
 #include <cbf/optimization/CBFQPOperations.h>
 #include <cbf/optimization/CBFQPGenerator.h>
+#include <model/DoubleIntegrator.h>
 #include <qpcpp/solvers/CPLEX.h>
 
 namespace cbf {
@@ -21,11 +22,12 @@ namespace cbf {
         using SolveStatus = qpcpp::SolveStatus;
         using Vector = math::Vector<T>;
         using VectorDIM = math::VectorDIM<T, DIM>;
+        using State = model::State<T, DIM>;
 
         CBFControl(std::shared_ptr<FovCBF> cbf);
         ~CBFControl()=default;
         bool optimize(VectorDIM &cbf_u, const VectorDIM &desired_u,
-                      const Vector &state, const Vector &target_state,
+                      const State &current_state, const std::vector<VectorDIM> &other_robot_positions,
                       const VectorDIM& u_min, const VectorDIM& u_max);
         bool optimizeWithSlackVariables(VectorDIM &cbf_u, const VectorDIM &desired_u,
                                         const Vector &state, const std::vector<VectorDIM> &other_robots_states, const std::vector<T> &slacks,

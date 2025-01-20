@@ -14,17 +14,25 @@ namespace cbf {
     template <typename T, unsigned int DIM>
     bool CBFControl<T, DIM>::optimize(VectorDIM& cbf_u,
                                       const VectorDIM &desired_u,
-                                      const Vector &state,
-                                      const Vector &target_state,
+                                      const State &current_state,
+                                      const std::vector<VectorDIM> &other_robot_positions,
                                       const VectorDIM& u_min,
                                       const VectorDIM& u_max) {
         // add cost
         qp_generator_.addDesiredControlCost(desired_u);
         // add constraints
-        qp_generator_.addSafetyConstraint(state, target_state);
-        qp_generator_.addLeftBorderConstraint(state, target_state);
-        qp_generator_.addRightBorderConstraint(state, target_state);
-        qp_generator_.addRangeConstraint(state, target_state);
+        Vector state(2*DIM);
+        state << current_state.pos_, current_state.vel_;
+        for (size_t i = 0; i < other_robot_positions.size(); ++i) {
+            Vector other_xy(2);
+            other_xy << other_robot_positions.at(i)(0), other_robot_positions.at(i)(1);
+            qp_generator_.addSafetyConstraint(state, other_xy);
+            qp_generator_.addLeftBorderConstraint(state, other_xy);
+            qp_generator_.addRightBorderConstraint(state, other_xy);
+            qp_generator_.addRangeConstraint(state, other_xy);
+        }
+        qp_generator_.addMinVelConstraints(state);
+        qp_generator_.addMaxVelConstraints(state);
         qp_generator_.addControlBoundConstraint(u_min, u_max);
 
         // solve QP

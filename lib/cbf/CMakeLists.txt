@@ -47,7 +47,8 @@ add_library(cbf_controller_CBFControl SHARED src/controller/CBFControl.cpp)
 target_include_directories(cbf_controller_CBFControl PUBLIC include)
 target_link_libraries(cbf_controller_CBFControl PUBLIC
         cbf_optimization_CBFQPGenerator
-        qpcpp_solvers_CPLEX)
+        qpcpp_solvers_CPLEX
+        model_DoubleIntegratorXYYaw)
 
 # add examples
 add_executable(cbf_test tests/cbf_test.cpp)
@@ -62,7 +63,8 @@ add_executable(cbf_examples_CBFControl_example examples/CBFControl_example.cpp)
 target_include_directories(cbf_examples_CBFControl_example PUBLIC include ../../third_party/json/single_include)
 target_link_libraries(cbf_examples_CBFControl_example PUBLIC
         model_DoubleIntegratorXYYaw
-        cbf_controller_CBFControl)
+        cbf_controller_CBFControl
+        cxxopts)
 
 add_executable(cbf_examples_CBFControlStaticTarget_example examples/CBFControlStaticTarget_example.cpp)
 target_include_directories(cbf_examples_CBFControlStaticTarget_example PUBLIC include ../../third_party/json/single_include)
