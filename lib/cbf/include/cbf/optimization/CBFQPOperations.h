@@ -27,6 +27,8 @@ namespace cbf {
         LinearConstraint leftBorderConstraint(const Vector& state, const Vector& target_state);
         LinearConstraint rightBorderConstraint(const Vector& state, const Vector& target_state);
         LinearConstraint rangeConstraint(const Vector& state, const Vector& target_state);
+        std::vector<LinearConstraint> minVelConstraints(const Vector& state);
+        std::vector<LinearConstraint> maxVelConstraints(const Vector& state);
         LinearConstraint leftBorderConstraintWithSlackVar(const Vector& state, const Vector& target_state, const T &slack);
         LinearConstraint rightBorderConstraintWithSlackVar(const Vector& state, const Vector& target_state, const T &slack);
         LinearConstraint rangeConstraintWithSlackVar(const Vector& state, const Vector& target_state, const T &slack);

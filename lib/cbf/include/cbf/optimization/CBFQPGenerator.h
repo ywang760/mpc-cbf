@@ -30,6 +30,8 @@ namespace cbf {
         void addLeftBorderConstraint(const Vector& state, const Vector& target_state);
         void addRightBorderConstraint(const Vector& state, const Vector& target_state);
         void addRangeConstraint(const Vector& state, const Vector& target_state);
+        void addMinVelConstraints(const Vector& state);
+        void addMaxVelConstraints(const Vector& state);
         void addLeftBorderConstraintWithSlackVar(const Vector& state, const Vector& target_state, const T &slack);
         void addRightBorderConstraintWithSlackVar(const Vector& state, const Vector& target_state, const T &slack);
         void addRangeConstraintWithSlackVar(const Vector& state, const Vector& target_state, const T &slack);

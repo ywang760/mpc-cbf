@@ -59,6 +59,24 @@ namespace cbf {
     }
 
     template <typename T, unsigned int DIM>
+    void CBFQPGenerator<T, DIM>::addMinVelConstraints(const Vector &state) {
+        std::vector<LinearConstraint> linear_constraints = cbf_operations_ptr_->minVelConstraints(state);
+        for (size_t i = 0; i < linear_constraints.size(); ++i) {
+            LinearConstraint &linear_constraint = linear_constraints.at(i);
+            addLinearConstraintForControlInput(linear_constraint);
+        }
+    }
+
+    template <typename T, unsigned int DIM>
+    void CBFQPGenerator<T, DIM>::addMaxVelConstraints(const Vector &state) {
+        std::vector<LinearConstraint> linear_constraints = cbf_operations_ptr_->maxVelConstraints(state);
+        for (size_t i = 0; i < linear_constraints.size(); ++i) {
+            LinearConstraint &linear_constraint = linear_constraints.at(i);
+            addLinearConstraintForControlInput(linear_constraint);
+        }
+    }
+
+    template <typename T, unsigned int DIM>
     void CBFQPGenerator<T, DIM>::addLeftBorderConstraintWithSlackVar(const Vector &state,
                                                                      const Vector &target_state,
                                                                      const T &slack) {

@@ -39,20 +39,28 @@ def instance_success(traj, goals, radius, collision_shape):
     """traj: [n_robot, ts, dim]"""
     n_robot = traj.shape[0]
     ts = traj.shape[1]
-    for t in range(ts):
-        for i in range(n_robot):
-            for j in range(i+1, n_robot):
-                pos_1 = traj[i, t, :3]  # [3, ]
-                pos_2 = traj[j, t, :3]  # [3, ]
-                if collision_check(pos_1[0], pos_1[1], pos_2[0], pos_2[1], collision_shape):
-                    return False
+    reach_goals = [False for i in range(n_robot)]
+
     for i in range(n_robot):
         pos = traj[i, -1, :2]
         goal = goals[i][:2]
         if not reach_goal_area(pos, goal, radius):
-            return False
+            return False, float('inf')
 
-    return True
+    for t in range(ts):
+        if all(reach_goals):
+            return True, max(0, t-1)
+        for i in range(n_robot):
+            pos_1 = traj[i, t, :3]  # [3, ]
+            goal_1 = goals[i]
+            if reach_goal_area(pos_1[:2], goal_1[:2], radius):
+                reach_goals[i] = True
+            for j in range(i+1, n_robot):
+                pos_2 = traj[j, t, :3]  # [3, ]
+                if collision_check(pos_1[0], pos_1[1], pos_2[0], pos_2[1], collision_shape):
+                    return False, float('inf')
+
+    return True, ts
 
 def in_fov(x1, y1, yaw1, x2, y2, fov_beta):
     R = np.array([[np.cos(yaw1), np.sin(yaw1)],

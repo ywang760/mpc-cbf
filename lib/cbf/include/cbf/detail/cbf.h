@@ -23,8 +23,8 @@ namespace cbf
             double fov;          // FoV
             double Ds;           // Safety dist
             double Rs;           // Max dist
-            double vmax;         // max velocity
-            double vmin;         // min velocity
+            Eigen::VectorXd vmin;         // min velocity
+            Eigen::VectorXd vmax;         // max velocity
             int STATE_VARS;
             int CONTROL_VARS;
             double gamma;
@@ -76,7 +76,7 @@ namespace cbf
 
 
         public:
-            FovCBF(double fov, double safety_dist, double max_dist, double vmax = 2);
+            FovCBF(double fov, double safety_dist, double max_dist, Eigen::VectorXd vmin, Eigen::VectorXd vmax);
             ~FovCBF();
             Eigen::VectorXd getSafetyConstraints(Eigen::VectorXd state, Eigen::VectorXd target_state);
             Eigen::VectorXd getRangeConstraints(Eigen::VectorXd state, Eigen::VectorXd target_state);

@@ -83,6 +83,117 @@ def fov_xy(pos, radian, fov_beta, fov_range, num_points=100):
     y = fov_range * np.sin(angles) + pos_y
     return x,y
 
+def snapshots2D_XYYaw(traj, goals, goal_radius, estimate_mean, estimate_cov, p_near, dt, Ts, bbox, frame_idx, pred_curve=None, fov_beta=None, fov_range=None, Trailing=True, Estimation=True, PredCurve=True, ShowGoals=False, colors="r", pre_save_name= "./test"):
+    n_agent, total_frame, _ = traj.shape
+    # load traj
+    x = traj[:, :, 0]
+    y = traj[:, :, 1]
+    yaw = traj[:, :, 2]
+    x_v = traj[:, :, 3]
+    y_v = traj[:, :, 4]
+    yaw_v = traj[:, :, 5]
+    est_x = estimate_mean[:, :, :, 0]  # [n, n-1, ts]
+    est_y = estimate_mean[:, :, :, 1]
+
+    # set frame scale
+    x_min = np.min(x)-3
+    x_max = np.max(x)+3
+    y_min = np.min(y)-3
+    y_max = np.max(y)+3
+    fig, ax = plt.subplots()
+    fig.set_size_inches(8, 8)
+    ax.set_xlim([x_min, x_max])
+    ax.set_ylim([y_min, y_max])
+    # Set equal aspect ratio
+    ax.set_aspect('equal')
+
+    # plot the init frame
+    p = [ax.plot([x[i, frame_idx]], [y[i, frame_idx]], c=colors[i], marker='o', markersize=6, linestyle='None', alpha=0.6) for i in range(n_agent)]
+
+    fov = []
+    for i in range(n_agent):
+        pos = [x[i, frame_idx], y[i, frame_idx]]
+        fov_x, fov_y = fov_xy(pos, yaw[i, frame_idx], fov_beta, fov_range)
+        fov.append(ax.fill(np.concatenate(([pos[0]], fov_x, [pos[0]])), np.concatenate(([pos[1]], fov_y, [pos[1]])), color=colors[i], alpha=0.2))
+
+    # Add the rectangles (boxes)
+    boxes = []
+    for i in range(n_agent):
+        rect = plt.Rectangle((x[i][frame_idx] - bbox[0], y[i][frame_idx] - bbox[1]), 2*bbox[0], 2*bbox[1],
+                             linewidth=1, edgecolor='blue', facecolor='none')
+        ax.add_patch(rect)
+        boxes.append(rect)
+
+    if Trailing:
+        trail = [Line2D([x[0][0]], [y[0][0]]) for i in range(n_agent)]
+        for i in range(n_agent):
+                trail[i], = ax.plot(x[i, :frame_idx+1], y[i, :frame_idx+1], c=colors[i], marker=None, linewidth=3, alpha=0.6)
+
+    pred_idx = int(frame_idx//int(dt/Ts))
+    if Estimation:
+        # est_mean = [[Line2D([x[i][j]], [y[i][j]]) for j in range(n_agent-1)] for i in range(n_agent)]
+        # for i in range(n_agent):
+        #     for j in range(n_agent-1):
+        #         est_mean[i][j], = ax.plot([est_x[i, j, pred_idx], est_y[i, j, pred_idx]], c=colors[i], marker=None, alpha=0.2)
+
+        ellipses = []
+        for i in range(n_agent):
+            ellipses.append([])
+            for j in range(n_agent-1):
+                est_pos = estimate_mean[i, j, pred_idx, :2]  # [2, ]
+                est_cov_arr = estimate_cov[i, j, pred_idx, :]  # [9, ]
+                est_cov = np.array([est_cov_arr[0], est_cov_arr[1], est_cov_arr[3], est_cov_arr[4]]).reshape(2,2)
+                ellipse_ij = plot_cov_ellipse_2d(est_pos, est_cov, edgecolor=colors[i], facecolor=colors[i], alpha=0.3, ax=ax)
+                ellipses[i].append(ellipse_ij)
+
+        p_near_ellipse = []
+        for i in range(n_agent):
+            p_near_ellipse.append([])
+            for j in range(n_agent-1):
+                try:
+                    p_near_ellipse[i].append(ax.plot(p_near[i,j,pred_idx,0], p_near[i,j,pred_idx,1], c=colors[i], marker='x', markersize=5, linestyle='None', alpha=0.6))
+                except:
+                    print()
+
+    if PredCurve:
+        fov_preview_plot_step = list(range(0, pred_curve.shape[-2], preview_skip_step))+list([pred_curve.shape[-2]-1])
+        iter_color = ['r', 'b', 'y', 'purple', 'pink', 'c', 'green', 'k']
+        impc_iters = pred_curve.shape[-3]
+
+        preds = []
+        pred_fovs = []  # Store predicted FoV polygons
+        for i in range(n_agent):
+            iter_pred = []
+            iter_pred_fov = []
+            for impc_it in range(impc_iters):
+                iter_pred_curve = pred_curve[:,:,impc_it,:,:]
+                pred, = ax.plot(iter_pred_curve[i, pred_idx, :, 0], iter_pred_curve[i, pred_idx, :, 1], c=iter_color[impc_it], marker=None, alpha=0.8)
+                iter_pred.append(pred)
+                if enable_preview:
+                    if impc_it == impc_iters-1 or impc_it == 0:
+                        pred_fov = []
+                        for k in fov_preview_plot_step:
+                            pos = [iter_pred_curve[i, pred_idx, k, 0], iter_pred_curve[i, pred_idx, k, 1]]
+                            fov_x, fov_y = fov_xy(pos, iter_pred_curve[i, pred_idx, k, 2], fov_beta, preview_fov_range)
+                            pred_fov.append(ax.fill(np.concatenate(([pos[0]], fov_x, [pos[0]])),
+                                                    np.concatenate(([pos[1]], fov_y, [pos[1]])),
+                                                    color=iter_color[impc_it], alpha=0.1))  # Predicted FoV in red
+                        iter_pred_fov.append(pred_fov)
+            preds.append(iter_pred)
+            pred_fovs.append(iter_pred_fov)
+
+
+    if ShowGoals:
+        for i in range(n_agent):
+            goal = goals[i]
+            circle = Circle((goal[0], goal[1]), goal_radius, alpha=0.2, linewidth=2)
+            # Add the circle patch to the axes
+            ax.add_patch(circle)
+
+    plt.savefig(pre_save_name+"_frame"+str(frame_idx)+".pdf", bbox_inches='tight')
+    # plt.show()
+
+
 def animation2D_XYYaw(traj, estimate_mean, estimate_cov, p_near, dt, Ts, bbox, pred_curve=None, fov_beta=None, fov_range=None, Trailing=True, Estimation=True, PredCurve=True, colors="r", save_name= "./test.mp4"):
     # animation settings
     n_agent, total_frame, _ = traj.shape
@@ -127,7 +238,7 @@ def animation2D_XYYaw(traj, estimate_mean, estimate_cov, p_near, dt, Ts, bbox, p
     for i in range(n_agent):
         pos = [x[i, 0], y[i, 0]]
         fov_x, fov_y = fov_xy(pos, yaw[i, 0], fov_beta, fov_range)
-        fov.append(ax.fill(np.concatenate(([pos[0]], fov_x, [pos[0]])), np.concatenate(([pos[1]], fov_y, [pos[1]])), color=colors[i], alpha=0.5))
+        fov.append(ax.fill(np.concatenate(([pos[0]], fov_x, [pos[0]])), np.concatenate(([pos[1]], fov_y, [pos[1]])), color=colors[i], alpha=0.2))
 
     # Add the rectangles (boxes)
     boxes = []
@@ -263,10 +374,13 @@ def animation2D_XYYaw(traj, estimate_mean, estimate_cov, p_near, dt, Ts, bbox, p
     anim.save(save_name, writer=animation.FFMpegWriter(fps=1/Ts))
     return anim
 
-def plot2D_XYYaw(traj, obs_time=None, save_name="./test.jpg"):
+def plot2D_XYYaw(traj, goals, goal_radius=1, obs_time=None, save_name="./test.jpg"):
 
     n_agent = traj.shape[0]
-    fig = plt.figure()
+    assert n_agent==goals.shape[0]
+    fig, ax = plt.subplots()
+    # Set equal aspect ratio
+    ax.set_aspect('equal')
     # use position data to plot the 3D trajectory
     for obs_index in range(n_agent):
         if obs_time != None:
@@ -285,25 +399,39 @@ def plot2D_XYYaw(traj, obs_time=None, save_name="./test.jpg"):
             x_v = states[:, 3]
             y_v = states[:, 4]
             yaw_v = states[:, 5]
-        plt.plot(x, y, label='motion' + str(obs_index))
+        ax.plot(x, y, label='motion' + str(obs_index))
+
+    for i in range(n_agent):
+        goal = goals[i]
+        circle = Circle((goal[0], goal[1]), goal_radius, alpha=0.2, linewidth=2)
+        # Add the circle patch to the axes
+        ax.add_patch(circle)
+
     plt.legend()
     plt.title('2D Trajectory')
     plt.savefig(save_name)
-    plt.show()
+    # plt.show()
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="argparse to read the config, states and output filenames"
     )
-    parser.add_argument("-c", "--config_filename", type=str, default="../experiments/instances/circle2_config.json", help="path to config json file")
-    parser.add_argument("-s", "--states_filename", type=str, default="../experiments/instances/results/log01012025/circle2States_0.json", help="path to simulation state json file")
-    parser.add_argument("-o", "--output_filename", type=str, default="../experiments/instances/results/log01012025/circle2.mp4", help="path to simulation animation file")
+    # parser.add_argument("-c", "--config_filename", type=str, default="../experiments/instances/circle_instances/circle5_config.json", help="path to config json file")
+    # parser.add_argument("-s", "--states_filename", type=str, default="../experiments/instances/results/log01062025/circle5_fov120_decay0.1_States_4.json", help="path to simulation state json file")
+    # parser.add_argument("-ov", "--output_video", type=str, default="../experiments/instances/results/log01062025/circle5.mp4", help="path to simulation animation file")
+    # parser.add_argument("-of", "--output_figure", type=str, default="../experiments/instances/results/log01062025/snapshots/circle5", help="path to simulation figure file")
+    parser.add_argument("-c", "--config_filename", type=str, default="../experiments/instances/formation_instances/formation4_config.json", help="path to config json file")
+    parser.add_argument("-s", "--states_filename", type=str, default="../experiments/instances/results/log01062025/formation4_fov120_decay0.2_States_0.json", help="path to simulation state json file")
+    parser.add_argument("-ov", "--output_video", type=str, default="../experiments/instances/results/log01062025/formation4.mp4", help="path to simulation animation file")
+    parser.add_argument("-of", "--output_figure", type=str, default="../experiments/instances/results/log01062025/snapshots/formation4", help="path to simulation figure file")
+    parser.add_argument("-f", "--fov", type=int, default=120, help="fov of simulation")
     args = parser.parse_args()
 
     config_json = args.config_filename
     states_json = load_states(args.states_filename)
-    output_filename = args.output_filename
+    output_video = args.output_video
+    output_figure = args.output_figure
 
     num_robots = len(states_json["robots"])
     traj = np.array([states_json["robots"][str(_)]["states"] for _ in range(num_robots)])  # [n_robot, ts, dim]
@@ -335,10 +463,23 @@ if __name__ == "__main__":
     dt = states_json["dt"]
     Ts = states_json["Ts"]
     bbox = load_states(config_json)["robot_params"]["collision_shape"]["aligned_box"][:2]
+    goals = np.array(load_states(config_json)["tasks"]["sf"])
+    goal_radius = 1.6
+
     pred_curve = np.array([states_json["robots"][str(_)]["pred_curve"] for _ in range(num_robots)])  # [n, h_samples, impc_iter, horizon, dim]
-    # plot2D_XYYaw(traj)
-    FoV_beta = load_states(config_json)["fov_cbf_params"]["beta"] * np.pi/180
+    FoV_beta = args.fov * np.pi/180
     FoV_range = load_states(config_json)["fov_cbf_params"]["Rs"]
 
     colors = generate_rgb_colors(num_robots)
-    animation2D_XYYaw(traj, estimate_mean, estimate_cov, p_near, dt, Ts, bbox, pred_curve, FoV_beta, FoV_range, colors=colors, save_name=output_filename)
+
+    # goal_radius = 1.6
+    # success = instance_success(traj, goals, goal_radius, collision_shape)
+    # print("success: ", success)
+
+    plot2D_XYYaw(traj, goals, save_name=output_figure)
+    _, total_frame, _ = traj.shape
+    frame_gap = 20
+    render_frame_indices = range(0, total_frame, frame_gap)
+    for frame_idx in render_frame_indices:
+        snapshots2D_XYYaw(traj, goals, goal_radius, estimate_mean, estimate_cov, p_near, dt, Ts, bbox, frame_idx, pred_curve, FoV_beta, FoV_range, colors=colors, pre_save_name=output_figure)
+    # animation2D_XYYaw(traj, estimate_mean, estimate_cov, p_near, dt, Ts, bbox, pred_curve, FoV_beta, FoV_range, colors=colors, save_name=output_video)
