@@ -64,7 +64,8 @@ target_include_directories(cbf_examples_CBFControl_example PUBLIC include ../../
 target_link_libraries(cbf_examples_CBFControl_example PUBLIC
         model_DoubleIntegratorXYYaw
         cbf_controller_CBFControl
-        cxxopts)
+        cxxopts
+        ParticleFilter)
 
 add_executable(cbf_examples_CBFControlStaticTarget_example examples/CBFControlStaticTarget_example.cpp)
 target_include_directories(cbf_examples_CBFControlStaticTarget_example PUBLIC include ../../third_party/json/single_include)
