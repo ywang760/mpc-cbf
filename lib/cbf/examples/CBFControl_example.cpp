@@ -5,6 +5,7 @@
 #include <model/DoubleIntegratorXYYaw.h>
 #include <cbf/detail/cbf.h>
 #include <cbf/controller/CBFControl.h>
+#include <particle_filter/detail/particle_filter.h>
 #include <nlohmann/json.hpp>
 #include <cxxopts.hpp>
 #include <fstream>
@@ -13,6 +14,74 @@
 constexpr unsigned int DIM = 3U;
 using State = model::State<double, DIM>;
 using VectorDIM = math::VectorDIM<double, DIM>;
+
+math::Vector<double> closestPointOnEllipse(const math::VectorDIM<double, 3U> &robot_pos,
+                                           const math::Vector<double> &target_mean,
+                                           const math::Matrix<double> &target_cov) {
+    if (!isinf(target_cov(0, 0))) {
+        Eigen::EigenSolver<math::Matrix<double>> es(target_cov.block(0, 0, 3U-1, 3U-1));
+        math::Vector<double> eigenvalues = es.eigenvalues().real();
+        math::Matrix<double> eigenvectors = es.eigenvectors().real();
+
+        // s = 4.605 for 90% confidence interval
+        // s = 5.991 for 95% confidence interval
+        // s = 9.210 for 99% confidence interval
+        double s = 4.605;
+        double a = sqrt(s * eigenvalues(0)); // major axis
+        double b = sqrt(s * eigenvalues(1)); // minor axis
+
+        // a could be smaller than b, so swap them
+        if (a < b)
+        {
+            double temp = a;
+            a = b;
+            b = temp;
+        }
+
+        int m = 0; // higher eigenvalue index
+        int l = 1; // lower eigenvalue index
+        if (eigenvalues(1) > eigenvalues(0))
+        {
+            m = 1;
+            l = 0;
+        }
+
+        double theta = atan2(eigenvectors(1, m), eigenvectors(0, m)); // angle of the major axis wrt positive x-asis (ccw rotation)
+        if (theta < 0.0) {
+            theta += M_PI;
+        } // angle in [0, 2pi]
+
+        double slope = atan2(-target_mean(1) + robot_pos(1), -target_mean(0) + robot_pos(0));
+        double x_n = target_mean(0) + a * cos(slope - theta) * cos(theta) - b * sin(slope - theta) * sin(theta);
+        double y_n = target_mean(1) + a * cos(slope - theta) * sin(theta) + b * sin(slope - theta) * cos(theta);
+
+        math::Vector<double> p_near(2);
+        p_near << x_n, y_n;
+        return p_near;
+//        double dist = sqrt(pow(p_near(0) - robot_pos(0), 2) + pow(p_near(1) - robot_pos(1), 2));
+//
+//        if (isnan(dist)) {
+//            dist = 5.0;
+//            return dist;
+//        }
+//
+//        // Check if robot is inside ellipse
+//        double d = sqrt(pow(target_mean(0) - robot_pos(0), 2) + pow(target_mean(1) - robot_pos(1), 2));
+//        double range = sqrt(pow(target_mean(0) - p_near(0), 2) + pow(target_mean(1) - p_near(1), 2));
+//
+//        if (d < range) {
+//            return -dist;
+//        } else {
+//            return dist;
+//        }
+    } else {
+        math::Vector<double> p_near(2);
+        p_near << 0, 0;
+        return p_near;
+    }
+
+//    return -5.0;
+}
 
 double convertYawInRange(double yaw) {
     assert(yaw < 2 * M_PI && yaw > -2 * M_PI);
@@ -87,10 +156,31 @@ math::VectorDIM<double, DIM> rotateControlInputToWorldFrame(const VectorDIM& con
     return R.transpose() * control_bf;
 }
 
+bool insideFOV(Eigen::VectorXd robot, Eigen::VectorXd target, double fov, double range)
+{
+    double yaw = robot(2);
+
+    Eigen::Matrix3d R;
+    R << cos(yaw), sin(yaw), 0.0,
+            -sin(yaw), cos(yaw), 0.0,
+            0.0, 0.0, 1.0;
+    Eigen::VectorXd t_local = R.block<2,2>(0,0) * (target.head(2) - robot.head(2));
+    double dist = t_local.norm();
+    double angle = abs(atan2(t_local(1), t_local(0)));
+    if (angle <= 0.5*fov && dist <= range)
+    {
+        return true;
+    } else
+    {
+        return false;
+    }
+}
+
 int main(int argc, char* argv[]) {
     using FovCBF = cbf::FovCBF;
     using DoubleIntegratorXYYaw = model::DoubleIntegratorXYYaw<double>;
     using CBFControl = cbf::CBFControl<double, DIM>;
+    using ParticleFilter = pf::ParticleFilter;
     using json = nlohmann::json;
 
     using Matrix = math::Matrix<double>;
@@ -149,7 +239,14 @@ int main(int argc, char* argv[]) {
             experiment_config_json["mpc_params"]["physical_limits"]["a_max"][1],
             experiment_config_json["mpc_params"]["physical_limits"]["a_max"][2];
 //    a_max << 120, 120, 120;
-    double VMAX = 1.;
+//    double VMAX = 1.;
+
+    // filter params
+    int num_particles = 100;
+    Matrix initCov = 1.0*Eigen::MatrixXd::Identity(DIM-1, DIM-1);
+    Matrix processCov = 0.25*Eigen::MatrixXd::Identity(DIM-1, DIM-1);
+    Matrix measCov = 0.05*Eigen::MatrixXd::Identity(DIM-1, DIM-1);
+
     // json for record
     std::string JSON_FILENAME = "../../../tools/CBFXYYawStates.json";
     json states;
@@ -183,7 +280,8 @@ int main(int argc, char* argv[]) {
         target_pos << sf_json[i][0], sf_json[i][1], sf_json[i][2];
         target_positions.push_back(target_pos);
     }
-
+    // init filters
+    std::vector<std::vector<ParticleFilter>> filters;
     std::vector<std::vector<size_t>> neighbor_ids(num_robots, std::vector<size_t>(num_robots-1));
     for (size_t i = 0; i < num_robots; ++i) {
         size_t neighbor_idx = 0;
@@ -196,6 +294,19 @@ int main(int argc, char* argv[]) {
         }
     }
 
+    for (size_t i = 0; i < num_robots; ++i){
+        filters.emplace_back(num_robots-1);
+        for (size_t j = 0; j < num_robots-1; ++j) {
+            size_t neighbor_id = neighbor_ids.at(i).at(j);
+            // init particle filter
+            Vector neighbor_xy(DIM-1);
+            neighbor_xy << init_states.at(neighbor_id).pos_(0), init_states.at(neighbor_id).pos_(1);
+            filters[i][j].init(num_particles, neighbor_xy, initCov, processCov, measCov);
+        }
+        assert(filters[i].size() == num_robots-1);
+    }
+    assert(filters.size() == num_robots);
+
     // control loop
     int loop_idx = 0;
     while (loop_idx < 400) {
@@ -204,60 +315,60 @@ int main(int argc, char* argv[]) {
             std::vector<Matrix> other_robot_covs;
             for (int j = 0; j < num_robots-1; ++j) {
                 size_t neighbor_id = neighbor_ids.at(robot_idx).at(j);
-//                const VectorDIM& ego_pos = init_states.at(robot_idx).pos_;
-//                const VectorDIM& neighbor_pos = init_states.at(neighbor_id).pos_;
-//                ParticleFilter &filter = filters.at(robot_idx).at(j);
-//                // update filter estimate
-//                filter.predict();
-//                Vector weights = filter.getWeights();
-//                Matrix samples = filter.getParticles();
-//                for (int s = 0; s < num_particles; ++s) {
-//                    if (insideFOV(ego_pos, samples.col(s), fov_beta, fov_Rs)) {
-//                        weights[s] /= 10.0;
-//                    }
-//                }
-//                filter.setWeights(weights);
-//
-//                // emulate vision
-//                if (insideFOV(ego_pos, neighbor_pos, fov_beta, fov_Rs)) {
-//                    Vector neighbor_xy(DIM-1);
-//                    neighbor_xy << neighbor_pos(0), neighbor_pos(1);
-//                    filter.update(neighbor_xy);
-//                }
-//
-//                filter.resample();
-//                filter.estimateState();
-//
-//                // update variables
-//                Vector estimate = filter.getState();
-//                VectorDIM extended_estimate;
-//                extended_estimate << estimate(0), estimate(1), 0;
-//                Matrix cov(DIM-1, DIM-1);
-//                cov = filter.getDistribution();
-//                other_robot_positions.push_back(extended_estimate);
-//                Matrix extended_cov(DIM, DIM);
-//                extended_cov << cov(0), cov(1), 0,
-//                        cov(2), cov(3), 0,
-//                        0,      0,      0;
-//                other_robot_covs.push_back(extended_cov);
-//                // log estimate
-//                states["robots"][std::to_string(robot_idx)]["estimates_mean"][std::to_string(neighbor_id)].push_back({extended_estimate(0), extended_estimate(1), extended_estimate(2)});
-//                states["robots"][std::to_string(robot_idx)]["estimates_cov"][std::to_string(neighbor_id)].push_back({extended_cov(0), extended_cov(1), extended_cov(2),
-//                                                                                                                     extended_cov(3), extended_cov(4), extended_cov(5),
-//                                                                                                                     extended_cov(6), extended_cov(7), extended_cov(8)});
-//
-//                // for the closest point on ellipse visualization
-//                Vector p_near = closestPointOnEllipse(ego_pos, estimate, cov);
-//                states["robots"][std::to_string(robot_idx)]["p_near_ellipse"][std::to_string(neighbor_id)].push_back({p_near(0), p_near(1)});
+                const VectorDIM& ego_pos = init_states.at(robot_idx).pos_;
+                const VectorDIM& neighbor_pos = init_states.at(neighbor_id).pos_;
+                ParticleFilter &filter = filters.at(robot_idx).at(j);
+                // update filter estimate
+                filter.predict();
+                Vector weights = filter.getWeights();
+                Matrix samples = filter.getParticles();
+                for (int s = 0; s < num_particles; ++s) {
+                    if (insideFOV(ego_pos, samples.col(s), fov_beta, fov_Rs)) {
+                        weights[s] /= 10.0;
+                    }
+                }
+                filter.setWeights(weights);
 
-                // for debug: fixed estimate
-                other_robot_positions.push_back(init_states.at(neighbor_id).pos_);
+                // emulate vision
+                if (insideFOV(ego_pos, neighbor_pos, fov_beta, fov_Rs)) {
+                    Vector neighbor_xy(DIM-1);
+                    neighbor_xy << neighbor_pos(0), neighbor_pos(1);
+                    filter.update(neighbor_xy);
+                }
 
-                Matrix other_robot_cov(DIM, DIM);
-                other_robot_cov << 0.1, 0, 0,
-                                   0, 0.1, 0,
-                                   0, 0, 0.1;
-                other_robot_covs.push_back(other_robot_cov);
+                filter.resample();
+                filter.estimateState();
+
+                // update variables
+                Vector estimate = filter.getState();
+                VectorDIM extended_estimate;
+                extended_estimate << estimate(0), estimate(1), 0;
+                Matrix cov(DIM-1, DIM-1);
+                cov = filter.getDistribution();
+                other_robot_positions.push_back(extended_estimate);
+                Matrix extended_cov(DIM, DIM);
+                extended_cov << cov(0), cov(1), 0,
+                        cov(2), cov(3), 0,
+                        0,      0,      0;
+                other_robot_covs.push_back(extended_cov);
+                // log estimate
+                states["robots"][std::to_string(robot_idx)]["estimates_mean"][std::to_string(neighbor_id)].push_back({extended_estimate(0), extended_estimate(1), extended_estimate(2)});
+                states["robots"][std::to_string(robot_idx)]["estimates_cov"][std::to_string(neighbor_id)].push_back({extended_cov(0), extended_cov(1), extended_cov(2),
+                                                                                                                     extended_cov(3), extended_cov(4), extended_cov(5),
+                                                                                                                     extended_cov(6), extended_cov(7), extended_cov(8)});
+
+                // for the closest point on ellipse visualization
+                Vector p_near = closestPointOnEllipse(ego_pos, estimate, cov);
+                states["robots"][std::to_string(robot_idx)]["p_near_ellipse"][std::to_string(neighbor_id)].push_back({p_near(0), p_near(1)});
+
+//                // for debug: fixed estimate
+//                other_robot_positions.push_back(init_states.at(neighbor_id).pos_);
+//
+//                Matrix other_robot_cov(DIM, DIM);
+//                other_robot_cov << 0.1, 0, 0,
+//                                   0, 0.1, 0,
+//                                   0, 0, 0.1;
+//                other_robot_covs.push_back(other_robot_cov);
             }
 
             // compute the desired control
