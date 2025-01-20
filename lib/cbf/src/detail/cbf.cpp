@@ -21,8 +21,8 @@ GiNaC::ex fifthAlpha(GiNaC::ex myh, double mygamma)
 namespace cbf
 {   
     // template <typename T>
-    FovCBF::FovCBF(double fov, double safety_dist, double max_dist, double vmax) : 
-    fov(fov), Ds(safety_dist), Rs(max_dist), vmax(vmax), vmin(-vmax), px("px"), py("py"), th("th"), vx("vx"), vy("vy"), w("w"), xt("xt"), yt("yt")
+    FovCBF::FovCBF(double fov, double safety_dist, double max_dist, Eigen::VectorXd vmin, Eigen::VectorXd vmax) :
+    fov(fov), Ds(safety_dist), Rs(max_dist), vmin(vmin), vmax(vmax), px("px"), py("py"), th("th"), vx("vx"), vy("vy"), w("w"), xt("xt"), yt("yt")
     {
         STATE_VARS = 6;
         CONTROL_VARS = 3;
@@ -74,33 +74,33 @@ namespace cbf
         Bc_range = res4.second;
 
 
-        GiNaC::ex bv1 = -state[3] + vmax;
+        GiNaC::ex bv1 = -state[3] + vmax(0);
         res = initVelCBF(bv1);
         Ac_v1_max = res.first;
         Bc_v1_max = res.second;
 
-        GiNaC::ex bv2 = -state[4] + vmax;
+        GiNaC::ex bv2 = -state[4] + vmax(1);
         res = initVelCBF(bv2);
         Ac_v2_max = res.first;
         Bc_v2_max = res.second;
 
 
-        GiNaC::ex bv3 = -state[5] + vmax;
+        GiNaC::ex bv3 = -state[5] + vmax(2);
         res = initVelCBF(bv3);
         Ac_v3_max = res.first;
         Bc_v3_max = res.second;
 
-        GiNaC::ex bv4 = state[3] - vmin;
+        GiNaC::ex bv4 = state[3] - vmin(0);
         res = initVelCBF(bv4);
         Ac_v1_min = res.first;
         Bc_v1_min = res.second;
 
-        GiNaC::ex bv5 = state[4] - vmin;
+        GiNaC::ex bv5 = state[4] - vmin(1);
         res = initVelCBF(bv5);
         Ac_v2_min = res.first;
         Bc_v2_min = res.second;
 
-        GiNaC::ex bv6 = state[5] - vmin;
+        GiNaC::ex bv6 = state[5] - vmin(2);
         res = initVelCBF(bv6);
         Ac_v3_min = res.first;
         Bc_v3_min = res.second;
@@ -451,7 +451,7 @@ namespace cbf
             Ac_v1(0, j) = Ac_v1j;
         }
 
-        GiNaC::ex Bc_v1 = lfbv + alpha(bv, 1.0);
+        GiNaC::ex Bc_v1 = lfbv + defaultAlpha(bv, 1);
         return std::make_pair(Ac_v1, Bc_v1);
     }
 
@@ -559,8 +559,10 @@ namespace cbf
         Acs.setZero();
         for (int i = 0; i < CONTROL_VARS; ++i)
         {
-            GiNaC::ex val = expressions[i].evalf();
-            Acs(i,i) = GiNaC::ex_to<GiNaC::numeric>(val).to_double();
+            for (int j = 0; j < CONTROL_VARS; ++j) {
+                GiNaC::ex val = expressions[i][j].evalf();
+                Acs(i,j) = GiNaC::ex_to<GiNaC::numeric>(val).to_double();
+            }
         }
 
         return Acs;
@@ -580,8 +582,10 @@ namespace cbf
         Acs.setZero();
         for (int i = 0; i < CONTROL_VARS; ++i)
         {
-            GiNaC::ex val = expressions[i].evalf();
-            Acs(i,i) = GiNaC::ex_to<GiNaC::numeric>(val).to_double();
+            for (int j = 0; j < CONTROL_VARS; ++j) {
+                GiNaC::ex val = expressions[i][j].evalf();
+                Acs(i, j) = GiNaC::ex_to<GiNaC::numeric>(val).to_double();
+            }
         }
 
         return Acs;

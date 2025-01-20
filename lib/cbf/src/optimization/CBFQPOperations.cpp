@@ -63,6 +63,36 @@ namespace cbf {
     }
 
     template <typename T, unsigned int DIM>
+    std::vector<typename CBFQPOperations<T, DIM>::LinearConstraint>
+    CBFQPOperations<T, DIM>::minVelConstraints(const Vector &state) {
+        Matrix coefficient_matrix = cbf_->getMinVelContraints(state);
+        Vector bounds = cbf_->getMinVelBounds(state);
+        assert(coefficient_matrix.rows() == bounds.size());
+        std::vector<LinearConstraint> linear_constraints;
+        for (size_t i = 0; i < coefficient_matrix.rows(); ++i) {
+            Vector coefficients = -1.0 * coefficient_matrix.row(i);
+            T bound = bounds(i);
+            linear_constraints.push_back(LinearConstraint(coefficients, std::numeric_limits<T>::lowest(), bound));
+        }
+        return linear_constraints;
+    }
+
+    template <typename T, unsigned int DIM>
+    std::vector<typename CBFQPOperations<T, DIM>::LinearConstraint>
+    CBFQPOperations<T, DIM>::maxVelConstraints(const Vector &state) {
+        Matrix coefficient_matrix = cbf_->getMaxVelContraints(state);
+        Vector bounds = cbf_->getMaxVelBounds(state);
+        assert(coefficient_matrix.rows() == bounds.size());
+        std::vector<LinearConstraint> linear_constraints;
+        for (size_t i = 0; i < coefficient_matrix.rows(); ++i) {
+            Vector coefficients = -1.0 * coefficient_matrix.row(i);
+            T bound = bounds(i);
+            linear_constraints.push_back(LinearConstraint(coefficients, std::numeric_limits<T>::lowest(), bound));
+        }
+        return linear_constraints;
+    }
+
+    template <typename T, unsigned int DIM>
     typename CBFQPOperations<T, DIM>::LinearConstraint
     CBFQPOperations<T, DIM>::leftBorderConstraintWithSlackVar(const Vector &state,
                                                               const Vector &target_state,
