@@ -294,9 +294,9 @@ int main(int argc, char* argv[]) {
     StatePropagator exe_A0 = exe_model_ptr->get_A0(int(h/Ts));
     StatePropagator exe_Lambda = exe_model_ptr->get_lambda(int(h/Ts));
     // init cbf
-    std::shared_ptr<FovCBF> fov_cbf = std::make_unique<FovCBF>(fov_beta, fov_Ds, fov_Rs);
+    std::shared_ptr<FovCBF> fov_cbf = std::make_unique<FovCBF>(fov_beta, fov_Ds, fov_Rs, v_min, v_max);
     // init bezier mpc-cbf
-    uint64_t bezier_continuity_upto_degree = 4;
+    uint64_t bezier_continuity_upto_degree = 3;
     int num_neighbors = experiment_config_json["tasks"]["so"].size() - 1;
     std::cout << "neighbor size: " << num_neighbors << "\n";
     BezierMPCCBFParams bezier_mpc_cbf_params = {piecewise_bezier_params, mpc_params, fov_cbf_params};
@@ -431,6 +431,10 @@ int main(int argc, char* argv[]) {
 //                                   0, 0.1, 0,
 //                                   0, 0, 0.1;
 //                other_robot_covs.push_back(other_robot_cov);
+//                states["robots"][std::to_string(robot_idx)]["estimates_mean"][std::to_string(neighbor_id)].push_back({init_states.at(neighbor_id).pos_(0), init_states.at(neighbor_id).pos_(1), init_states.at(neighbor_id).pos_(2)});
+//                states["robots"][std::to_string(robot_idx)]["estimates_cov"][std::to_string(neighbor_id)].push_back({other_robot_cov(0), other_robot_cov(1), other_robot_cov(2),
+//                                                                                                                     other_robot_cov(3), other_robot_cov(4), other_robot_cov(5),
+//                                                                                                                     other_robot_cov(6), other_robot_cov(7), other_robot_cov(8)});
             }
 //            BezierIMPCCBF bezier_impc_cbf(bezier_impc_cbf_params, pred_model_ptr, fov_cbf, bezier_continuity_upto_degree, aligned_box_collision_shape_ptr, impc_iter);
             bezier_impc_cbf.resetProblem();
@@ -447,7 +451,13 @@ int main(int argc, char* argv[]) {
                                                     other_robot_positions, other_robot_covs,
                                                     ref_positions);
             if (!success) {
-                std::cout << "QP failed at ts: " << sim_t << "\n";
+                std::cout << "QP failed at ts: " << sim_t;
+                if (!trajs.empty()) {
+                    std::cout << "; But initial planning is successful...";
+                    pred_traj_ptrs.at(robot_idx) = std::make_shared<SingleParameterPiecewiseCurve>(std::move(trajs.back()));
+                    traj_eval_ts.at(robot_idx) = 0;
+                }
+                std::cout << "\n";
             }
 
 //            /* continuous control
@@ -460,19 +470,19 @@ int main(int argc, char* argv[]) {
             // log down the prediction
             double t = 0;
             while (t <= pred_horizon) {
-                for (size_t traj_index = 0; traj_index < trajs.size(); ++traj_index) { // TODO log down iteration of predictions
-                    VectorDIM pred_pos;
+//                for (size_t traj_index = 0; traj_index < trajs.size(); ++traj_index) {
+                VectorDIM pred_pos;
 //                    if (success) {
 //                        pred_pos = trajs.at(traj_index).eval(t, 0);
 //                    } else {
-                    double pred_t = traj_eval_ts.at(robot_idx) + t;
-                    if (pred_t > pred_traj_ptrs.at(robot_idx)->max_parameter()) {
-                        pred_t = pred_traj_ptrs.at(robot_idx)->max_parameter();
-                    }
-                    pred_pos = pred_traj_ptrs.at(robot_idx)->eval(pred_t, 0);
-//                    }
-                    states["robots"][std::to_string(robot_idx)]["pred_curve"][loop_idx][traj_index].push_back({pred_pos(0), pred_pos(1), pred_pos(2)});
+                double pred_t = traj_eval_ts.at(robot_idx) + t;
+                if (pred_t > pred_traj_ptrs.at(robot_idx)->max_parameter()) {
+                    pred_t = pred_traj_ptrs.at(robot_idx)->max_parameter();
                 }
+                pred_pos = pred_traj_ptrs.at(robot_idx)->eval(pred_t, 0);
+//                    }
+                states["robots"][std::to_string(robot_idx)]["pred_curve"][loop_idx][0].push_back({pred_pos(0), pred_pos(1), pred_pos(2)});
+//                }
                 t += 0.05;
             }
 
