@@ -4,6 +4,7 @@
 
 #include <eigen3/Eigen/Dense>
 #include <eigen3/Eigen/Sparse>
+#include <math/Helpers.h>
 #include <functional>
 #include <ginac/ginac.h>
 

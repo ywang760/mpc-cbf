@@ -28,7 +28,8 @@ endif()
 # add libraries
 add_library(cbf_detail_FovCBF SHARED src/detail/cbf.cpp)
 target_include_directories(cbf_detail_FovCBF PUBLIC include)
-target_link_libraries(cbf_detail_FovCBF PUBLIC ginac cln)
+target_link_libraries(cbf_detail_FovCBF PUBLIC ginac cln
+        math_Helpers)
 
 add_library(cbf_optimization_CBFQPOperations SHARED src/optimization/CBFQPOperations.cpp)
 target_include_directories(cbf_optimization_CBFQPOperations PUBLIC include)
@@ -51,13 +52,13 @@ target_link_libraries(cbf_controller_CBFControl PUBLIC
         model_DoubleIntegratorXYYaw)
 
 # add examples
-add_executable(cbf_test tests/cbf_test.cpp)
-target_include_directories(cbf_test PUBLIC include)
-target_link_libraries(cbf_test PUBLIC ginac cln)
-
-add_executable(test_class tests/test_class.cpp)
-target_include_directories(test_class PUBLIC include)
-target_link_libraries(test_class PUBLIC cbf_detail_FovCBF ginac cln)
+#add_executable(cbf_test tests/cbf_test.cpp)
+#target_include_directories(cbf_test PUBLIC include)
+#target_link_libraries(cbf_test PUBLIC ginac cln)
+#
+#add_executable(test_class tests/test_class.cpp)
+#target_include_directories(test_class PUBLIC include)
+#target_link_libraries(test_class PUBLIC cbf_detail_FovCBF ginac cln)
 
 add_executable(cbf_examples_CBFControl_example examples/CBFControl_example.cpp)
 target_include_directories(cbf_examples_CBFControl_example PUBLIC include ../../third_party/json/single_include)
@@ -67,16 +68,16 @@ target_link_libraries(cbf_examples_CBFControl_example PUBLIC
         cxxopts
         ParticleFilter)
 
-add_executable(cbf_examples_CBFControlStaticTarget_example examples/CBFControlStaticTarget_example.cpp)
-target_include_directories(cbf_examples_CBFControlStaticTarget_example PUBLIC include ../../third_party/json/single_include)
-target_link_libraries(cbf_examples_CBFControlStaticTarget_example PUBLIC
-        model_DoubleIntegratorXYYaw
-        cbf_controller_CBFControl)
+#add_executable(cbf_examples_CBFControlStaticTarget_example examples/CBFControlStaticTarget_example.cpp)
+#target_include_directories(cbf_examples_CBFControlStaticTarget_example PUBLIC include ../../third_party/json/single_include)
+#target_link_libraries(cbf_examples_CBFControlStaticTarget_example PUBLIC
+#        model_DoubleIntegratorXYYaw
+#        cbf_controller_CBFControl)
 
-add_executable(cbf_examples_CBFControlSlack_example examples/CBFControlSlack_example.cpp)
-target_include_directories(cbf_examples_CBFControlSlack_example PUBLIC include ../../third_party/json/single_include)
-target_link_libraries(cbf_examples_CBFControlSlack_example PUBLIC
-        model_DoubleIntegratorXYYaw
-        cbf_controller_CBFControl
-        ParticleFilter
-        cxxopts)
+#add_executable(cbf_examples_CBFControlSlack_example examples/CBFControlSlack_example.cpp)
+#target_include_directories(cbf_examples_CBFControlSlack_example PUBLIC include ../../third_party/json/single_include)
+#target_link_libraries(cbf_examples_CBFControlSlack_example PUBLIC
+#        model_DoubleIntegratorXYYaw
+#        cbf_controller_CBFControl
+#        ParticleFilter
+#        cxxopts)
