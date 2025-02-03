@@ -19,6 +19,30 @@ def CI_compute(sample_arr):
     ci = 1.96 * (std_arr / np.sqrt(M))  # [T,]
     return mean_arr, ci
 
+def percentile_compute(sample_arr):
+    '''
+    Compute the median, 25th percentile (Q1), and 75th percentile (Q3) for samples.
+
+    :param sample_arr: [entries, M] where entries is the number of statistics entry,
+                       M is the number of samples.
+    :return:
+    median_arr [entries,]
+    q1_arr [entries,] (25th percentile)
+    q3_arr [entries,] (75th percentile)
+    '''
+    # Compute the median
+    median_arr = np.median(sample_arr, axis=1)  # [T,]
+
+    # Compute the 25th percentile (Q1)
+    q1_arr = np.percentile(sample_arr, 25, axis=1)  # [T,]
+    q1_arr = median_arr - q1_arr
+
+    # Compute the 75th percentile (Q3)
+    q3_arr = np.percentile(sample_arr, 75, axis=1)  # [T,]
+    q3_arr = q3_arr - median_arr
+
+    return median_arr, q1_arr, q3_arr
+
 def CI_compute_with_inf(sample_arr):
     # constants
     T, M = sample_arr.shape
@@ -43,6 +67,37 @@ def CI_compute_with_inf(sample_arr):
             ci.append(np.nan)
 
     return np.array(mean_arr), np.array(ci)
+
+def percentile_compute_with_inf(sample_arr):
+    # constants
+    T, M = sample_arr.shape
+    valid_sample_arr = [[] for i in range(T)]
+    median_arr = []
+    q1_arr = []
+    q3_arr = []
+    for i in range(T):
+        for j in range(M):
+            if sample_arr[i, j] != float("inf"):
+                valid_sample_arr[i].append(sample_arr[i, j])
+
+    for i in range(T):
+        valid_size = len(valid_sample_arr[i])
+        if valid_size > 0:
+            median = np.median(valid_sample_arr[i])
+            median_arr.append(median)
+            q1 = np.percentile(valid_sample_arr[i], 25)
+            q1 = median - q1
+            # Compute the 75th percentile (Q3)
+            q3 = np.percentile(valid_sample_arr[i], 75)
+            q3 = q3 - median
+            q1_arr.append(q1)
+            q3_arr.append(q3)
+        else:
+            median_arr.append(np.nan)
+            q1_arr.append(np.nan)
+            q3_arr.append(np.nan)
+
+    return np.array(median_arr), np.array(q1_arr), np.array(q3_arr)
 
 def CI_plot(x, mean_arr, ci, save_name="./ci_plot.png", xlabel="entry", ylabel="value", label = ""):
     '''
@@ -80,7 +135,7 @@ def CI_plot(x, mean_arr, ci, save_name="./ci_plot.png", xlabel="entry", ylabel="
     ax.set_ylabel(ylabel)
     plt.savefig(save_name, bbox_inches='tight')
 
-def list_CI_plot(x, mean_arr_list, ci_arr_list, label_list, colors, xlabel="entry", ylabel="value", save_name="./ci_plot.png"):
+def list_CI_plot(x, mean_arr_list, negative_ci_arr_list, positive_ci_arr_list, label_list, colors, xlabel="entry", ylabel="value", save_name="./ci_plot.png"):
     '''
     plot the confident interval for the reward curve across the training epochs.
     :param
@@ -92,12 +147,15 @@ def list_CI_plot(x, mean_arr_list, ci_arr_list, label_list, colors, xlabel="entr
     assert x.shape == mean_arr_list[0].shape
     # create canvas
     fig, ax = plt.subplots(figsize=(10, 3))
+
+    linestyles = ["--", "--", "--", "-", "-", "-", "-.", "-."]
     for i in range(len(mean_arr_list)):
     # plot
-        ax.plot(x, mean_arr_list[i][:], c=colors[i], label=f"${label_list[i]}$")
+        ax.plot(x, mean_arr_list[i][:], c=colors[i], label=f"${label_list[i]}$", ls=linestyles[i])
+        ax.scatter(x, mean_arr_list[i][:], c=colors[i], s=4, lw=1)
         ax.fill_between(x,
-                        mean_arr_list[i][:] - ci_arr_list[i][:],
-                        mean_arr_list[i][:] + ci_arr_list[i][:],
+                        mean_arr_list[i][:] - negative_ci_arr_list[i][:],
+                        mean_arr_list[i][:] + positive_ci_arr_list[i][:],
                         color=colors[i] ,alpha=0.1)
     plt.xticks(x, fontsize=13)
     plt.yticks(fontsize=13)
@@ -111,18 +169,22 @@ def list_CI_plot(x, mean_arr_list, ci_arr_list, label_list, colors, xlabel="entr
 
 
     # legend and label, save the figure
-    plt.legend(fontsize=11)
+    plt.legend(fontsize=9, ncol=3)
     ax.set_xlabel(xlabel, fontsize=16)
     ax.set_ylabel(ylabel, fontsize=16)
     plt.savefig(save_name, bbox_inches='tight')
 
-def histogram_list_CI_plot(categories, samples_arr_list, mean_arr_list, ci_arr_list, label_list, colors, xlabel="entry", ylabel="value", legend=False, save_name="./hist_plot.png"):
+def histogram_list_CI_plot(categories, samples_arr_list, mean_arr_list, negative_err_arr_list, positive_err_arr_list, label_list, colors, xlabel="entry", ylabel="value", legend=False, save_name="./hist_plot.png"):
     n_category = len(categories)
     n_subgroup = len(mean_arr_list)
     values = mean_arr_list
-    cis = ci_arr_list
+    negative_cis = negative_err_arr_list
+    positive_cis = positive_err_arr_list
     samples = samples_arr_list
 
+    # hatches = ["/","/","/", None, None, None, None, None]
+    alphas = [0.3, 0.3, 0.3, 0.7, 0.7, 0.7, 0.9, 0.9]
+    ls = ["--", "--", "--", "-", "-", "-", "-.", "-.",]
 
     # values = [[] for i in range(n_category)]
     # cis = [[] for i in range(n_category)]
@@ -138,7 +200,7 @@ def histogram_list_CI_plot(categories, samples_arr_list, mean_arr_list, ci_arr_l
     # Parameters for the bar chart
     num_categories = len(categories)
     num_subgroups = len(subgroups)
-    width = 0.1  # Width of each bar
+    width = 0.09  # Width of each bar
 
     # create canvas
     fig, ax = plt.subplots(figsize=(10, 3))
@@ -150,12 +212,15 @@ def histogram_list_CI_plot(categories, samples_arr_list, mean_arr_list, ci_arr_l
             bar_positions,
             values[i],
             width,
-            yerr=cis[i],
-            capsize=2,
+            yerr=np.array([negative_cis[i], positive_cis[i]]),
+            capsize=1.5,
             label=f"${subgroups[i]}$",
             color=colors[i],
             edgecolor="k",
-            alpha=0.7
+            alpha=alphas[i],
+            # hatch=hatches[i],
+            ls = ls[i],
+            lw=0.8
         )
         # Add scatter points with hollow circles
         for j, pos in enumerate(bar_positions):
@@ -164,15 +229,16 @@ def histogram_list_CI_plot(categories, samples_arr_list, mean_arr_list, ci_arr_l
                 samples[i][j],
                 facecolors='none',  # Hollow center
                 edgecolors='black',  # Black border
-                alpha=0.8,
-                s=5  # Point size
+                alpha=0.6,
+                s=4,  # Point size
+                lw=0.5
             )
 
     # legend and label, save the figure
     # plt.legend()
     if legend:
         ax.legend(
-            fontsize=15,
+            fontsize=12,
             bbox_to_anchor=(0.47, 1.15),  # Center it above the plot
             loc='lower center',          # Place it at the bottom of the legend box
             ncol=3,                      # Display the legend in a single row
