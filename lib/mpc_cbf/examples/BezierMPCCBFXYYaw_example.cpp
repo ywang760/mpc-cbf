@@ -53,9 +53,18 @@ int main() {
             experiment_config_json["mpc_params"]["physical_limits"]["p_max"][1];
     // fov cbf params
     double fov_beta = double(experiment_config_json["fov_cbf_params"]["beta"]) * M_PI / 180.0;
-    double fov_Ds = experiment_config_json["fov_cbf_params"]["Ds"];
+    double fov_Ds = experiment_config_json["robot_params"]["collision_shape"]["aligned_box"][0];
     double fov_Rs = experiment_config_json["fov_cbf_params"]["Rs"];
 
+    // robot physical params
+    VectorDIM v_min;
+    v_min << experiment_config_json["mpc_params"]["physical_limits"]["v_min"][0],
+            experiment_config_json["mpc_params"]["physical_limits"]["v_min"][1],
+            experiment_config_json["mpc_params"]["physical_limits"]["v_min"][2];
+    VectorDIM v_max;
+    v_max << experiment_config_json["mpc_params"]["physical_limits"]["v_max"][0],
+            experiment_config_json["mpc_params"]["physical_limits"]["v_max"][1],
+            experiment_config_json["mpc_params"]["physical_limits"]["v_max"][2];
     VectorDIM a_min;
     a_min << experiment_config_json["mpc_params"]["physical_limits"]["a_min"][0],
             experiment_config_json["mpc_params"]["physical_limits"]["a_min"][1],
@@ -75,7 +84,7 @@ int main() {
             std::make_shared<const AlignedBoxCollisionShape>(robot_bbox_at_zero);
     // create params
     PiecewiseBezierParams piecewise_bezier_params = {num_pieces, num_control_points, piece_max_parameter};
-    MPCParams mpc_params = {h, Ts, k_hor, {w_pos_err, w_u_eff, spd_f}, {p_min, p_max, a_min, a_max}};
+    MPCParams mpc_params = {h, Ts, k_hor, {w_pos_err, w_u_eff, spd_f}, {p_min, p_max, v_min, v_max, a_min, a_max}};
     FoVCBFParams fov_cbf_params = {fov_beta, fov_Ds, fov_Rs};
 
     // json for record

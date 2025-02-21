@@ -65,6 +65,8 @@ public:
     using MPCParams = mpc::MPCParams<double>;
     using FoVCBFParams = cbf::FoVCBFParams<double>;
     using BezierMPCCBFParams = mpc_cbf::PiecewiseBezierMPCCBFQPOperations<double, DIM>::Params;
+    using IMPCParams = mpc_cbf::BezierIMPCCBF<double, DIM>::IMPCParams;
+    using IMPCCBFParams = mpc_cbf::BezierIMPCCBF<double, DIM>::Params;
     using SingleParameterPiecewiseCurve = splines::SingleParameterPiecewiseCurve<double, DIM>;
 
     using json = nlohmann::json;
@@ -128,9 +130,17 @@ public:
                 experiment_config_json["mpc_params"]["physical_limits"]["p_max"][1];
         // fov cbf params
         double fov_beta = double(experiment_config_json["fov_cbf_params"]["beta"]) * M_PI / 180.0;
-        double fov_Ds = experiment_config_json["fov_cbf_params"]["Ds"];
+        double fov_Ds = experiment_config_json["robot_params"]["collision_shape"]["aligned_box"][0];
         double fov_Rs = experiment_config_json["fov_cbf_params"]["Rs"];
 
+        VectorDIM v_min;
+        v_min << experiment_config_json["mpc_params"]["physical_limits"]["v_min"][0],
+                experiment_config_json["mpc_params"]["physical_limits"]["v_min"][1],
+                experiment_config_json["mpc_params"]["physical_limits"]["v_min"][2];
+        VectorDIM v_max;
+        v_max << experiment_config_json["mpc_params"]["physical_limits"]["v_max"][0],
+                experiment_config_json["mpc_params"]["physical_limits"]["v_max"][1],
+                experiment_config_json["mpc_params"]["physical_limits"]["v_max"][2];
         VectorDIM a_min;
         a_min << experiment_config_json["mpc_params"]["physical_limits"]["a_min"][0],
                 experiment_config_json["mpc_params"]["physical_limits"]["a_min"][1],
@@ -163,7 +173,7 @@ public:
 
         // create params
         PiecewiseBezierParams piecewise_bezier_params = {num_pieces, num_control_points, piece_max_parameter};
-        MPCParams mpc_params = {h_, Ts_, k_hor_, {w_pos_err, w_u_eff, spd_f}, {p_min, p_max, a_min, a_max}};
+        MPCParams mpc_params = {h_, Ts_, k_hor_, {w_pos_err, w_u_eff, spd_f}, {p_min, p_max, v_min, v_max, a_min, a_max}};
         FoVCBFParams fov_cbf_params = {fov_beta, fov_Ds, fov_Rs};
 
         // subs
@@ -200,13 +210,18 @@ public:
         StatePropagator exe_A0 = exe_model_ptr->get_A0(int(h_/Ts_));
         StatePropagator exe_Lambda = exe_model_ptr->get_lambda(int(h_/Ts_));
         // init cbf
-        std::shared_ptr<FovCBF> fov_cbf = std::make_unique<FovCBF>(fov_beta, fov_Ds, fov_Rs);
+        std::shared_ptr<FovCBF> fov_cbf = std::make_unique<FovCBF>(fov_beta, fov_Ds, fov_Rs, v_min, v_max);
         // init bezier mpc-cbf
         uint64_t bezier_continuity_upto_degree = 7;
         int impc_iter = 2;
-        BezierMPCCBFParams bezier_impc_cbf_params = {piecewise_bezier_params, mpc_params, fov_cbf_params};
-
-        bezier_impc_cbf_ptr_ = std::make_unique<BezierIMPCCBF>(bezier_impc_cbf_params, pred_model_ptr, fov_cbf, bezier_continuity_upto_degree, aligned_box_collision_shape_ptr, impc_iter);
+        int cbf_horizon = 2;
+        double slack_cost = 1000;
+        double slack_decay_rate = 0.2;
+        bool slack_mode = false;
+        BezierMPCCBFParams bezier_mpc_cbf_params = {piecewise_bezier_params, mpc_params, fov_cbf_params};
+        IMPCParams impc_params = {cbf_horizon, impc_iter, slack_cost, slack_decay_rate, slack_mode};
+        IMPCCBFParams impc_cbf_params = {bezier_mpc_cbf_params, impc_params};
+        bezier_impc_cbf_ptr_ = std::make_unique<BezierIMPCCBF>(impc_cbf_params, pred_model_ptr, fov_cbf, bezier_continuity_upto_degree, aligned_box_collision_shape_ptr, NUM_TARGETS);
         std::cout << "successfully init the control core..." << "\n";
 
         last_request_ = ros::Time::now();
@@ -356,30 +371,31 @@ void ControlNode::optimization_callback() {
         // update the plan only if the traj_optim success
         if (success) {
             curve_ = std::make_shared<SingleParameterPiecewiseCurve>(std::move(trajs.back()));
+            // reset the eval_t
+            eval_t_ = 0;
+            last_traj_optim_t_ = ros::Time::now();
+            optim_done_ = true;
         }
-
-        // reset the eval_t
-        eval_t_ = 0;
-        last_traj_optim_t_ = ros::Time::now();
 
         // Publish planned path
-        nav_msgs::Path path_msg;
-        path_msg.header.frame_id = "map";
-        path_msg.header.stamp = ros::Time::now();
-        for (double t_i = 0; t_i < h_*(k_hor_-1); t_i=t_i+2*h_)
-        {
-            geometry_msgs::PoseStamped pose;
-            VectorDIM eval = curve_->eval(t_i, 0);
-            pose.pose.position.x = eval(0);
-            pose.pose.position.y = eval(1);
-            pose.pose.position.z = z_;
-            tf2::Quaternion q;
-            q.setRPY(0, 0, eval(2));
-            pose.pose.orientation = tf2::toMsg(q);
-            path_msg.poses.push_back(pose);
+        if (optim_done_) {
+            nav_msgs::Path path_msg;
+            path_msg.header.frame_id = "map";
+            path_msg.header.stamp = ros::Time::now();
+            for (double t_i = 0; t_i < h_*(k_hor_-1); t_i=t_i+2*h_)
+            {
+                geometry_msgs::PoseStamped pose;
+                VectorDIM eval = curve_->eval(t_i, 0);
+                pose.pose.position.x = eval(0);
+                pose.pose.position.y = eval(1);
+                pose.pose.position.z = z_;
+                tf2::Quaternion q;
+                q.setRPY(0, 0, eval(2));
+                pose.pose.orientation = tf2::toMsg(q);
+                path_msg.poses.push_back(pose);
+            }
+            path_pub_.publish(path_msg);
         }
-        path_pub_.publish(path_msg);
-        optim_done_ = true;
     }
 }
 
@@ -422,7 +438,10 @@ void ControlNode::takeoff_callback() {
 }
 
 void ControlNode::timer_callback() {
-     if (taken_off_ && optim_done_ && !land_) {
+    if (taken_off_ && !optim_done_ && !land_) {
+        local_pos_pub_.publish(takeoff_pose_);
+    }
+    else if (taken_off_ && optim_done_ && !land_) {
         // std::cout << "Inside control loop\n";
         eval_t_ = (ros::Time::now() - last_traj_optim_t_).toSec();
         // this could happen when optimization fails
@@ -472,7 +491,7 @@ void ControlNode::timer_callback() {
             land_ = true;
             std::cout << "Mission finished, start landing...\n";
         }
-     } else if (land_) {
+    } else if (land_) {
          offb_set_mode_.request.custom_mode = "AUTO.LAND";
          // go to near ground, ready to land
          if (ros::Time::now() - land_start_time_ < ros::Duration(land_time)) {
@@ -487,7 +506,7 @@ void ControlNode::timer_callback() {
              }
              last_request_ = ros::Time::now();
          }
-     }
+    }
 
 }
 

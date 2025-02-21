@@ -23,6 +23,7 @@ namespace cbf {
         size_t numDecisionVariables() const {return DIM;}
 
         CostAddition desiredControlCost(const VectorDIM& desired_u);
+        CostAddition slackCost(const std::vector<T>& slack_weights);
         LinearConstraint safetyConstraint(const Vector& state, const Vector& target_state);
         LinearConstraint leftBorderConstraint(const Vector& state, const Vector& target_state);
         LinearConstraint rightBorderConstraint(const Vector& state, const Vector& target_state);

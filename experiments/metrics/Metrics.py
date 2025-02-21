@@ -45,6 +45,7 @@ def instance_success(traj, goals, radius, collision_shape):
         pos = traj[i, -1, :2]
         goal = goals[i][:2]
         if not reach_goal_area(pos, goal, radius):
+            print("cannot reach goal area...")
             return False, float('inf')
 
     for t in range(ts):
@@ -58,6 +59,7 @@ def instance_success(traj, goals, radius, collision_shape):
             for j in range(i+1, n_robot):
                 pos_2 = traj[j, t, :3]  # [3, ]
                 if collision_check(pos_1[0], pos_1[1], pos_2[0], pos_2[1], collision_shape):
+                    print("collision happens at timestep: ", t)
                     return False, float('inf')
 
     return True, ts
@@ -70,7 +72,7 @@ def in_fov(x1, y1, yaw1, x2, y2, fov_beta):
     angle = np.abs(np.arctan2(target_local[1], target_local[0]))
     return angle < 0.5*fov_beta
 
-def avg_neighbor_in_fov(traj, FoV_beta):
+def avg_neighbor_in_fov(traj, FoV_beta, makespan):
     """traj: [n_robot, ts, dim]"""
     n_robot = traj.shape[0]
     ts = traj.shape[1]
@@ -80,13 +82,13 @@ def avg_neighbor_in_fov(traj, FoV_beta):
         for j in range(n_robot):
             if i == j:
                 continue
-            for t in range(ts):
+            for t in range(min(makespan, ts)):
                 pos_1 = traj[i, t, :3]  # [3, ]
                 pos_2 = traj[j, t, :3]  # [3, ]
                 inFoV = in_fov(pos_1[0], pos_1[1], pos_1[2], pos_2[0], pos_2[1], FoV_beta)
                 if inFoV:
                     num_neighbor_in_fov += 1
-        avg_in_fov.append(num_neighbor_in_fov / ts)
+        avg_in_fov.append(num_neighbor_in_fov / min(makespan, ts))
     return avg_in_fov
 
 

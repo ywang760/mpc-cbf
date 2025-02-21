@@ -92,8 +92,9 @@ def snapshots2D_XYYaw(traj, goals, goal_radius, estimate_mean, estimate_cov, p_n
     x_v = traj[:, :, 3]
     y_v = traj[:, :, 4]
     yaw_v = traj[:, :, 5]
-    est_x = estimate_mean[:, :, :, 0]  # [n, n-1, ts]
-    est_y = estimate_mean[:, :, :, 1]
+    if Estimation:
+        est_x = estimate_mean[:, :, :, 0]  # [n, n-1, ts]
+        est_y = estimate_mean[:, :, :, 1]
 
     # set frame scale
     x_min = np.min(x)-3
@@ -106,6 +107,8 @@ def snapshots2D_XYYaw(traj, goals, goal_radius, estimate_mean, estimate_cov, p_n
     ax.set_ylim([y_min, y_max])
     # Set equal aspect ratio
     ax.set_aspect('equal')
+    # Remove the entire axis
+    ax.axis('off')
 
     # plot the init frame
     p = [ax.plot([x[i, frame_idx]], [y[i, frame_idx]], c=colors[i], marker='o', markersize=6, linestyle='None', alpha=0.6) for i in range(n_agent)]
@@ -157,7 +160,7 @@ def snapshots2D_XYYaw(traj, goals, goal_radius, estimate_mean, estimate_cov, p_n
 
     if PredCurve:
         fov_preview_plot_step = list(range(0, pred_curve.shape[-2], preview_skip_step))+list([pred_curve.shape[-2]-1])
-        iter_color = ['r', 'b', 'y', 'purple', 'pink', 'c', 'green', 'k']
+        iter_color = ['b', 'r', 'y', 'purple', 'pink', 'c', 'green', 'k']
         impc_iters = pred_curve.shape[-3]
 
         preds = []
@@ -208,8 +211,9 @@ def animation2D_XYYaw(traj, estimate_mean, estimate_cov, p_near, dt, Ts, bbox, p
     x_v = traj[:, :, 3]
     y_v = traj[:, :, 4]
     yaw_v = traj[:, :, 5]
-    est_x = estimate_mean[:, :, :, 0]  # [n, n-1, ts]
-    est_y = estimate_mean[:, :, :, 1]
+    if Estimation:
+        est_x = estimate_mean[:, :, :, 0]  # [n, n-1, ts]
+        est_y = estimate_mean[:, :, :, 1]
 
     # set frame scale
     x_min = np.min(x)-3
@@ -277,7 +281,7 @@ def animation2D_XYYaw(traj, estimate_mean, estimate_cov, p_near, dt, Ts, bbox, p
 
     if PredCurve:
         fov_preview_plot_step = list(range(0, pred_curve.shape[-2], preview_skip_step))+list([pred_curve.shape[-2]-1])
-        iter_color = ['r', 'b', 'y', 'purple', 'pink', 'c', 'green', 'k']
+        iter_color = ['b', 'r', 'y', 'purple', 'pink', 'c', 'green', 'k']
         impc_iters = pred_curve.shape[-3]
 
         preds = []
@@ -358,7 +362,8 @@ def animation2D_XYYaw(traj, estimate_mean, estimate_cov, p_near, dt, Ts, bbox, p
                     iter_pred_curve = pred_curve[:,:,impc_it,:,:]
                     preds[i][impc_it].set_data(iter_pred_curve[i, pred_index, :, 0], iter_pred_curve[i, pred_index, :, 1])
                     if enable_preview:
-                        for index_i, iter_index in enumerate([0, impc_iters-1]):
+                        for index_i, iter_index in enumerate([0]): # TODO fix this, for now is a temporary fix and the next line is the original
+                        # for index_i, iter_index in enumerate([0, impc_iters-1]):
                             if impc_it == iter_index:
                                 # Update predicted FoV
                                 for index, k in enumerate(fov_preview_plot_step):
@@ -412,20 +417,44 @@ def plot2D_XYYaw(traj, goals, goal_radius=1, obs_time=None, save_name="./test.jp
     plt.savefig(save_name)
     # plt.show()
 
+def derivatives_plot(traj, dt):
+    n_agent = traj.shape[0]
+    ts = np.arange(traj.shape[1])
+    fig, ax = plt.subplots()
+    # Set equal aspect ratio
+    # ax.set_aspect('equal')
+    ax.set_ylim([-6, 6])
+
+    x_v = traj[:, :, 3]
+    x_y = traj[:, :, 4]
+    x_yaw = traj[:, :, 5]
+
+
+    for robot_idx in range(n_agent):
+        ax.plot(ts, x_v[robot_idx])
+        pass
+    plt.show()
 
 if __name__ == "__main__":
+    default_instance_type="circle"
+    default_instance=default_instance_type+"5"
+    default_fov = 120
+    exp_idx=0
     parser = argparse.ArgumentParser(
         description="argparse to read the config, states and output filenames"
     )
-    # parser.add_argument("-c", "--config_filename", type=str, default="../experiments/instances/circle_instances/circle5_config.json", help="path to config json file")
-    # parser.add_argument("-s", "--states_filename", type=str, default="../experiments/instances/results/log01062025/circle5_fov120_decay0.1_States_4.json", help="path to simulation state json file")
-    # parser.add_argument("-ov", "--output_video", type=str, default="../experiments/instances/results/log01062025/circle5.mp4", help="path to simulation animation file")
-    # parser.add_argument("-of", "--output_figure", type=str, default="../experiments/instances/results/log01062025/snapshots/circle5", help="path to simulation figure file")
-    parser.add_argument("-c", "--config_filename", type=str, default="../experiments/instances/formation_instances/formation4_config.json", help="path to config json file")
-    parser.add_argument("-s", "--states_filename", type=str, default="../experiments/instances/results/log01062025/formation4_fov120_decay0.2_States_0.json", help="path to simulation state json file")
-    parser.add_argument("-ov", "--output_video", type=str, default="../experiments/instances/results/log01062025/formation4.mp4", help="path to simulation animation file")
-    parser.add_argument("-of", "--output_figure", type=str, default="../experiments/instances/results/log01062025/snapshots/formation4", help="path to simulation figure file")
-    parser.add_argument("-f", "--fov", type=int, default=120, help="fov of simulation")
+    parser.add_argument("-c", "--config_filename", type=str, default="../experiments/instances/"+default_instance_type+"_instances/"+default_instance+"_config.json", help="path to config json file")
+    # parser.add_argument("-s", "--states_filename", type=str, default="/media/lishuo/ssd/RSS2025_results/log01142025/circle2_fov120_decay0.2_States_0.json", help="path to simulation state json file")
+    # parser.add_argument("-s", "--states_filename", type=str, default="/media/lishuo/ssd/RSS2025_results/log01212025/"+default_instance+"_fov"+str(default_fov)+"_decay0.2_States_"+str(exp_idx)+".json", help="path to simulation state json file")
+    # parser.add_argument("-s", "--states_filename", type=str, default="/media/lishuo/ssd/RSS2025_results/log01212025/baseline_"+default_instance+"_fov"+str(default_fov)+"_decay0.2_States_"+str(exp_idx)+".json", help="path to simulation state json file")
+    parser.add_argument("-s", "--states_filename", type=str, default="../tools/circle_0.json", help="path to simulation state json file")
+    parser.add_argument("-ov", "--output_video", type=str, default="../tools/snapshots/"+default_instance+".mp4", help="path to simulation animation file")
+    parser.add_argument("-of", "--output_figure", type=str, default="../tools/snapshots/snapshots/"+default_instance, help="path to simulation figure file")
+    # parser.add_argument("-c", "--config_filename", type=str, default="../experiments/instances/formation_instances/formation4_config.json", help="path to config json file")
+    # parser.add_argument("-s", "--states_filename", type=str, default="../experiments/instances/results/log01062025/formation4_fov120_decay0.2_States_0.json", help="path to simulation state json file")
+    # parser.add_argument("-ov", "--output_video", type=str, default="../experiments/instances/results/log01062025/formation4.mp4", help="path to simulation animation file")
+    # parser.add_argument("-of", "--output_figure", type=str, default="../experiments/instances/results/log01062025/snapshots/formation4", help="path to simulation figure file")
+    parser.add_argument("-f", "--fov", type=int, default=default_fov, help="fov of simulation")
     args = parser.parse_args()
 
     config_json = args.config_filename
@@ -435,6 +464,8 @@ if __name__ == "__main__":
 
     num_robots = len(states_json["robots"])
     traj = np.array([states_json["robots"][str(_)]["states"] for _ in range(num_robots)])  # [n_robot, ts, dim]
+    # if "baseline" not in args.states_filename:
+    #     traj = traj[:,::10,:]
     neighbor_ids = []
     for i in range(num_robots):
         neighbor_ids.append([])
@@ -459,13 +490,47 @@ if __name__ == "__main__":
     estimate_cov = np.array(estimate_cov)  # [n_robot, n_robot-1, ts, dimxdim]
     p_near = np.array(p_near)  # [n_robot, n_robot-1, ts, 2]
 
+    # estimate_mean = None
+    # estimate_cov = None
+    # p_near = None
+    # pred_curve = None
+
     # estimate_mean = [[states_json["robots"][str(_)]["estimates_mean"][neighbor_id] for neighbor_id in neighbor_ids[_]] for _ in range(num_robots)]]  # [n_robot, n_robot-1, ts, dim]
     dt = states_json["dt"]
     Ts = states_json["Ts"]
+    # if "baseline" not in args.states_filename:
+    #     Ts = Ts*10
     bbox = load_states(config_json)["robot_params"]["collision_shape"]["aligned_box"][:2]
     goals = np.array(load_states(config_json)["tasks"]["sf"])
     goal_radius = 1.6
 
+    # pred_curve = [states_json["robots"][str(_)]["pred_curve"] for _ in range(num_robots)]  # [n, h_samples, impc_iter(dynamic), horizon, dim]
+    # impc_iter_max = max(
+    #     max(len(seq) for seq in sublist if seq is not None)  # Ignore None values
+    #     for sublist in pred_curve
+    # )
+    # d1 = len(pred_curve)
+    # d2 = len(pred_curve[0])
+    # d3 = impc_iter_max
+    # for i in range(len(pred_curve[0])):
+    #     if len(pred_curve[0][i]) != 0:
+    #         d4 = len(pred_curve[0][i][0])
+    #         d5 = len(pred_curve[0][i][0][0])
+    #         break
+    # # Create a numpy array filled with zeros (or another padding value)
+    # padded_array = np.zeros((d1, d2, d3, d4, d5)) * np.nan
+    # # Fill in the original data
+    # for i in range(d1):
+    #     for j in range(d2):
+    #         seq = pred_curve[i][j]  # Access the varying `x` dimension
+    #         if seq is not None and len(seq) > 0:  # Ensure it's not None
+    #             seq_array = np.asarray(seq)  # Convert to NumPy array
+    #             padded_array[i, j, :len(seq), :, :] = seq  # Copy actual data
+    # pred_curve = padded_array
+    # # # Fill the array with data
+    # # for i, seq in enumerate(data_list):
+    # # padded_array[i, :len(seq), :, :] = seq  # Copy data
+    # # pred_curve = [states_json["robots"][str(_)]["pred_curve"] for _ in range(num_robots)]  # [n, h_samples, impc_iter(dynamic), horizon, dim]
     pred_curve = np.array([states_json["robots"][str(_)]["pred_curve"] for _ in range(num_robots)])  # [n, h_samples, impc_iter, horizon, dim]
     FoV_beta = args.fov * np.pi/180
     FoV_range = load_states(config_json)["fov_cbf_params"]["Rs"]
@@ -475,11 +540,11 @@ if __name__ == "__main__":
     # goal_radius = 1.6
     # success = instance_success(traj, goals, goal_radius, collision_shape)
     # print("success: ", success)
-
+    derivatives_plot(traj, Ts)
     plot2D_XYYaw(traj, goals, save_name=output_figure)
     _, total_frame, _ = traj.shape
     frame_gap = 20
     render_frame_indices = range(0, total_frame, frame_gap)
-    for frame_idx in render_frame_indices:
-        snapshots2D_XYYaw(traj, goals, goal_radius, estimate_mean, estimate_cov, p_near, dt, Ts, bbox, frame_idx, pred_curve, FoV_beta, FoV_range, colors=colors, pre_save_name=output_figure)
-    # animation2D_XYYaw(traj, estimate_mean, estimate_cov, p_near, dt, Ts, bbox, pred_curve, FoV_beta, FoV_range, colors=colors, save_name=output_video)
+    # for frame_idx in render_frame_indices:
+    #     snapshots2D_XYYaw(traj, goals, goal_radius, estimate_mean, estimate_cov, p_near, dt, Ts, bbox, frame_idx, pred_curve, FoV_beta, FoV_range, PredCurve=True, colors=colors, pre_save_name=output_figure)
+    animation2D_XYYaw(traj, estimate_mean, estimate_cov, p_near, dt, Ts, bbox, pred_curve, FoV_beta, FoV_range, Estimation=True, PredCurve=True, colors=colors, save_name=output_video)
