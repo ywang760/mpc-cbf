@@ -50,7 +50,7 @@ target_link_libraries(splines_curves_SingleParameterPiecewiseCurve PUBLIC
 add_library(splines_curves_Helpers SHARED src/curves/Helpers.cpp)
 target_include_directories(splines_curves_Helpers PUBLIC
         include
-        ../../third_party/json/single_include)
+        ../../../third_party/json/single_include)
 target_link_libraries(splines_curves_Helpers PUBLIC
         math_Types)
 

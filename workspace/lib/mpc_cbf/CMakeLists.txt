@@ -16,7 +16,7 @@ if(NOT is_cbf_ADDED)
 endif()
 
 if(NOT TARGET cxxopts)
-    add_subdirectory(../../third_party/cxxopts
+    add_subdirectory(../../../third_party/cxxopts
             ${CMAKE_CURRENT_BINARY_DIR}/cxxopts)
 endif()
 
@@ -53,14 +53,14 @@ target_link_libraries(mpc_cbf_controller_BezierIMPCCBF PUBLIC
 
 # add examples
 #add_executable(mpc_cbf_examples_BezierMPCCBFXYYaw_example examples/BezierMPCCBFXYYaw_example.cpp)
-#target_include_directories(mpc_cbf_examples_BezierMPCCBFXYYaw_example PUBLIC include ../../third_party/json/single_include)
+#target_include_directories(mpc_cbf_examples_BezierMPCCBFXYYaw_example PUBLIC include ../../../third_party/json/single_include)
 #target_link_libraries(mpc_cbf_examples_BezierMPCCBFXYYaw_example PUBLIC
 #        mpc_cbf_controller_BezierMPCCBF
 #        model_DoubleIntegratorXYYaw
 #        math_collision_shapes_AlignedBoxCollisionShape)
 
 #add_executable(mpc_cbf_examples_BezierIMPCCBFXYYaw_example examples/BezierIMPCCBFXYYaw_example.cpp)
-#target_include_directories(mpc_cbf_examples_BezierIMPCCBFXYYaw_example PUBLIC include ../../third_party/json/single_include)
+#target_include_directories(mpc_cbf_examples_BezierIMPCCBFXYYaw_example PUBLIC include ../../../third_party/json/single_include)
 #target_link_libraries(mpc_cbf_examples_BezierIMPCCBFXYYaw_example PUBLIC
 #        mpc_cbf_controller_BezierIMPCCBF
 #        model_DoubleIntegratorXYYaw
@@ -68,7 +68,7 @@ target_link_libraries(mpc_cbf_controller_BezierIMPCCBF PUBLIC
 #        cxxopts)
 
 add_executable(mpc_cbf_examples_BezierIMPCCBFPFXYYaw_example examples/BezierIMPCCBFPFXYYaw_example.cpp)
-target_include_directories(mpc_cbf_examples_BezierIMPCCBFPFXYYaw_example PUBLIC include ../../third_party/json/single_include)
+target_include_directories(mpc_cbf_examples_BezierIMPCCBFPFXYYaw_example PUBLIC include ../../../third_party/json/single_include)
 target_link_libraries(mpc_cbf_examples_BezierIMPCCBFPFXYYaw_example PUBLIC
         mpc_cbf_controller_BezierIMPCCBF
         model_DoubleIntegratorXYYaw

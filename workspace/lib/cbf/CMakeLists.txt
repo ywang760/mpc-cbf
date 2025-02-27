@@ -21,7 +21,7 @@ if(NOT is_pf_ADDED)
 endif()
 
 if(NOT TARGET cxxopts)
-    add_subdirectory(../../third_party/cxxopts
+    add_subdirectory(../../../third_party/cxxopts
             ${CMAKE_CURRENT_BINARY_DIR}/cxxopts)
 endif()
 
@@ -61,7 +61,7 @@ target_link_libraries(cbf_controller_CBFControl PUBLIC
 #target_link_libraries(test_class PUBLIC cbf_detail_FovCBF ginac cln)
 
 add_executable(cbf_examples_CBFControl_example examples/CBFControl_example.cpp)
-target_include_directories(cbf_examples_CBFControl_example PUBLIC include ../../third_party/json/single_include)
+target_include_directories(cbf_examples_CBFControl_example PUBLIC include ../../../third_party/json/single_include)
 target_link_libraries(cbf_examples_CBFControl_example PUBLIC
         model_DoubleIntegratorXYYaw
         cbf_controller_CBFControl
@@ -69,13 +69,13 @@ target_link_libraries(cbf_examples_CBFControl_example PUBLIC
         ParticleFilter)
 
 #add_executable(cbf_examples_CBFControlStaticTarget_example examples/CBFControlStaticTarget_example.cpp)
-#target_include_directories(cbf_examples_CBFControlStaticTarget_example PUBLIC include ../../third_party/json/single_include)
+#target_include_directories(cbf_examples_CBFControlStaticTarget_example PUBLIC include ../../../third_party/json/single_include)
 #target_link_libraries(cbf_examples_CBFControlStaticTarget_example PUBLIC
 #        model_DoubleIntegratorXYYaw
 #        cbf_controller_CBFControl)
 
 #add_executable(cbf_examples_CBFControlSlack_example examples/CBFControlSlack_example.cpp)
-#target_include_directories(cbf_examples_CBFControlSlack_example PUBLIC include ../../third_party/json/single_include)
+#target_include_directories(cbf_examples_CBFControlSlack_example PUBLIC include ../../../third_party/json/single_include)
 #target_link_libraries(cbf_examples_CBFControlSlack_example PUBLIC
 #        model_DoubleIntegratorXYYaw
 #        cbf_controller_CBFControl

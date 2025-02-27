@@ -50,7 +50,7 @@ include_directories(
 ## With catkin_make all packages are built within a single CMake context
 ## The recommended prefix ensures that target names across packages don't collide
 add_executable(control_node src/control_node.cpp)
-target_include_directories(control_node PUBLIC include ../../third_party/json/single_include)
+target_include_directories(control_node PUBLIC include ../../../third_party/json/single_include)
 add_dependencies(control_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 target_link_libraries(control_node PUBLIC
         ${catkin_LIBRARIES}
@@ -59,12 +59,12 @@ target_link_libraries(control_node PUBLIC
         math_collision_shapes_AlignedBoxCollisionShape)
 
 add_executable(goal_node src/goal_node.cpp)
-target_include_directories(goal_node PUBLIC include ../../third_party/json/single_include)
+target_include_directories(goal_node PUBLIC include ../../../third_party/json/single_include)
 add_dependencies(goal_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 target_link_libraries(goal_node PUBLIC ${catkin_LIBRARIES} math_Types)
 
 add_executable(ids_node src/ids_node.cpp)
-target_include_directories(ids_node PUBLIC include ../../third_party/json/single_include)
+target_include_directories(ids_node PUBLIC include ../../../third_party/json/single_include)
 add_dependencies(ids_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 target_link_libraries(ids_node PUBLIC
         ${catkin_LIBRARIES}
