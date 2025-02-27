@@ -5,7 +5,7 @@ services:
     build:
       context: ..
       dockerfile: .docker/Dockerfile
-    image: mpc-cbf
+    image: wangyt163/mpc-cbf:latest
     stdin_open: true
     tty: true
     volumes:
