@@ -8,9 +8,8 @@ services:
     image: mpc-cbf
     stdin_open: true
     tty: true
-    working_dir: /usr/src/fovmpc-mpc-cbf/workspace/lib/cbf/build
-    command: >
-      sh -c "rm -rf * && cmake -G Ninja -DCMAKE_BUILD_TYPE=Release .. && ninja -j20"
+    volumes:
+    - workspace:/usr/src/mpc-cbf/workspace  # Mount the workspace volume to /usr/src/mpc-cbf/workspace
 
 volumes:
   workspace:

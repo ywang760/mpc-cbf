@@ -1,7 +1,7 @@
 FROM ubuntu:22.04
 
 # Set the working directory inside the container
-WORKDIR /usr/src/fovmpc-mpc-cbf
+WORKDIR /usr/src/mpc-cbf
 
 # Set environment variables to make installation non-interactive
 ENV DEBIAN_FRONTEND=noninteractive
@@ -43,7 +43,7 @@ ENV PATH=$CPLEX_HOME/cplex/bin/x86-64_linux:$PATH
 ENV LD_LIBRARY_PATH=$CPLEX_HOME/cplex/lib/x86-64_linux:${LD_LIBRARY_PATH:-""}
 ENV CPLEX_INSTALLER=cplex_studio*.linux*.bin
 RUN echo "Starting CPLEX installation"
-WORKDIR /usr/src/fovmpc-mpc-cbf/.docker
+WORKDIR /usr/src/mpc-cbf/.docker
 RUN set -x && \
     if [ -f cplex/$CPLEX_INSTALLER ]; then \
     echo "Installing CPLEX" && \
@@ -52,13 +52,13 @@ RUN set -x && \
     else \
     echo "No installer found for CPLEX"; \
     fi
-RUN rm -rf /usr/src/fovmpc-mpc-cbf/.docker/cplex
+RUN rm -rf /usr/src/mpc-cbf/.docker/cplex
 
 # # Build the cbf library
-# WORKDIR /usr/src/fovmpc-mpc-cbf/lib/cbf
+# WORKDIR /usr/src/mpc-cbf/lib/cbf
 # RUN mkdir build && cd build && cmake -G Ninja .. && ninja
 
 # Initialize shell
-WORKDIR /usr/src/fovmpc-mpc-cbf
+WORKDIR /usr/src/mpc-cbf
 ENV DEBIAN_FRONTEND=dialog
 CMD ["bash"]
