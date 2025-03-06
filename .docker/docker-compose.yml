@@ -2,14 +2,8 @@ name: "mpc-cbf"
 
 services:
   dev-container:
-    build:
-      context: ..
-      dockerfile: .docker/Dockerfile
     image: wangyt163/mpc-cbf:latest
     stdin_open: true
     tty: true
     volumes:
-    - workspace:/usr/src/mpc-cbf/workspace  # Mount the workspace volume to /usr/src/mpc-cbf/workspace
-
-volumes:
-  workspace:
+      - ../workspace:/usr/src/mpc-cbf/workspace

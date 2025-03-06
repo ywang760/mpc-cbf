@@ -1,6 +1,6 @@
 # Ignore build directories
-build/
-cmake-build-*/
+**/build/
+**/cmake-build-*/
 
 # Ignore temporary files
 *.tmp
@@ -29,3 +29,11 @@ cmake-build-*/
 # Ignore OS generated files
 .DS_Store
 Thumbs.db
+
+# Ignore Docker files
+.docker/
+.git/
+.gitignore
+
+# Ignore workspace/ altogether
+workspace/
