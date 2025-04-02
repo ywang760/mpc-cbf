@@ -12,6 +12,7 @@ from matplotlib.patches import Ellipse, Circle
 from matplotlib import animation, rc, rcParams
 import colorsys
 import argparse
+import os
 
 # visualization parameters
 preview_fov_range = 0.5
@@ -437,23 +438,16 @@ def derivatives_plot(traj, dt):
 
 if __name__ == "__main__":
     default_instance_type="circle"
-    default_instance=default_instance_type+"5"
+    default_instance=default_instance_type+"4"
     default_fov = 120
     exp_idx=0
     parser = argparse.ArgumentParser(
         description="argparse to read the config, states and output filenames"
     )
     parser.add_argument("-c", "--config_filename", type=str, default="../experiments/instances/"+default_instance_type+"_instances/"+default_instance+"_config.json", help="path to config json file")
-    # parser.add_argument("-s", "--states_filename", type=str, default="/media/lishuo/ssd/RSS2025_results/log01142025/circle2_fov120_decay0.2_States_0.json", help="path to simulation state json file")
-    # parser.add_argument("-s", "--states_filename", type=str, default="/media/lishuo/ssd/RSS2025_results/log01212025/"+default_instance+"_fov"+str(default_fov)+"_decay0.2_States_"+str(exp_idx)+".json", help="path to simulation state json file")
-    # parser.add_argument("-s", "--states_filename", type=str, default="/media/lishuo/ssd/RSS2025_results/log01212025/baseline_"+default_instance+"_fov"+str(default_fov)+"_decay0.2_States_"+str(exp_idx)+".json", help="path to simulation state json file")
     parser.add_argument("-s", "--states_filename", type=str, default="../tools/circle_0.json", help="path to simulation state json file")
     parser.add_argument("-ov", "--output_video", type=str, default="../tools/snapshots/"+default_instance+".mp4", help="path to simulation animation file")
-    parser.add_argument("-of", "--output_figure", type=str, default="../tools/snapshots/snapshots/"+default_instance, help="path to simulation figure file")
-    # parser.add_argument("-c", "--config_filename", type=str, default="../experiments/instances/formation_instances/formation4_config.json", help="path to config json file")
-    # parser.add_argument("-s", "--states_filename", type=str, default="../experiments/instances/results/log01062025/formation4_fov120_decay0.2_States_0.json", help="path to simulation state json file")
-    # parser.add_argument("-ov", "--output_video", type=str, default="../experiments/instances/results/log01062025/formation4.mp4", help="path to simulation animation file")
-    # parser.add_argument("-of", "--output_figure", type=str, default="../experiments/instances/results/log01062025/snapshots/formation4", help="path to simulation figure file")
+    parser.add_argument("-of", "--output_figure", type=str, default="../tools/snapshots/"+default_instance, help="path to simulation figure file")
     parser.add_argument("-f", "--fov", type=int, default=default_fov, help="fov of simulation")
     args = parser.parse_args()
 
@@ -461,6 +455,12 @@ if __name__ == "__main__":
     states_json = load_states(args.states_filename)
     output_video = args.output_video
     output_figure = args.output_figure
+    
+    # make directory if not exist
+    if not os.path.exists(os.path.dirname(output_video)):
+        os.makedirs(os.path.dirname(output_video))
+    if not os.path.exists(os.path.dirname(output_figure)):
+        os.makedirs(os.path.dirname(output_figure))
 
     num_robots = len(states_json["robots"])
     traj = np.array([states_json["robots"][str(_)]["states"] for _ in range(num_robots)])  # [n_robot, ts, dim]
@@ -531,7 +531,8 @@ if __name__ == "__main__":
     # # for i, seq in enumerate(data_list):
     # # padded_array[i, :len(seq), :, :] = seq  # Copy data
     # # pred_curve = [states_json["robots"][str(_)]["pred_curve"] for _ in range(num_robots)]  # [n, h_samples, impc_iter(dynamic), horizon, dim]
-    pred_curve = np.array([states_json["robots"][str(_)]["pred_curve"] for _ in range(num_robots)])  # [n, h_samples, impc_iter, horizon, dim]
+    # pred_curve = np.array([states_json["robots"][str(_)]["pred_curve"] for _ in range(num_robots)])  # [n, h_samples, impc_iter, horizon, dim]
+    pred_curve = None
     FoV_beta = args.fov * np.pi/180
     FoV_range = load_states(config_json)["fov_cbf_params"]["Rs"]
 
@@ -547,4 +548,4 @@ if __name__ == "__main__":
     render_frame_indices = range(0, total_frame, frame_gap)
     # for frame_idx in render_frame_indices:
     #     snapshots2D_XYYaw(traj, goals, goal_radius, estimate_mean, estimate_cov, p_near, dt, Ts, bbox, frame_idx, pred_curve, FoV_beta, FoV_range, PredCurve=True, colors=colors, pre_save_name=output_figure)
-    animation2D_XYYaw(traj, estimate_mean, estimate_cov, p_near, dt, Ts, bbox, pred_curve, FoV_beta, FoV_range, Estimation=True, PredCurve=True, colors=colors, save_name=output_video)
+    animation2D_XYYaw(traj, estimate_mean, estimate_cov, p_near, dt, Ts, bbox, pred_curve, FoV_beta, FoV_range, Estimation=True, PredCurve=False, colors=colors, save_name=output_video)

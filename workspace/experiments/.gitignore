@@ -1,0 +1,7 @@
+# Ignore all config files except examples
+config/*
+!config/examples/
+
+# Ignore all results except examples
+results/*
+!results/examples

@@ -223,15 +223,14 @@ int main(int argc, char* argv[]) {
 
     // load experiment config
     std::cout << "loading experiment settings...\n";
-    // std::string experiment_config_filename = "../../../config/config.json";
     std::string instance_type = option_parse["instance_type"].as<std::string>();
     std::string instance_path = instance_type+"_instances/";
     const int num_robots_parse = option_parse["num_robots"].as<int>();
     const int fov_beta_parse = option_parse["fov"].as<int>();
-    std::string experiment_config_filename = "../../../experiments/instances/"+instance_path+instance_type+std::to_string(num_robots_parse)+"_config.json";
+    // std::string experiment_config_filename = "../../../experiments/instances/"+instance_path+instance_type+std::to_string(num_robots_parse)+"_config.json";
+    std::string experiment_config_filename = "../../../config/circle_instances/circle4_config.json";
     std::fstream experiment_config_fc(experiment_config_filename.c_str(), std::ios_base::in);
     json experiment_config_json = json::parse(experiment_config_fc);
-//    double h = experiment_config_json["mpc_params"]["h"];
     double Ts = experiment_config_json["mpc_params"]["h"];
 
     double fov_beta = double(fov_beta_parse) * M_PI / 180.0;
@@ -394,6 +393,7 @@ int main(int argc, char* argv[]) {
                 Vector p_near = closestPointOnEllipse(ego_pos, estimate, cov);
                 states["robots"][std::to_string(robot_idx)]["p_near_ellipse"][std::to_string(neighbor_id)].push_back({p_near(0), p_near(1)});
 
+                // use this instead of filter
 //                // for debug: fixed estimate
 //                other_robot_positions.push_back(init_states.at(neighbor_id).pos_);
 //

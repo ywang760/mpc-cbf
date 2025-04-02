@@ -1,5 +1,5 @@
 from Metrics import *
-from ComputeCI import *
+from workspace.experiments.scripts.metrics.compute_ci import *
 import colorsys
 
 # from src.fovmpc.experiments.metrics.ComputeCI import percentile_compute_with_inf, percentile_compute
