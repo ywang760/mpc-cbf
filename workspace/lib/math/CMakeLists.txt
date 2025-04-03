@@ -9,6 +9,12 @@ set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/../../cmake ${CMAKE_MODULE_PATH})
 find_package(Eigen3 REQUIRED)
 find_package(Boost REQUIRED)
 
+# Add model library dependency
+get_property(is_model_ADDED GLOBAL PROPERTY model_ADDED)
+if(NOT is_model_ADDED)
+    add_subdirectory(../model ${CMAKE_CURRENT_BINARY_DIR}/model)
+endif()
+
 # add libraries
 add_library(math_Types INTERFACE)
 target_include_directories(math_Types INTERFACE include ${EIGEN3_INCLUDE_DIR})
@@ -18,6 +24,19 @@ target_include_directories(math_Combinatorics PUBLIC include)
 
 add_library(math_Helpers SHARED src/Helpers.cpp)
 target_include_directories(math_Helpers PUBLIC include ${EIGEN3_INCLUDE_DIR})
+
+# Add new libraries for refactored functions
+add_library(math_Geometry SHARED src/Geometry.cpp)
+target_include_directories(math_Geometry PUBLIC include ${EIGEN3_INCLUDE_DIR})
+target_link_libraries(math_Geometry PUBLIC math_Types model_DoubleIntegrator)
+
+add_library(math_Controls INTERFACE)
+target_include_directories(math_Controls INTERFACE include)
+target_link_libraries(math_Controls INTERFACE math_Types model_DoubleIntegrator)
+
+add_library(math_Random SHARED src/Random.cpp)
+target_include_directories(math_Random PUBLIC include)
+target_link_libraries(math_Random PUBLIC math_Types)
 
 add_library(math_collision_shapes_CollisionShape SHARED src/collision_shapes/CollisionShape.cpp)
 target_include_directories(math_collision_shapes_CollisionShape PUBLIC include)
