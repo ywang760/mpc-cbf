@@ -59,6 +59,7 @@ target_link_libraries(cbf_examples_CBFControl_example PUBLIC
         cbf_controller_CBFControl
         cxxopts
         ParticleFilter
+        PFApplications
         math_Geometry
         math_Controls
         math_Random)
