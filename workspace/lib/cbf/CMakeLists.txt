@@ -52,7 +52,7 @@ target_link_libraries(cbf_controller_CBFControl PUBLIC
         model_DoubleIntegratorXYYaw)
 
 # add examples
-add_executable(cbf_examples_CBFControl_example examples/CBFControl_example.cpp)
+add_executable(cbf_examples_CBFControl_example examples/fov/CBFControl_example.cpp)
 target_include_directories(cbf_examples_CBFControl_example PUBLIC include ../../../third_party/json/single_include)
 target_link_libraries(cbf_examples_CBFControl_example PUBLIC
         model_DoubleIntegratorXYYaw

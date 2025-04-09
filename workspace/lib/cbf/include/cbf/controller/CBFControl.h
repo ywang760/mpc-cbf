@@ -36,6 +36,8 @@ namespace cbf {
 
         T distanceToEllipse(const VectorDIM& robot_position, const Vector& target_mean, const Matrix& target_cov);
         bool compareDist(const VectorDIM& p_current, const std::pair<VectorDIM, Matrix>& a, const std::pair<VectorDIM, Matrix>& b);
+
+// TODO: deprecated, to remove
 //        bool optimizeWithSlackVariables(VectorDIM &cbf_u, const VectorDIM &desired_u,
 //                                        const Vector &state, const std::vector<VectorDIM> &other_robots_states, const std::vector<T> &slacks,
 //                                        const VectorDIM& u_min, const VectorDIM& u_max);

@@ -9,6 +9,7 @@
 #include <cbf/detail/cbf.h>
 #include <cbf/controller/CBFControl.h>
 #include <particle_filter/detail/particle_filter.h>
+#include <particle_filter/pf_applications.h>
 #include <nlohmann/json.hpp>
 #include <cxxopts.hpp>
 #include <fstream>
@@ -35,18 +36,18 @@ int main(int argc, char* argv[]) {
     // Parse command-line arguments
     cxxopts::Options options(
             "simulation",
-            "Field-of-view CBF simulation for multi-robot coordination");
+            "fovmpc simulation");
     options.add_options()
-            ("instance_type", "Instance type for simulations (e.g., circle)",
+            ("instance_type", "instance type for simulations",
              cxxopts::value<std::string>()->default_value("circle"))
-            ("num_robots", "Number of robots in the simulation",
+            ("num_robots", "number of robots in the simulation",
              cxxopts::value<int>()->default_value(std::to_string(2)))
-            ("fov", "Field of view angle in degrees",
+            ("fov", "fov degree",
              cxxopts::value<int>()->default_value(std::to_string(120)))
-            ("slack_decay", "Slack variable cost decay rate",
+            ("slack_decay", "slack variable cost decay rate",
              cxxopts::value<double>()->default_value(std::to_string(0.1)))
-            ("write_filename", "JSON file to write simulation results",
-             cxxopts::value<std::string>()->default_value("/usr/src/mpc-cbf/workspace/experiments/results/circle2States.json"));
+            ("write_filename", "write to json filename",
+             cxxopts::value<std::string>()->default_value("/usr/src/mpc-cbf/workspace/experiments/results/states.json"));
     auto option_parse = options.parse(argc, argv);
 
     // Load experiment configuration
@@ -55,20 +56,20 @@ int main(int argc, char* argv[]) {
     std::string instance_path = instance_type+"_instances/";
     const int num_robots_parse = option_parse["num_robots"].as<int>();
     const int fov_beta_parse = option_parse["fov"].as<int>();
-    
+
     // Configuration file path
     std::string experiment_config_filename = "/usr/src/mpc-cbf/workspace/experiments/config/circle/circle4_config.json";
     std::fstream experiment_config_fc(experiment_config_filename.c_str(), std::ios_base::in);
     json experiment_config_json = json::parse(experiment_config_fc);
-    
+
     // Extract simulation parameters
-    double Ts = experiment_config_json["mpc_params"]["h"];  // Time step
+    double Ts = experiment_config_json["mpc_params"]["h"]; // Time step
 
     // Field of view parameters
-    double fov_beta = double(fov_beta_parse) * M_PI / 180.0;  // Convert to radians
+    double fov_beta = double(fov_beta_parse) * M_PI / 180.0; // Convert to radians
     std::cout << "fov_beta: " << double(fov_beta_parse) << "\n";
-    double fov_Ds = experiment_config_json["robot_params"]["collision_shape"]["aligned_box"][0];  // Safety distance
-    double fov_Rs = experiment_config_json["fov_cbf_params"]["Rs"];  // Sensing range
+    double fov_Ds = experiment_config_json["robot_params"]["collision_shape"]["aligned_box"][0]; // Safety distance
+    double fov_Rs = experiment_config_json["fov_cbf_params"]["Rs"];                              // Sensing range
 
     // Velocity and acceleration constraints
     VectorDIM v_min;
@@ -78,8 +79,8 @@ int main(int argc, char* argv[]) {
 
     VectorDIM v_max;
     v_max << experiment_config_json["mpc_params"]["physical_limits"]["v_max"][0],
-            experiment_config_json["mpc_params"]["physical_limits"]["v_max"][1],
-            experiment_config_json["mpc_params"]["physical_limits"]["v_max"][2];
+        experiment_config_json["mpc_params"]["physical_limits"]["v_max"][1],
+        experiment_config_json["mpc_params"]["physical_limits"]["v_max"][2];
 
     VectorDIM a_min;
     a_min << experiment_config_json["mpc_params"]["physical_limits"]["a_min"][0],
@@ -88,8 +89,8 @@ int main(int argc, char* argv[]) {
 
     VectorDIM a_max;
     a_max << experiment_config_json["mpc_params"]["physical_limits"]["a_max"][0],
-            experiment_config_json["mpc_params"]["physical_limits"]["a_max"][1],
-            experiment_config_json["mpc_params"]["physical_limits"]["a_max"][2];
+        experiment_config_json["mpc_params"]["physical_limits"]["a_max"][1],
+        experiment_config_json["mpc_params"]["physical_limits"]["a_max"][2];
 
     // filter params
     int num_particles = 100;
@@ -170,66 +171,47 @@ int main(int argc, char* argv[]) {
     // Main simulation loop
     int loop_idx = 0;
     while (loop_idx < 400) {
+        // Print out current loop_idx if loop_idx is a multiple of 10
+        if (loop_idx % 10 == 0)
+        {
+            std::cout << "Timestep: " << loop_idx << "\n";
+        }
+
         // Process each robot in the simulation
         for (int robot_idx = 0; robot_idx < num_robots; ++robot_idx) {
             // These vectors will store estimated positions and covariances of other robots
             std::vector<VectorDIM> other_robot_positions;
             std::vector<Matrix> other_robot_covs;
-            
+
             // Process each neighbor robot
             for (int j = 0; j < num_robots-1; ++j) {
                 size_t neighbor_id = neighbor_ids.at(robot_idx).at(j);
                 const VectorDIM& ego_pos = init_states.at(robot_idx).pos_;
-                const VectorDIM& neighbor_pos = init_states.at(neighbor_id).pos_;
+                const VectorDIM &neighbor_pos = init_states.at(neighbor_id).pos_;
 
-                // TODO: the entier part below can be refactored to the pf class
-                ParticleFilter &filter = filters.at(robot_idx).at(j);
-                
-                // Propagate particles forward according to motion model
-                filter.predict();
-                
-                // Get and update particle weights based on field of view
-                Vector weights = filter.getWeights();
-                Matrix samples = filter.getParticles();
-                for (int s = 0; s < num_particles; ++s) {
-                    // Reduce weight of particles that are in robot's field of view
-                    // but don't match observation (implicit negative information)
-                    if (math::insideFOV(ego_pos, samples.col(s), fov_beta, fov_Rs))
-                    {
-                        weights[s] /= 10.0;
-                    }
-                }
-                filter.setWeights(weights);
+                // TODO: use pf to update estimate or use fixed estimate (for debugging)
+                // ParticleFilter &filter = filters.at(robot_idx).at(j);
+                // auto [estimate, cov] = pf::PFApplications::processFovUpdate<double, DIM>(
+                //     filter, ego_pos, neighbor_pos, fov_beta, fov_Rs);
 
-                // Update filter with new measurement if neighbor is visible
-                if (math::insideFOV(ego_pos, neighbor_pos, fov_beta, fov_Rs))
-                {
-                    Vector neighbor_xy(DIM-1);
-                    neighbor_xy << neighbor_pos(0), neighbor_pos(1);
-                    filter.update(neighbor_xy);
-                }
+                // Fixed estimate for debugging
+                auto estimate = init_states.at(neighbor_id).pos_;
+                Matrix cov(DIM - 1, DIM - 1);
+                cov << 0.1, 0,
+                    0, 0.1;
 
-                // Resample particles and compute state estimate
-                filter.resample();
-                filter.estimateState();
-
-                // Extract state estimate and covariance from the filter
-                Vector estimate = filter.getState();
+                // Extend the estimate to include yaw dimension (set to 0) and store them
                 VectorDIM extended_estimate;
-                extended_estimate << estimate(0), estimate(1), 0;  // Add yaw dimension (set to 0)
-                Matrix cov(DIM-1, DIM-1);
-                cov = filter.getDistribution();
-                
-                // Store position and covariance estimates for CBF control
+                extended_estimate << estimate(0), estimate(1), 0; // Add yaw dimension (set to 0)
                 other_robot_positions.push_back(extended_estimate);
-                
+
                 // Extend covariance to include yaw dimension
                 Matrix extended_cov(DIM, DIM);
                 extended_cov << cov(0), cov(1), 0,
                         cov(2), cov(3), 0,
                         0,      0,      0;
                 other_robot_covs.push_back(extended_cov);
-                
+
                 // Record estimates for logging/visualization
                 states["robots"][std::to_string(robot_idx)]["estimates_mean"][std::to_string(neighbor_id)].push_back({extended_estimate(0), extended_estimate(1), extended_estimate(2)});
                 states["robots"][std::to_string(robot_idx)]["estimates_cov"][std::to_string(neighbor_id)].push_back({extended_cov(0), extended_cov(1), extended_cov(2),
@@ -239,16 +221,6 @@ int main(int argc, char* argv[]) {
                 // Calculate closest point on uncertainty ellipse for visualization
                 Vector p_near = math::closestPointOnEllipse(ego_pos, estimate, cov);
                 states["robots"][std::to_string(robot_idx)]["p_near_ellipse"][std::to_string(neighbor_id)].push_back({p_near(0), p_near(1)});
-
-                // TODO: !IMPORTANT use this instead of filter
-                //                // for debug: fixed estimate
-                //                other_robot_positions.push_back(init_states.at(neighbor_id).pos_);
-                //
-                //                Matrix other_robot_cov(DIM, DIM);
-                //                other_robot_cov << 0.1, 0, 0,
-                //                                   0, 0.1, 0,
-                //                                   0, 0, 0.1;
-                //                other_robot_covs.push_back(other_robot_cov);
             }
 
             // Compute desired control using spring control toward target
@@ -258,34 +230,42 @@ int main(int argc, char* argv[]) {
             // Apply CBF to modify control for safety
             CBFControl cbf_control(fov_cbf, num_neighbors, slack_mode, slack_cost, slack_decay_rate);
             VectorDIM cbf_u;
-            
+
             // Optimize control with CBF constraints
             bool success = cbf_control.optimize(cbf_u, desired_u, init_states.at(robot_idx), other_robot_positions, other_robot_covs, a_min, a_max);
             if (!success) {
                 std::cout << "optimization failed\n";
-                cbf_u = VectorDIM::Zero();  // Use zero control if optimization fails
+                cbf_u = VectorDIM::Zero(); // Use zero control if optimization fails
             }
-            
+
             // Apply control to robot model to get next state
             State next_state = pred_model_ptr->applyInput(init_states.at(robot_idx), cbf_u);
-            
+
             // Extract position and velocity, normalize yaw angle
             Vector x_t_pos = next_state.pos_;
             x_t_pos(2) = math::convertYawInRange(x_t_pos(2));
             Vector x_t_vel = next_state.vel_;
-            
+
             // Combine into full state vector
             Vector x_t(6);
             x_t << x_t_pos, x_t_vel;
-            
+
             // Add process noise to simulate real-world uncertainty
             x_t = math::addRandomNoise(x_t, pos_std, vel_std);
             current_states.at(robot_idx) = x_t;
 
             // Log robot state for visualization/analysis
             states["robots"][std::to_string(robot_idx)]["states"].push_back({x_t[0], x_t[1], x_t[2], x_t[3], x_t[4], x_t[5]});
+            // Print out robot state, where x_t[0] is x, x_t[1] is y, x_t[2] is yaw, x_t[3] is vx, x_t[4] is vy, x_t[5] is yaw rate
+            std::cout << "Robot " << robot_idx << " state: "
+                      << "x: " << x_t[0] << ", "
+                      << "y: " << x_t[1] << ", "
+                      << "yaw: " << x_t[2] << ", "
+                      << "vx: " << x_t[3] << ", "
+                      << "vy: " << x_t[4] << ", "
+                      << "yaw rate: " << x_t[5] << "\n";
         }
-        
+
         // Update each robot's state for the next iteration
         for (size_t robot_idx = 0; robot_idx < num_robots; ++robot_idx) {
             init_states.at(robot_idx).pos_(0) = current_states.at(robot_idx)(0);
