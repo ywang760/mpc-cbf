@@ -31,11 +31,18 @@ target_include_directories(cbf_detail_FovCBF PUBLIC include)
 target_link_libraries(cbf_detail_FovCBF PUBLIC ginac cln
         math_Helpers)
 
+# add connectivity CBF library
+# add_library(cbf_detail_ConnectivityCBF SHARED src/detail/connectivity_cbf.cpp)
+# target_include_directories(cbf_detail_ConnectivityCBF PUBLIC include)
+# target_link_libraries(cbf_detail_ConnectivityCBF PUBLIC ginac cln
+#         math_Helpers)
+
 add_library(cbf_optimization_CBFQPOperations SHARED src/optimization/CBFQPOperations.cpp)
 target_include_directories(cbf_optimization_CBFQPOperations PUBLIC include)
 target_link_libraries(cbf_optimization_CBFQPOperations PUBLIC
         qpcpp_QPOperations
         cbf_detail_FovCBF)
+        # cbf_detail_ConnectivityCBF)
 
 add_library(cbf_optimization_CBFQPGenerator SHARED src/optimization/CBFQPGenerator.cpp)
 target_include_directories(cbf_optimization_CBFQPGenerator PUBLIC include)
@@ -60,6 +67,16 @@ target_link_libraries(cbf_examples_CBFControl_example PUBLIC
         cxxopts
         ParticleFilter
         PFApplications
+        math_Geometry
+        math_Controls
+        math_Random)
+
+add_executable(cbf_examples_CBFFormationControl_example examples/connectivity/CBFFormationControl_example.cpp)
+target_include_directories(cbf_examples_CBFFormationControl_example PUBLIC include ../../../third_party/json/single_include)
+target_link_libraries(cbf_examples_CBFFormationControl_example PUBLIC
+        model_DoubleIntegratorXYYaw
+        cbf_controller_CBFControl
+        cxxopts
         math_Geometry
         math_Controls
         math_Random)

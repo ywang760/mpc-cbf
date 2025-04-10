@@ -92,9 +92,6 @@ namespace cbf
             Eigen::VectorXd getMaxVelBounds(Eigen::VectorXd state);
             Eigen::VectorXd getMinVelBounds(Eigen::VectorXd state);
             void setAlpha(std::function<GiNaC::ex(GiNaC::ex, double)> newAlpha);
-            
-
-
 
     };
 }

@@ -73,6 +73,13 @@ if __name__ == "__main__":
 
     # fov cbf params
     fov_cbf_params = {"beta": args.fov, "Rs": 20}
+    
+    # output dir
+    output_dir = os.path.join(
+        os.path.dirname(os.path.realpath(__file__)), f"../../config/{instance_type}"
+    )
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
 
     so = []
     sf = []
@@ -130,7 +137,9 @@ if __name__ == "__main__":
         plot_fov(start_xs[i], start_ys[i], fov_beta, fov_range, start_yaws[i], "r", ax)
         plot_position(goal_xs[i], goal_ys[i], i, "b", ax)
         plot_fov(goal_xs[i], goal_ys[i], fov_beta, fov_range, goal_yaws[i], "b", ax)
-    plt.show()
+    save_path = os.path.join(output_dir, f"{instance_type}{num_robots}_config.png")
+    plt.savefig(save_path)
+    plt.close(fig)
 
     # generate the json config file
     data = {
@@ -145,10 +154,7 @@ if __name__ == "__main__":
     }
     
     # save to json
-    output_dir = os.path.join(
-        os.path.dirname(os.path.realpath(__file__)), f"../../config/{instance_type}_instances"
-    )
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
     with open(os.path.join(output_dir, f"{instance_type}{num_robots}_config.json"), "w") as file:
         json.dump(data, file, indent=4)
+        
+    print(f"Generated {instance_type} instance with {num_robots} robots and saved to {output_dir}")

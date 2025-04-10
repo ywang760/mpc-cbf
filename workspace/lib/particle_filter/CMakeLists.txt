@@ -18,7 +18,7 @@ target_include_directories(ParticleFilter PUBLIC include ${EIGEN3_INCLUDE_DIR})
 # target_link_libraries(ParticleFilter PUBLIC ginac cln)
 
 # Add the PFApplications library with implementation
-add_library(PFApplications SHARED src/detail/pf_applications.cpp)
+add_library(PFApplications SHARED src/pf_applications.cpp)
 target_include_directories(PFApplications PUBLIC include ${EIGEN3_INCLUDE_DIR})
 target_link_libraries(PFApplications PUBLIC ParticleFilter math_Types math_Geometry)
 
