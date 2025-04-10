@@ -26,18 +26,17 @@ if(NOT TARGET cxxopts)
 endif()
 
 # add libraries
-add_library(cbf_detail_FovCBF SHARED src/detail/cbf.cpp)
+add_library(cbf_detail_FovCBF SHARED src/detail/FovCBF.cpp)
 target_include_directories(cbf_detail_FovCBF PUBLIC include)
 target_link_libraries(cbf_detail_FovCBF PUBLIC ginac cln
         math_Helpers)
 
 # add connectivity CBF library
-# add_library(cbf_detail_ConnectivityCBF SHARED src/detail/connectivity_cbf.cpp)
+# add_library(cbf_detail_ConnectivityCBF SHARED src/detail/ConnectivityCBF.cpp)
 # target_include_directories(cbf_detail_ConnectivityCBF PUBLIC include)
 # target_link_libraries(cbf_detail_ConnectivityCBF PUBLIC ginac cln
 #         math_Helpers)
 
-# Add the new base QP generator
 add_library(cbf_optimization_CBFQPGeneratorBase SHARED src/optimization/CBFQPGeneratorBase.cpp)
 target_include_directories(cbf_optimization_CBFQPGeneratorBase PUBLIC include)
 target_link_libraries(cbf_optimization_CBFQPGeneratorBase PUBLIC
@@ -45,16 +44,15 @@ target_link_libraries(cbf_optimization_CBFQPGeneratorBase PUBLIC
         qpcpp_Problem
         math_Helpers)
 
-# Add FOV QP generator that inherits from the base
 add_library(cbf_optimization_FovQPGenerator SHARED src/optimization/FovQPGenerator.cpp)
 target_include_directories(cbf_optimization_FovQPGenerator PUBLIC include)
 target_link_libraries(cbf_optimization_FovQPGenerator PUBLIC
         cbf_optimization_CBFQPGeneratorBase
         cbf_detail_FovCBF)
 
-add_library(cbf_controller_CBFControl SHARED src/controller/CBFControl.cpp)
-target_include_directories(cbf_controller_CBFControl PUBLIC include)
-target_link_libraries(cbf_controller_CBFControl PUBLIC
+add_library(cbf_controller_FovControl SHARED src/controller/FovControl.cpp)
+target_include_directories(cbf_controller_FovControl PUBLIC include)
+target_link_libraries(cbf_controller_FovControl PUBLIC
         cbf_optimization_FovQPGenerator
         qpcpp_solvers_CPLEX
         model_DoubleIntegratorXYYaw)
@@ -64,7 +62,7 @@ add_executable(cbf_examples_CBFControl_example examples/fov/CBFControl_example.c
 target_include_directories(cbf_examples_CBFControl_example PUBLIC include ../../../third_party/json/single_include)
 target_link_libraries(cbf_examples_CBFControl_example PUBLIC
         model_DoubleIntegratorXYYaw
-        cbf_controller_CBFControl
+        cbf_controller_FovControl
         cxxopts
         ParticleFilter
         PFApplications
@@ -76,7 +74,7 @@ add_executable(cbf_examples_CBFFormationControl_example examples/connectivity/CB
 target_include_directories(cbf_examples_CBFFormationControl_example PUBLIC include ../../../third_party/json/single_include)
 target_link_libraries(cbf_examples_CBFFormationControl_example PUBLIC
         model_DoubleIntegratorXYYaw
-        cbf_controller_CBFControl
+        cbf_controller_FovControl
         cxxopts
         math_Geometry
         math_Controls
@@ -87,12 +85,12 @@ target_link_libraries(cbf_examples_CBFFormationControl_example PUBLIC
 #target_include_directories(cbf_examples_CBFControlStaticTarget_example PUBLIC include ../../../third_party/json/single_include)
 #target_link_libraries(cbf_examples_CBFControlStaticTarget_example PUBLIC
 #        model_DoubleIntegratorXYYaw
-#        cbf_controller_CBFControl)
+#        cbf_controller_FovControl)
 
 #add_executable(cbf_examples_CBFControlSlack_example examples/CBFControlSlack_example.cpp)
 #target_include_directories(cbf_examples_CBFControlSlack_example PUBLIC include ../../../third_party/json/single_include)
 #target_link_libraries(cbf_examples_CBFControlSlack_example PUBLIC
 #        model_DoubleIntegratorXYYaw
-#        cbf_controller_CBFControl
+#        cbf_controller_FovControl
 #        ParticleFilter
 #        cxxopts)

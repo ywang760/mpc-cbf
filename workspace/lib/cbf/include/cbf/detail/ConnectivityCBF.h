@@ -6,7 +6,7 @@
 #include <math/Helpers.h>
 #include <functional>
 #include <ginac/ginac.h>
-
+#include <vector>
 
 namespace cbf
 {

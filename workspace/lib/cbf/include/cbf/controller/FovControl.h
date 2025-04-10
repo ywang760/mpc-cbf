@@ -2,10 +2,10 @@
 // Created by lishuo on 9/1/24.
 //
 
-#ifndef CBF_CBFCONTROL_H
-#define CBF_CBFCONTROL_H
+#ifndef CBF_FOVCONTROL_H
+#define CBF_FOVCONTROL_H
 
-#include <cbf/detail/cbf.h>
+#include <cbf/detail/FovCBF.h>
 #include <cbf/optimization/FovQPGenerator.h>
 #include <model/DoubleIntegrator.h>
 #include <qpcpp/solvers/CPLEX.h>
@@ -44,4 +44,4 @@ namespace cbf {
 
 } // cbf
 
-#endif //CBF_CBFCONTROL_H
+#endif //CBF_FOVCONTROL_H

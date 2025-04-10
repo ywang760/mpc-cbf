@@ -1,5 +1,5 @@
 #include <vector>
-#include <cbf/detail/cbf.h>
+#include <cbf/detail/FovCBF.h>
 
 // Default alpha function for Control Barrier Functions (CBF)
 // Implements a linear scaling of the barrier function

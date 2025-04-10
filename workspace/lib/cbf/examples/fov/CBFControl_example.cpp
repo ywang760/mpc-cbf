@@ -6,8 +6,8 @@
 // It tracks other robots using particle filters when they're in the field of view.
 
 #include <model/DoubleIntegratorXYYaw.h>
-#include <cbf/detail/cbf.h>
-#include <cbf/controller/CBFControl.h>
+#include <cbf/detail/FovCBF.h>
+#include <cbf/controller/FovControl.h>
 #include <particle_filter/detail/particle_filter.h>
 #include <particle_filter/pf_applications.h>
 #include <nlohmann/json.hpp>

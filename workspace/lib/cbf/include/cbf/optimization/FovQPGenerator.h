@@ -2,7 +2,7 @@
 #define MPC_FOVQPGENERATOR_H
 
 #include <cbf/optimization/CBFQPGeneratorBase.h>
-#include <cbf/detail/cbf.h>
+#include <cbf/detail/FovCBF.h>
 
 namespace cbf {
     /**

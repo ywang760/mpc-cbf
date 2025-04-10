@@ -2,7 +2,7 @@
 // Created by lishuo on 9/1/24.
 //
 
-#include <cbf/controller/CBFControl.h>
+#include <cbf/controller/FovControl.h>
 
 namespace cbf {
     template <typename T, unsigned int DIM>

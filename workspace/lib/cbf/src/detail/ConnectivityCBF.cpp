@@ -1,5 +1,4 @@
-#include <vector>
-#include <cbf/detail/connectivity_cbf.h>
+#include <cbf/detail/ConnectivityCBF.h>
 
 // Default alpha function for Control Barrier Functions (CBF)
 // Implements a linear scaling of the barrier function
