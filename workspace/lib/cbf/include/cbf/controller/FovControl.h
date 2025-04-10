@@ -13,7 +13,8 @@
 
 namespace cbf {
     template <typename T, unsigned int DIM>
-    class CBFControl {
+    class FovControl
+    {
     public:
         using QPGenerator = cbf::FovQPGenerator<T, DIM>;
         using Problem = qpcpp::Problem<T>;
@@ -24,8 +25,8 @@ namespace cbf {
         using Matrix = math::Matrix<T>;
         using State = model::State<T, DIM>;
 
-        CBFControl(std::shared_ptr<FovCBF> cbf, int number_neighbors=0, bool slack_mode=false, T slack_cost=1000, T slack_decay_rate=0.2);
-        ~CBFControl()=default;
+        FovControl(std::shared_ptr<FovCBF> cbf, int number_neighbors = 0, bool slack_mode = false, T slack_cost = 1000, T slack_decay_rate = 0.2);
+        ~FovControl() = default;
         bool optimize(VectorDIM &cbf_u, const VectorDIM &desired_u,
                       const State &current_state,
                       const std::vector<VectorDIM> &other_robot_positions,

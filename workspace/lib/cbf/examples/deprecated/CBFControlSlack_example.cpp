@@ -208,7 +208,7 @@ bool insideFOV(Eigen::VectorXd robot, Eigen::VectorXd target, double fov, double
 int main(int argc, char* argv[]) {
     using FovCBF = cbf::FovCBF;
     using DoubleIntegratorXYYaw = model::DoubleIntegratorXYYaw<double>;
-    using CBFControl = cbf::CBFControl<double, DIM>;
+    using FovControl = cbf::FovControl<double, DIM>;
     using json = nlohmann::json;
     using ParticleFilter = pf::ParticleFilter;
 
@@ -380,7 +380,7 @@ int main(int argc, char* argv[]) {
             // VectorDIM desired_u = proportionalControl(init_states.at(robot_idx).pos_, target_pos, 0.8);
             VectorDIM desired_u = criticallyDampedSpringControl(init_states.at(robot_idx), target_pos, 1.0);
             // cbf control
-            CBFControl cbf_control(fov_cbf);
+            FovControl cbf_control(fov_cbf);
             VectorDIM cbf_u;
             cbf_control.optimizeWithSlackVariables(cbf_u, desired_u, current_state, other_robot_positions, slack_vars, a_min, a_max);
             std::cout << "Desired u: " << desired_u.transpose() << " | optimal u: " << cbf_u.transpose() << std::endl;

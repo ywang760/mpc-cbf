@@ -28,8 +28,8 @@ namespace cbf
             int CONTROL_VARS;
             double gamma;
 
-            GiNaC::symbol px, py, th, vx, vy, w, ax, ay;
-            
+            GiNaC::symbol px, py, th, vx, vy, w, xt, yt;
+
             GiNaC::matrix state;
             GiNaC::matrix agent_state;
             GiNaC::matrix A;        // state matrix
@@ -40,17 +40,17 @@ namespace cbf
             GiNaC::matrix g;        // g(x)
             std::vector<GiNaC::matrix> Ac_tot;              // Linear constraints
             std::vector<GiNaC::ex> Bc_tot;                  // upper bounds
-            GiNaC::matrix Ac_min_dist;                      // Minimum distance constraint
-            GiNaC::matrix Ac_max_dist;                      // Maximum distance constraint
+            GiNaC::matrix Ac_safe;                          // Safety constraint
+            GiNaC::matrix Ac_connectivity;                  // Connectivity constraint
             GiNaC::matrix Ac_v1_max;                        // Max velocity constraints
             GiNaC::matrix Ac_v2_max;
             GiNaC::matrix Ac_v3_max;
             GiNaC::matrix Ac_v1_min;                        // Min velocity constraints
             GiNaC::matrix Ac_v2_min;
             GiNaC::matrix Ac_v3_min;
-            
-            GiNaC::ex Bc_min_dist;                          // Minimum distance bound
-            GiNaC::ex Bc_max_dist;                          // Maximum distance bound
+
+            GiNaC::ex Bc_safe;                              // Safety bound
+            GiNaC::ex Bc_connectivity;                      // Connectivity bound
             GiNaC::ex Bc_v1_max;                            // Max velocity bounds
             GiNaC::ex Bc_v2_max;
             GiNaC::ex Bc_v3_max;
@@ -60,8 +60,8 @@ namespace cbf
 
             std::function<GiNaC::ex(GiNaC::ex, double)> alpha;
 
-            std::pair<GiNaC::matrix, GiNaC::ex> initMinDistCBF();
-            std::pair<GiNaC::matrix, GiNaC::ex> initMaxDistCBF();
+            std::pair<GiNaC::matrix, GiNaC::ex> initSafetyCBF();
+            std::pair<GiNaC::matrix, GiNaC::ex> initConnectivityCBF();
             std::pair<GiNaC::matrix, GiNaC::ex> initVelCBF(GiNaC::ex bv);
             // TODO: these two are public helper functions -> could move to a helper class
             GiNaC::ex matrixSubs(GiNaC::matrix a, Eigen::VectorXd state, Eigen::VectorXd agent_state);
@@ -70,11 +70,11 @@ namespace cbf
         public:
             ConnectivityCBF(double min_dist, double max_dist, Eigen::VectorXd vmin, Eigen::VectorXd vmax);
             ~ConnectivityCBF();
-            Eigen::VectorXd getMinDistConstraints(Eigen::VectorXd state, Eigen::VectorXd agent_state);
-            Eigen::VectorXd getMaxDistConstraints(Eigen::VectorXd state, Eigen::VectorXd agent_state);
+            Eigen::VectorXd getSafetyConstraints(Eigen::VectorXd state, Eigen::VectorXd agent_state);
+            Eigen::VectorXd getConnectivityConstraints(Eigen::VectorXd state, Eigen::VectorXd agent_state);
             Eigen::MatrixXd getMaxVelContraints(Eigen::VectorXd state);
             Eigen::MatrixXd getMinVelContraints(Eigen::VectorXd state);
-            double getMinDistBound(Eigen::VectorXd state, Eigen::VectorXd agent_state);
+            double getSafetyBound(Eigen::VectorXd state, Eigen::VectorXd agent_state);
             double getMaxDistBound(Eigen::VectorXd state, Eigen::VectorXd agent_state);
             Eigen::VectorXd getMaxVelBounds(Eigen::VectorXd state);
             Eigen::VectorXd getMinVelBounds(Eigen::VectorXd state);

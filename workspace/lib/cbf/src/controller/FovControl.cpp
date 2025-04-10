@@ -6,13 +6,13 @@
 
 namespace cbf {
     template <typename T, unsigned int DIM>
-    CBFControl<T, DIM>::CBFControl(std::shared_ptr<FovCBF> cbf, int number_neighbors, bool slack_mode, T slack_cost, T slack_decay_rate)
+    FovControl<T, DIM>::FovControl(std::shared_ptr<FovCBF> cbf, int number_neighbors, bool slack_mode, T slack_cost, T slack_decay_rate)
         : qp_generator_(cbf, number_neighbors, slack_mode), slack_mode_(slack_mode), slack_cost_(slack_cost), slack_decay_rate_(slack_decay_rate)
     {
     }
 
     template <typename T, unsigned int DIM>
-    bool CBFControl<T, DIM>::optimize(VectorDIM& cbf_u,
+    bool FovControl<T, DIM>::optimize(VectorDIM& cbf_u,
                                       const VectorDIM &desired_u,
                                       const State &current_state,
                                       const std::vector<VectorDIM> &other_robot_positions,
@@ -89,7 +89,7 @@ namespace cbf {
 
 
     template <typename T, unsigned int DIM>
-    T CBFControl<T, DIM>::distanceToEllipse(const VectorDIM &robot_pos,
+    T FovControl<T, DIM>::distanceToEllipse(const VectorDIM &robot_pos,
                                             const Vector &target_mean,
                                             const Matrix &target_cov) {
         assert(DIM == 3); // DIM other than 3 is not implemented yet.
@@ -157,12 +157,12 @@ namespace cbf {
 
 
     template <typename T, unsigned int DIM>
-    bool CBFControl<T, DIM>::compareDist(const VectorDIM& p_current,
+    bool FovControl<T, DIM>::compareDist(const VectorDIM& p_current,
                                          const std::pair<VectorDIM, Matrix>& a,
                                          const std::pair<VectorDIM, Matrix>& b) {
         return distanceToEllipse(p_current, a.first, a.second) < distanceToEllipse(p_current, b.first, b.second);
     }
 
-    template class CBFControl<double, 3U>;
+    template class FovControl<double, 3U>;
 
 } // cbf

@@ -40,7 +40,7 @@ math::VectorDIM<double, DIM> rotateControlInputToWorldFrame(const VectorDIM& con
 int main() {
     using FovCBF = cbf::FovCBF;
     using DoubleIntegratorXYYaw = model::DoubleIntegratorXYYaw<double>;
-    using CBFControl = cbf::CBFControl<double, DIM>;
+    using FovControl = cbf::FovControl<double, DIM>;
     using json = nlohmann::json;
 
     using Vector = math::Vector<double>;
@@ -114,7 +114,7 @@ int main() {
         VectorDIM desired_u;
         desired_u << 0.2, 0.2, 0.0;
         // cbf control
-        CBFControl cbf_control(fov_cbf);
+        FovControl cbf_control(fov_cbf);
         VectorDIM cbf_u;
 
         bool qp_success = cbf_control.optimize(cbf_u, desired_u, state, targets, a_min, a_max);

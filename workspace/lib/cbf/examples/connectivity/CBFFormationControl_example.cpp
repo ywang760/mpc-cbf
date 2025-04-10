@@ -38,8 +38,8 @@ int main(int argc, char* argv[]) {
              cxxopts::value<int>()->default_value(std::to_string(2)))
             ("slack_decay", "slack variable cost decay rate",
              cxxopts::value<double>()->default_value(std::to_string(0.1)))
-            ("config_file", "path to experiment configuration file",              // TODO: changeg the config_file
-             cxxopts::value<std::string>()->default_value("/usr/src/mpc-cbf/workspace/experiments/config/circle/circle4_config.json"))
+            ("config_file", "path to experiment configuration file",              // TODO: change the config_file
+             cxxopts::value<std::string>()->default_value("/usr/src/mpc-cbf/workspace/experiments/config/circle/circle2_config.json"))
             ("write_filename", "write to json filename",
              cxxopts::value<std::string>()->default_value("/usr/src/mpc-cbf/workspace/experiments/results/states.json"));
     auto option_parse = options.parse(argc, argv);
@@ -87,12 +87,24 @@ int main(int argc, char* argv[]) {
     // init model
     std::shared_ptr<DoubleIntegratorXYYaw> pred_model_ptr = std::make_shared<DoubleIntegratorXYYaw>(Ts);
     // init cbf
-    std::shared_ptr<ConnectivityCBF> connectivity_cbf = std::make_shared<ConnectivityCBF>();
+    // TODO: make these parameters configurable
+    double min_dist = 0.2;
+    double max_dist = 2.0;
+    std::shared_ptr<ConnectivityCBF> connectivity_cbf = std::make_shared<ConnectivityCBF>(min_dist, max_dist, v_min, v_max);
     // cbf controller setting
-    bool slack_mode = true;
+    bool slack_mode = false; // TODO: change this to be configurable
     double slack_cost = 1000;
     double slack_decay_rate = option_parse["slack_decay"].as<double>();
-    std::cout << "slack_decay: " << slack_decay_rate << "\n";
+    if (slack_mode)
+    {
+        std::cout << "slack mode is enabled\n";
+        std::cout << "slack_cost: " << slack_cost << "\n";
+        std::cout << "slack_decay: " << slack_decay_rate << "\n";
+    }
+    else
+    {
+        std::cout << "slack mode is disabled\n";
+    }
     // physical settings
     double pos_std = experiment_config_json["mpc_params"]["physical_limits"]["pos_std"];
     double vel_std = experiment_config_json["mpc_params"]["physical_limits"]["vel_std"];
@@ -197,7 +209,7 @@ int main(int argc, char* argv[]) {
             bool success = connectivity_control.optimize(cbf_u, desired_u, init_states.at(robot_idx), 
                                                    other_robot_positions, other_robot_covs, a_min, a_max);
             if (!success) {
-                std::cout << "optimization failed\n";
+                std::cout << "Optimization failed for robot " << robot_idx << " at timestep " << loop_idx << "\n";
                 cbf_u = VectorDIM::Zero(); // Use zero control if optimization fails
             }
 

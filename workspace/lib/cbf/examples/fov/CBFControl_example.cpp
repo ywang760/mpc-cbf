@@ -27,7 +27,7 @@ int main(int argc, char* argv[]) {
     // Type aliases for better readability
     using FovCBF = cbf::FovCBF;
     using DoubleIntegratorXYYaw = model::DoubleIntegratorXYYaw<double>;
-    using CBFControl = cbf::CBFControl<double, DIM>;
+    using FovControl = cbf::FovControl<double, DIM>;
     using ParticleFilter = pf::ParticleFilter;
     using json = nlohmann::json;
     using Matrix = math::Matrix<double>;
@@ -228,7 +228,7 @@ int main(int argc, char* argv[]) {
             VectorDIM desired_u = math::criticallyDampedSpringControl<double, DIM>(init_states.at(robot_idx), target_pos, 1.);
 
             // Apply CBF to modify control for safety
-            CBFControl cbf_control(fov_cbf, num_neighbors, slack_mode, slack_cost, slack_decay_rate);
+            FovControl cbf_control(fov_cbf, num_neighbors, slack_mode, slack_cost, slack_decay_rate);
             VectorDIM cbf_u;
 
             // Optimize control with CBF constraints
@@ -257,13 +257,13 @@ int main(int argc, char* argv[]) {
             // Log robot state for visualization/analysis
             states["robots"][std::to_string(robot_idx)]["states"].push_back({x_t[0], x_t[1], x_t[2], x_t[3], x_t[4], x_t[5]});
             // Print out robot state, where x_t[0] is x, x_t[1] is y, x_t[2] is yaw, x_t[3] is vx, x_t[4] is vy, x_t[5] is yaw rate
-            std::cout << "Robot " << robot_idx << " state: "
-                      << "x: " << x_t[0] << ", "
-                      << "y: " << x_t[1] << ", "
-                      << "yaw: " << x_t[2] << ", "
-                      << "vx: " << x_t[3] << ", "
-                      << "vy: " << x_t[4] << ", "
-                      << "yaw rate: " << x_t[5] << "\n";
+            // std::cout << "Robot " << robot_idx << " state: "
+            //           << "x: " << x_t[0] << ", "
+            //           << "y: " << x_t[1] << ", "
+            //           << "yaw: " << x_t[2] << ", "
+            //           << "vx: " << x_t[3] << ", "
+            //           << "vy: " << x_t[4] << ", "
+            //           << "yaw rate: " << x_t[5] << "\n";
         }
 
         // Update each robot's state for the next iteration

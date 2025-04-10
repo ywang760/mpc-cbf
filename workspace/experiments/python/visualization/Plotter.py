@@ -442,7 +442,7 @@ if __name__ == "__main__":
         description="argparse to read the config, states and output filenames"
     )
     # TODO: properly construct the inputs
-    parser.add_argument("-c", "--config_filename", type=str, default="/usr/src/mpc-cbf/workspace/experiments/config/circle/circle4_config.json", help="path to config json file")
+    parser.add_argument("-c", "--config_filename", type=str, default="/usr/src/mpc-cbf/workspace/experiments/config/circle/circle2_config.json", help="path to config json file")
     parser.add_argument("-s", "--states_filename", type=str, default="/usr/src/mpc-cbf/workspace/experiments/results/states.json", help="path to simulation state json file")
     # Need to install ffmpeg to save the video as mp4 (use pillow to save as gif)
     parser.add_argument("-ov", "--output_video", type=str, default="../../results"+default_instance+".gif", help="path to simulation animation file")
