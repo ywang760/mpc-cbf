@@ -1,5 +1,4 @@
-#include <cbf/detail/cbf.h>
-
+#include <cbf/detail/FovCBF.h>
 
 int main()
 {

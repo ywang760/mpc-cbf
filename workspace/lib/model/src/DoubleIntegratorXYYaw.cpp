@@ -9,6 +9,8 @@ namespace model {
     DoubleIntegratorXYYaw<T>::DoubleIntegratorXYYaw(T ts) {
         assert(dim_ == 3U);
         // Linear system directly depend on position, velocity and acceleration.
+        // The state vector is [px, py, pyaw, vx, vy, vyaw]^T
+        // The control input is [ax, ay, ayaw]^T
         A_ = Matrix::Zero(6, 6);
         B_ = Matrix::Zero(6, 3);
         A_ << 1, 0, 0, ts, 0, 0,

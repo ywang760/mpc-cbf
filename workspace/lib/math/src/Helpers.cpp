@@ -113,6 +113,21 @@ namespace math {
         return true;
     }
 
+    template <typename Derived1, typename Derived2, typename T>
+    bool isApproximatelyEqual(const Eigen::MatrixBase<Derived1> &lhs,
+                              const Eigen::MatrixBase<Derived2> &rhs,
+                              T tolerance)
+    {
+            // Check dimensions match
+            if (lhs.rows() != rhs.rows() || lhs.cols() != rhs.cols())
+            {
+                    return false;
+            }
+
+            // Check each element is approximately equal
+            return ((lhs - rhs).array().abs() <= tolerance).all();
+    }
+
     template <typename T, unsigned int DIM>
     bool isInPositiveSide(const Hyperplane<T, DIM>& hyperplane,
                           const AlignedBox<T, DIM>& box) {
@@ -360,5 +375,43 @@ namespace math {
             const VectorDIM<double, 2U>& v);
     template VectorDIM<float, 2U> computeAPerpendicularVector<float, 2U>(
             const VectorDIM<float, 2U>& v);
+
+    template bool isApproximatelyEqual<Eigen::Matrix<double, 2, 1>, Eigen::Matrix<double, 2, 1>, double>(
+        const Eigen::MatrixBase<Eigen::Matrix<double, 2, 1>> &lhs,
+        const Eigen::MatrixBase<Eigen::Matrix<double, 2, 1>> &rhs,
+        double tolerance);
+
+    template bool isApproximatelyEqual<Eigen::Matrix<float, 2, 1>, Eigen::Matrix<float, 2, 1>, float>(
+        const Eigen::MatrixBase<Eigen::Matrix<float, 2, 1>> &lhs,
+        const Eigen::MatrixBase<Eigen::Matrix<float, 2, 1>> &rhs,
+        float tolerance);
+
+    // For Vector3d and Vector3f
+    template bool isApproximatelyEqual<Eigen::Matrix<double, 3, 1>, Eigen::Matrix<double, 3, 1>, double>(
+        const Eigen::MatrixBase<Eigen::Matrix<double, 3, 1>> &lhs,
+        const Eigen::MatrixBase<Eigen::Matrix<double, 3, 1>> &rhs,
+        double tolerance);
+
+    template bool isApproximatelyEqual<Eigen::Matrix<float, 3, 1>, Eigen::Matrix<float, 3, 1>, float>(
+        const Eigen::MatrixBase<Eigen::Matrix<float, 3, 1>> &lhs,
+        const Eigen::MatrixBase<Eigen::Matrix<float, 3, 1>> &rhs,
+        float tolerance);
+
+    // For explicitly comparing with expression types
+    template bool isApproximatelyEqual<Eigen::CwiseBinaryOp<Eigen::internal::scalar_sum_op<double, double>,
+                                                            const Eigen::Matrix<double, 2, 1>, const Eigen::Matrix<double, 2, 1>>,
+                                       Eigen::Matrix<double, 2, 1>, double>(
+        const Eigen::MatrixBase<Eigen::CwiseBinaryOp<Eigen::internal::scalar_sum_op<double, double>,
+                                                     const Eigen::Matrix<double, 2, 1>, const Eigen::Matrix<double, 2, 1>>> &lhs,
+        const Eigen::MatrixBase<Eigen::Matrix<double, 2, 1>> &rhs,
+        double tolerance);
+
+    template bool isApproximatelyEqual<Eigen::CwiseBinaryOp<Eigen::internal::scalar_sum_op<float, float>,
+                                                            const Eigen::Matrix<float, 2, 1>, const Eigen::Matrix<float, 2, 1>>,
+                                       Eigen::Matrix<float, 2, 1>, float>(
+        const Eigen::MatrixBase<Eigen::CwiseBinaryOp<Eigen::internal::scalar_sum_op<float, float>,
+                                                     const Eigen::Matrix<float, 2, 1>, const Eigen::Matrix<float, 2, 1>>> &lhs,
+        const Eigen::MatrixBase<Eigen::Matrix<float, 2, 1>> &rhs,
+        float tolerance);
 
 }  // namespace math

@@ -26,58 +26,83 @@ if(NOT TARGET cxxopts)
 endif()
 
 # add libraries
-add_library(cbf_detail_FovCBF SHARED src/detail/cbf.cpp)
+add_library(cbf_detail_FovCBF SHARED src/detail/FovCBF.cpp)
 target_include_directories(cbf_detail_FovCBF PUBLIC include)
 target_link_libraries(cbf_detail_FovCBF PUBLIC ginac cln
         math_Helpers)
 
-add_library(cbf_optimization_CBFQPOperations SHARED src/optimization/CBFQPOperations.cpp)
-target_include_directories(cbf_optimization_CBFQPOperations PUBLIC include)
-target_link_libraries(cbf_optimization_CBFQPOperations PUBLIC
-        qpcpp_QPOperations
-        cbf_detail_FovCBF)
+add_library(cbf_detail_ConnectivityCBF SHARED src/detail/ConnectivityCBF.cpp)
+target_include_directories(cbf_detail_ConnectivityCBF PUBLIC include)
+target_link_libraries(cbf_detail_ConnectivityCBF PUBLIC ginac cln
+        math_Helpers)
 
-add_library(cbf_optimization_CBFQPGenerator SHARED src/optimization/CBFQPGenerator.cpp)
-target_include_directories(cbf_optimization_CBFQPGenerator PUBLIC include)
-target_link_libraries(cbf_optimization_CBFQPGenerator PUBLIC
-        cbf_optimization_CBFQPOperations
+add_library(cbf_optimization_CBFQPGeneratorBase SHARED src/optimization/CBFQPGeneratorBase.cpp)
+target_include_directories(cbf_optimization_CBFQPGeneratorBase PUBLIC include)
+target_link_libraries(cbf_optimization_CBFQPGeneratorBase PUBLIC
+        qpcpp_QPOperations
         qpcpp_Problem
         math_Helpers)
 
-add_library(cbf_controller_CBFControl SHARED src/controller/CBFControl.cpp)
-target_include_directories(cbf_controller_CBFControl PUBLIC include)
-target_link_libraries(cbf_controller_CBFControl PUBLIC
-        cbf_optimization_CBFQPGenerator
+add_library(cbf_optimization_FovQPGenerator SHARED src/optimization/FovQPGenerator.cpp)
+target_include_directories(cbf_optimization_FovQPGenerator PUBLIC include)
+target_link_libraries(cbf_optimization_FovQPGenerator PUBLIC
+        cbf_optimization_CBFQPGeneratorBase
+        cbf_detail_FovCBF)
+
+add_library(cbf_optimization_ConnectivityQPGenerator SHARED src/optimization/ConnectivityQPGenerator.cpp)
+target_include_directories(cbf_optimization_ConnectivityQPGenerator PUBLIC include)
+target_link_libraries(cbf_optimization_ConnectivityQPGenerator PUBLIC
+        cbf_optimization_CBFQPGeneratorBase
+        cbf_detail_ConnectivityCBF)
+
+add_library(cbf_controller_FovControl SHARED src/controller/FovControl.cpp)
+target_include_directories(cbf_controller_FovControl PUBLIC include)
+target_link_libraries(cbf_controller_FovControl PUBLIC
+        cbf_optimization_FovQPGenerator
+        qpcpp_solvers_CPLEX
+        model_DoubleIntegratorXYYaw)
+
+add_library(cbf_controller_ConnectivityControl SHARED src/controller/ConnectivityControl.cpp)
+target_include_directories(cbf_controller_ConnectivityControl PUBLIC include)
+target_link_libraries(cbf_controller_ConnectivityControl PUBLIC
+        cbf_optimization_ConnectivityQPGenerator
         qpcpp_solvers_CPLEX
         model_DoubleIntegratorXYYaw)
 
 # add examples
-#add_executable(cbf_test tests/cbf_test.cpp)
-#target_include_directories(cbf_test PUBLIC include)
-#target_link_libraries(cbf_test PUBLIC ginac cln)
-#
-#add_executable(test_class tests/test_class.cpp)
-#target_include_directories(test_class PUBLIC include)
-#target_link_libraries(test_class PUBLIC cbf_detail_FovCBF ginac cln)
-
-add_executable(cbf_examples_CBFControl_example examples/CBFControl_example.cpp)
+add_executable(cbf_examples_CBFControl_example examples/fov/CBFControl_example.cpp)
 target_include_directories(cbf_examples_CBFControl_example PUBLIC include ../../../third_party/json/single_include)
 target_link_libraries(cbf_examples_CBFControl_example PUBLIC
         model_DoubleIntegratorXYYaw
-        cbf_controller_CBFControl
+        cbf_controller_FovControl
         cxxopts
-        ParticleFilter)
+        ParticleFilter
+        PFApplications
+        math_Geometry
+        math_Controls
+        math_Random)
 
+add_executable(cbf_examples_CBFFormationControl_example examples/connectivity/CBFFormationControl_example.cpp)
+target_include_directories(cbf_examples_CBFFormationControl_example PUBLIC include ../../../third_party/json/single_include)
+target_link_libraries(cbf_examples_CBFFormationControl_example PUBLIC
+        model_DoubleIntegratorXYYaw
+        cbf_controller_ConnectivityControl
+        cxxopts
+        math_Geometry
+        math_Controls
+        math_Random)
+
+# TODO: remove the deprecated examples
 #add_executable(cbf_examples_CBFControlStaticTarget_example examples/CBFControlStaticTarget_example.cpp)
 #target_include_directories(cbf_examples_CBFControlStaticTarget_example PUBLIC include ../../../third_party/json/single_include)
 #target_link_libraries(cbf_examples_CBFControlStaticTarget_example PUBLIC
 #        model_DoubleIntegratorXYYaw
-#        cbf_controller_CBFControl)
+#        cbf_controller_FovControl)
 
 #add_executable(cbf_examples_CBFControlSlack_example examples/CBFControlSlack_example.cpp)
 #target_include_directories(cbf_examples_CBFControlSlack_example PUBLIC include ../../../third_party/json/single_include)
 #target_link_libraries(cbf_examples_CBFControlSlack_example PUBLIC
 #        model_DoubleIntegratorXYYaw
-#        cbf_controller_CBFControl
+#        cbf_controller_FovControl
 #        ParticleFilter
 #        cxxopts)

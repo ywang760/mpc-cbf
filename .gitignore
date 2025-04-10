@@ -67,3 +67,7 @@ src/bin/
 src/lib/
 
 *.bin
+
+# Python 
+.venv/
+venv/

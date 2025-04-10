@@ -6,7 +6,7 @@
 #define MPC_PIECEWISEBEZIERMPCCBFQPOPERATIONS_H
 
 #include <mpc/optimization/PiecewiseBezierMPCQPOperations.h>
-#include <cbf/detail/cbf.h>
+#include <cbf/detail/FovCBF.h>
 
 namespace mpc_cbf {
     template <typename T, unsigned int DIM>

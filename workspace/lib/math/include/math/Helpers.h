@@ -108,6 +108,23 @@ namespace math {
                               const VectorDIM<T, DIM>& rhs, T tolerance = 1e-10);
 
     /**
+     * @brief Generic function to check if two Eigen expressions are approximately equal
+     *
+     * @tparam Derived1 First Eigen derived type
+     * @tparam Derived2 Second Eigen derived type
+     * @tparam T Scalar type used for tolerance
+     * @param lhs Left-hand side Eigen expression
+     * @param rhs Right-hand side Eigen expression
+     * @param tolerance Maximum allowed difference between elements
+     * @return true if expressions are approximately equal
+     * @return false otherwise
+     */
+    template <typename Derived1, typename Derived2, typename T = typename Derived1::Scalar>
+    bool isApproximatelyEqual(const Eigen::MatrixBase<Derived1> &lhs,
+                              const Eigen::MatrixBase<Derived2> &rhs,
+                              T tolerance = static_cast<T>(1e-10));
+
+    /**
      * @brief Return whether two MatrixRCs are component-wise approximately equal
      *
      * @tparam T Floating point number type

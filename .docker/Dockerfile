@@ -10,6 +10,7 @@ RUN apt-get update && apt-get install -y \
     python3 \
     python-is-python3 \
     python3-pip \
+    python3.10-venv \
     libboost-all-dev \
     libeigen3-dev \
     libginac-dev \
@@ -20,7 +21,8 @@ RUN apt-get update && apt-get install -y \
     cmake \
     doxygen \
     git \
-    ninja-build
+    ninja-build \
+    ffmpeg
     
 # Setup g++-9 as the compiler
 # RUN apt-get update && apt-get install -y \

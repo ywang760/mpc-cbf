@@ -17,10 +17,10 @@ namespace model {
 
         for (int  k = 0; k < K; ++k) {
             new_row = A_ * prev_row;
-            A0.pos_.middleRows(idx, 3) = new_row.middleRows(0, 3);
-            A0.vel_.middleRows(idx, 3) = new_row.middleRows(3, 3);
+            A0.pos_.middleRows(idx, dim_) = new_row.middleRows(0, dim_);
+            A0.vel_.middleRows(idx, dim_) = new_row.middleRows(dim_, dim_);
             prev_row = new_row;
-            idx += 3;
+            idx += dim_;
         }
 
         return A0;
@@ -41,10 +41,10 @@ namespace model {
             add_b << Matrix::Zero(B_.rows(), B_.cols() * (k)), B_,
                     Matrix::Zero(B_.rows(), B_.cols() * (K - k - 1));
             new_row = A_ * prev_row + add_b;
-            Lambda.pos_.middleRows(idx, 3) = new_row.middleRows(0, 3);
-            Lambda.vel_.middleRows(idx, 3) = new_row.middleRows(3, 3);
+            Lambda.pos_.middleRows(idx, dim_) = new_row.middleRows(0, dim_);
+            Lambda.vel_.middleRows(idx, dim_) = new_row.middleRows(dim_, dim_);
             prev_row = new_row;
-            idx += 3;
+            idx += dim_;
         }
 
         return Lambda;
