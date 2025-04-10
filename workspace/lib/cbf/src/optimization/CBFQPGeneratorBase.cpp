@@ -1,20 +1,16 @@
 //
-// Created by lishuo on 8/31/24.
+// Created on 4/10/25.
 //
 
-#include <cbf/optimization/CBFQPGenerator.h>
+#include <cbf/optimization/CBFQPGeneratorBase.h>
 
 namespace cbf {
     template <typename T, unsigned int DIM>
-    void
-    CBFQPGenerator<T, DIM>::addCBFOperations(std::unique_ptr<CBFQPOperations> cbf_operations_ptr, int num_neighbors, bool slack_mode) {
-        // Store the operations pointer for later use
-        cbf_operations_ptr_ = std::move(cbf_operations_ptr);
-
+    CBFQPGeneratorBase<T, DIM>::CBFQPGeneratorBase(int num_neighbors, bool slack_mode) {
         // Allocate the decision variables for the control input
-        size_t num_decision_variables_of_control_input = cbf_operations_ptr_->numDecisionVariables();
+        size_t num_decision_variables = DIM;
         for (size_t decision_variable_idx = 0;
-             decision_variable_idx < num_decision_variables_of_control_input;
+             decision_variable_idx < num_decision_variables;
              ++decision_variable_idx) {
             qpcpp::Variable<T>* variable_ptr = problem_.addVariable();
             variables_.push_back(variable_ptr);
@@ -31,156 +27,71 @@ namespace cbf {
     }
 
     template <typename T, unsigned int DIM>
-    qpcpp::Problem<T>& CBFQPGenerator<T, DIM>::problem() {
+    qpcpp::Problem<T>& CBFQPGeneratorBase<T, DIM>::problem() {
         // Return a reference to the underlying QP problem
         return problem_;
     }
 
     template <typename T, unsigned int DIM>
-    void CBFQPGenerator<T, DIM>::addDesiredControlCost(const VectorDIM& desired_u) {
-        // Get the cost terms for tracking the desired control input
-        CostAddition cost_addition = cbf_operations_ptr_->desiredControlCost(desired_u);
-        // Add these cost terms to the QP problem
+    void CBFQPGeneratorBase<T, DIM>::addDesiredControlCost(const VectorDIM& desired_u) {
+        // Create quadratic cost for tracking desired control
+        Matrix quadratic_term(DIM, DIM);
+        quadratic_term.setZero();
+        Vector linear_term(DIM);
+        linear_term.setZero();
+
+        // Set the quadratic term to identity matrix for a standard quadratic norm
+        quadratic_term.setIdentity();
+
+        // Set the linear term as -2 * desired_u to create the expanded form of ||u - desired_u||^2
+        linear_term = -2.0 * desired_u;
+
+        // Set the constant term as the squared norm of desired_u
+        T constant_term = desired_u.transpose() * desired_u;
+
+        // Create cost addition and add to the QP problem
+        CostAddition cost_addition(quadratic_term, linear_term, constant_term);
         addCostAdditionForControlInput(cost_addition);
     }
 
     template <typename T, unsigned int DIM>
-    void CBFQPGenerator<T, DIM>::addSlackCost(const std::vector<T> &slack_weights) {
-        // Get the cost terms for the slack variables based on the provided weights
-        CostAddition cost_addition = cbf_operations_ptr_->slackCost(slack_weights);
-        // Add these cost terms to the QP problem
+    void CBFQPGeneratorBase<T, DIM>::addSlackCost(const std::vector<T> &slack_weights) {
+        // Initialize cost terms for slack variables
+        Matrix quadratic_term(slack_weights.size(), slack_weights.size());
+        quadratic_term.setZero();
+        Vector linear_term(slack_weights.size());
+        linear_term.setZero();
+
+        // For slack variables, we only use linear costs to penalize their usage
+        for (std::size_t i = 0; i < slack_weights.size(); ++i) {
+            linear_term(i) = slack_weights.at(i);
+        }
+
+        // Create cost addition and add to the QP problem
+        CostAddition cost_addition(quadratic_term, linear_term, 0);
         addCostAdditionForSlackVariables(cost_addition);
     }
 
     template <typename T, unsigned int DIM>
-    void CBFQPGenerator<T, DIM>::addSafetyConstraint(const Vector &state,
-                                                     const Vector &target_state) {
-        // Get the safety constraint based on current states
-        LinearConstraint linear_constraint = cbf_operations_ptr_->safetyConstraint(state, target_state);
-        // Add this constraint to the QP problem
-        addLinearConstraintForControlInput(linear_constraint);
-    }
+    void CBFQPGeneratorBase<T, DIM>::addControlBoundConstraint(const VectorDIM &u_min, const VectorDIM &u_max) {
+        // Initialize vectors for the lower and upper bounds on control inputs
+        VectorDIM lower_bounds;
+        VectorDIM upper_bounds;
 
-    template <typename T, unsigned int DIM>
-    void CBFQPGenerator<T, DIM>::addLeftBorderConstraint(const Vector &state,
-                                                         const Vector &target_state) {
-        // Get the left field-of-view border constraint
-        LinearConstraint linear_constraint = cbf_operations_ptr_->leftBorderConstraint(state, target_state);
-        // Add this constraint to the QP problem
-        addLinearConstraintForControlInput(linear_constraint);
-    }
-
-    template <typename T, unsigned int DIM>
-    void CBFQPGenerator<T, DIM>::addRightBorderConstraint(const Vector &state,
-                                                          const Vector &target_state) {
-        // Get the right field-of-view border constraint
-        LinearConstraint linear_constraint = cbf_operations_ptr_->rightBorderConstraint(state, target_state);
-        // Add this constraint to the QP problem
-        addLinearConstraintForControlInput(linear_constraint);
-    }
-
-    template <typename T, unsigned int DIM>
-    void CBFQPGenerator<T, DIM>::addRangeConstraint(const Vector &state,
-                                                    const Vector &target_state) {
-        // Get the sensing range constraint
-        LinearConstraint linear_constraint = cbf_operations_ptr_->rangeConstraint(state, target_state);
-        // Add this constraint to the QP problem
-        addLinearConstraintForControlInput(linear_constraint);
-    }
-
-    template <typename T, unsigned int DIM>
-    void CBFQPGenerator<T, DIM>::addMinVelConstraints(const Vector &state) {
-        // Get all minimum velocity constraints
-        std::vector<LinearConstraint> linear_constraints = cbf_operations_ptr_->minVelConstraints(state);
-        // Add each constraint to the QP problem
-        for (size_t i = 0; i < linear_constraints.size(); ++i) {
-            LinearConstraint &linear_constraint = linear_constraints.at(i);
-            addLinearConstraintForControlInput(linear_constraint);
+        // Set the individual bounds for each control dimension
+        for (size_t d = 0; d < DIM; ++d) {
+            lower_bounds(d) = u_min(d);
+            upper_bounds(d) = u_max(d);
         }
-    }
 
-    template <typename T, unsigned int DIM>
-    void CBFQPGenerator<T, DIM>::addMaxVelConstraints(const Vector &state) {
-        // Get all maximum velocity constraints
-        std::vector<LinearConstraint> linear_constraints = cbf_operations_ptr_->maxVelConstraints(state);
-        // Add each constraint to the QP problem
-        for (size_t i = 0; i < linear_constraints.size(); ++i) {
-            LinearConstraint &linear_constraint = linear_constraints.at(i);
-            addLinearConstraintForControlInput(linear_constraint);
-        }
-    }
-
-    template <typename T, unsigned int DIM>
-    void CBFQPGenerator<T, DIM>::addSafetyCBFConstraintWithSlackVariables(const Vector &state,
-                                                                          const Vector &target_state,
-                                                                          std::size_t neighbor_idx) {
-        // Get the safety constraint
-        LinearConstraint linear_constraint = cbf_operations_ptr_->safetyConstraint(state, target_state);
-
-        // Create a row vector for slack variable coefficients (all zeros except at neighbor_idx)
-        Row slack_coefficients = Row::Zero(slack_variables_.size());
-        slack_coefficients(neighbor_idx) = -1; // Negative coefficient allows constraint relaxation
-
-        // Add the constraint with slack variable to the QP problem
-        addLinearConstraintForControlInputWithSlackVariables(linear_constraint, slack_coefficients);
-    }
-
-    template <typename T, unsigned int DIM>
-    void CBFQPGenerator<T, DIM>::addLeftBorderConstraintWithSlackVariables(const Vector &state,
-                                                                          const Vector &target_state,
-                                                                          std::size_t neighbor_idx) {
-        // Get the left field-of-view border constraint
-        LinearConstraint linear_constraint = cbf_operations_ptr_->leftBorderConstraint(state, target_state);
-
-        // Create a row vector for slack variable coefficients (all zeros except at neighbor_idx)
-        Row slack_coefficients = Row::Zero(slack_variables_.size());
-        slack_coefficients(neighbor_idx) = -1; // Negative coefficient allows constraint relaxation
-
-        // Add the constraint with slack variable to the QP problem
-        addLinearConstraintForControlInputWithSlackVariables(linear_constraint, slack_coefficients);
-    }
-
-    template <typename T, unsigned int DIM>
-    void CBFQPGenerator<T, DIM>::addRightBorderConstraintWithSlackVariables(const Vector &state,
-                                                                           const Vector &target_state,
-                                                                           std::size_t neighbor_idx) {
-        // Get the right field-of-view border constraint
-        LinearConstraint linear_constraint = cbf_operations_ptr_->rightBorderConstraint(state, target_state);
-
-        // Create a row vector for slack variable coefficients (all zeros except at neighbor_idx)
-        Row slack_coefficients = Row::Zero(slack_variables_.size());
-        slack_coefficients(neighbor_idx) = -1; // Negative coefficient allows constraint relaxation
-
-        // Add the constraint with slack variable to the QP problem
-        addLinearConstraintForControlInputWithSlackVariables(linear_constraint, slack_coefficients);
-    }
-
-    template <typename T, unsigned int DIM>
-    void CBFQPGenerator<T, DIM>::addRangeConstraintWithSlackVariables(const Vector &state,
-                                                                      const Vector &target_state,
-                                                                      std::size_t neighbor_idx) {
-        // Get the sensing range constraint
-        LinearConstraint linear_constraint = cbf_operations_ptr_->rangeConstraint(state, target_state);
-
-        // Create a row vector for slack variable coefficients (all zeros except at neighbor_idx)
-        Row slack_coefficients = Row::Zero(slack_variables_.size());
-        slack_coefficients(neighbor_idx) = -1; // Negative coefficient allows constraint relaxation
-
-        // Add the constraint with slack variable to the QP problem
-        addLinearConstraintForControlInputWithSlackVariables(linear_constraint, slack_coefficients);
-    }
-
-    template <typename T, unsigned int DIM>
-    void CBFQPGenerator<T, DIM>::addControlBoundConstraint(const VectorDIM &u_min, const VectorDIM &u_max) {
-        // Get bounds for control inputs
-        DecisionVariableBounds decision_variable_bounds = cbf_operations_ptr_->controlBoundConstraint(u_min, u_max);
-        // Add these bounds to the QP problem
+        // Create decision variable bounds and add to the QP problem
+        DecisionVariableBounds decision_variable_bounds(lower_bounds, upper_bounds);
         addDecisionVariableBoundsForControlInput(decision_variable_bounds);
     }
 
     template <typename T, unsigned int DIM>
     void
-    CBFQPGenerator<T, DIM>::addCostAdditionForControlInput(const CostAddition &cost_addition) {
+    CBFQPGeneratorBase<T, DIM>::addCostAdditionForControlInput(const CostAddition &cost_addition) {
         // Small value to check if a coefficient is approximately zero
         constexpr T epsilon = std::numeric_limits<T>::epsilon() * T(100.0);
         size_t num_decision_variables = variables_.size();
@@ -189,7 +100,7 @@ namespace cbf {
         if (num_decision_variables != cost_addition.linear_term().rows() ||
             num_decision_variables != cost_addition.quadratic_term().rows() ||
             num_decision_variables != cost_addition.quadratic_term().cols()) {
-            throw std::runtime_error("CBFQPGenerator::addCostAdditionForControlInput:"
+            throw std::runtime_error("CBFQPGeneratorBase::addCostAdditionForControlInput:"
                                      " number of decision variables of the controlInput does not match the "
                                      "CostAddition structure");
         }
@@ -218,7 +129,7 @@ namespace cbf {
     }
 
     template <typename T, unsigned int DIM>
-    void CBFQPGenerator<T, DIM>::addCostAdditionForSlackVariables(const CostAddition &cost_addition) {
+    void CBFQPGeneratorBase<T, DIM>::addCostAdditionForSlackVariables(const CostAddition &cost_addition) {
         // Small value to check if a coefficient is approximately zero
         constexpr T epsilon = std::numeric_limits<T>::epsilon() * T(100.0);
         size_t num_slack_variables = slack_variables_.size();
@@ -227,7 +138,7 @@ namespace cbf {
         if (num_slack_variables != cost_addition.linear_term().rows() ||
             num_slack_variables != cost_addition.quadratic_term().rows() ||
             num_slack_variables != cost_addition.quadratic_term().cols()) {
-            throw std::runtime_error("CBFQPGenerator::addCostAdditionForSlackVariables:"
+            throw std::runtime_error("CBFQPGeneratorBase::addCostAdditionForSlackVariables:"
                                      " number of slack variables does not match the "
                                      "CostAddition structure");
         }
@@ -257,12 +168,12 @@ namespace cbf {
 
     template <typename T, unsigned int DIM>
     void
-    CBFQPGenerator<T, DIM>::addLinearConstraintForControlInput(const LinearConstraint &linear_constraint) {
+    CBFQPGeneratorBase<T, DIM>::addLinearConstraintForControlInput(const LinearConstraint &linear_constraint) {
         size_t num_decision_variables = variables_.size();
 
         // Validate that the constraint structure matches our variable count
         if (num_decision_variables != linear_constraint.coefficients().cols()) {
-            throw std::runtime_error("CBFQPGenerator::"
+            throw std::runtime_error("CBFQPGeneratorBase::"
                                      "addLinearConstraintForControlInput:"
                                      " number of decision variables of the controlInput does not match the "
                                      "LinearConstraint structure");
@@ -283,7 +194,7 @@ namespace cbf {
     }
 
     template <typename T, unsigned int DIM>
-    void CBFQPGenerator<T, DIM>::addLinearConstraintForControlInputWithSlackVariables(
+    void CBFQPGeneratorBase<T, DIM>::addLinearConstraintForControlInputWithSlackVariables(
             const LinearConstraint &linear_constraint,
             const Row &slack_coefficients) {
         size_t num_decision_variables = variables_.size();
@@ -291,13 +202,13 @@ namespace cbf {
 
         // Validate that the constraint and slack coefficient structures match our variable counts
         if (num_decision_variables != linear_constraint.coefficients().cols()) {
-            throw std::runtime_error("CBFQPGenerator::"
+            throw std::runtime_error("CBFQPGeneratorBase::"
                                      "addLinearConstraintForControlInputWithSlackVariables:"
                                      " number of decision variables of the controlInput does not match the "
                                      "LinearConstraint structure");
         }
         if (num_slack_variables != slack_coefficients.size()) {
-            throw std::runtime_error("CBFQPGenerator::"
+            throw std::runtime_error("CBFQPGeneratorBase::"
                                      "addLinearConstraintForControlInputWithSlackVariables:"
                                      " number of slack variables does not match the "
                                      "slack_coefficients structure");
@@ -327,13 +238,13 @@ namespace cbf {
 
     template <typename T, unsigned int DIM>
     void
-    CBFQPGenerator<T, DIM>::addDecisionVariableBoundsForControlInput(const DecisionVariableBounds& decision_variable_bounds) {
+    CBFQPGeneratorBase<T, DIM>::addDecisionVariableBoundsForControlInput(const DecisionVariableBounds& decision_variable_bounds) {
         size_t num_decision_variables = variables_.size();
 
         // Validate that the bounds structure matches our variable count
         if (num_decision_variables != decision_variable_bounds.lower_bounds().rows() ||
             num_decision_variables != decision_variable_bounds.upper_bounds().rows()) {
-            throw std::invalid_argument("CBFQPGenerator::"
+            throw std::invalid_argument("CBFQPGeneratorBase::"
                                         "addDecisionVariableBoundsForControlInput:"
                                         " number of decision variables of the controlInput does not match the "
                                         "DecisionVariablesBounds structure");
@@ -359,9 +270,9 @@ namespace cbf {
     }
 
     template <typename T, unsigned int DIM>
-    typename CBFQPGenerator<T, DIM>::VectorDIM
-    CBFQPGenerator<T, DIM>::generatorCBFControlInput() const {
-        assert(DIM == cbf_operations_ptr_->numDecisionVariables());
+    typename CBFQPGeneratorBase<T, DIM>::VectorDIM
+    CBFQPGeneratorBase<T, DIM>::generatorCBFControlInput() const {
+        assert(DIM == numDecisionVariables());
 
         // Extract the solution values from the QP solver into a vector
         VectorDIM solution;
@@ -371,7 +282,7 @@ namespace cbf {
         return solution;
     }
 
-    template class CBFQPGenerator<double, 3U>;
-//    template class CBFQPGenerator<float, 3U>;
+    // Explicit template instantiation
+    template class CBFQPGeneratorBase<double, 3U>;
 
 } // cbf

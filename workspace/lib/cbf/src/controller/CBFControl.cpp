@@ -6,12 +6,9 @@
 
 namespace cbf {
     template <typename T, unsigned int DIM>
-    CBFControl<T, DIM>::CBFControl(std::shared_ptr<FovCBF> cbf, int number_neighbors, bool slack_mode, T slack_cost, T slack_decay_rate) {
-        std::unique_ptr<CBFQPOperations> cbf_operations = std::make_unique<CBFQPOperations>(cbf);
-        qp_generator_.addCBFOperations(std::move(cbf_operations), number_neighbors, slack_mode);
-        slack_mode_ = slack_mode;
-        slack_cost_ = slack_cost;
-        slack_decay_rate_ = slack_decay_rate;
+    CBFControl<T, DIM>::CBFControl(std::shared_ptr<FovCBF> cbf, int number_neighbors, bool slack_mode, T slack_cost, T slack_decay_rate)
+        : qp_generator_(cbf, number_neighbors, slack_mode), slack_mode_(slack_mode), slack_cost_(slack_cost), slack_decay_rate_(slack_decay_rate)
+    {
     }
 
     template <typename T, unsigned int DIM>
@@ -65,10 +62,10 @@ namespace cbf {
                 qp_generator_.addRightBorderConstraint(state, other_xy);
                 qp_generator_.addRangeConstraint(state, other_xy);
             } else {
-                qp_generator_.addSafetyCBFConstraintWithSlackVariables(state, other_xy, i);
-                qp_generator_.addLeftBorderConstraintWithSlackVariables(state, other_xy, i);
-                qp_generator_.addRightBorderConstraintWithSlackVariables(state, other_xy, i);
-                qp_generator_.addRangeConstraintWithSlackVariables(state, other_xy, i);
+                qp_generator_.addSafetyConstraint(state, other_xy, true, i);
+                qp_generator_.addLeftBorderConstraint(state, other_xy, true, i);
+                qp_generator_.addRightBorderConstraint(state, other_xy, true, i);
+                qp_generator_.addRangeConstraint(state, other_xy, true, i);
             }
         }
         qp_generator_.addMinVelConstraints(state);
@@ -166,40 +163,6 @@ namespace cbf {
         return distanceToEllipse(p_current, a.first, a.second) < distanceToEllipse(p_current, b.first, b.second);
     }
 
-//    template <typename T, unsigned int DIM>
-//    bool CBFControl<T, DIM>::optimizeWithSlackVariables(VectorDIM& cbf_u,
-//                                                        const VectorDIM &desired_u,
-//                                                        const Vector &state,
-//                                                        const std::vector<VectorDIM> &other_robots_states,
-//                                                        const std::vector<T> &slacks,
-//                                                        const VectorDIM& u_min,
-//                                                        const VectorDIM& u_max) {
-//
-//        // add cost
-//        qp_generator_.addDesiredControlCost(desired_u);
-//        // add constraints
-//        for (int i = 0; i < other_robots_states.size(); ++i)
-//        {
-//            qp_generator_.addSafetyConstraint(state, other_robots_states.at(i));
-//            qp_generator_.addLeftBorderConstraintWithSlackVar(state, other_robots_states.at(i), slacks.at(i));
-//            qp_generator_.addRightBorderConstraintWithSlackVar(state, other_robots_states.at(i), slacks.at(i));
-//            // qp_generator_.addRangeConstraintWithSlackVar(state, other_robots_states.at(i), slacks.at(i));
-//        }
-//        qp_generator_.addControlBoundConstraint(u_min, u_max);
-//        // solve QP
-//        Problem &problem = qp_generator_.problem();
-//        CPLEXSolver cplex_solver;
-//        SolveStatus solve_status = cplex_solver.solve(problem);
-//        bool success;
-//        if (solve_status == SolveStatus::OPTIMAL) {
-//            success = true;
-//        } else {
-//            success = false;
-//        }
-//        cbf_u = qp_generator_.generatorCBFControlInput();
-//        return success;
-//    }
-
     template class CBFControl<double, 3U>;
-//    template class CBFControl<float, 3U>;
+
 } // cbf

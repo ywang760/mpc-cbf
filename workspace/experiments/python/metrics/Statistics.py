@@ -1,8 +1,6 @@
 from Metrics import *
-from workspace.experiments.scripts.metrics.compute_ci import *
+from ComputeCI import *
 import colorsys
-
-# from src.fovmpc.experiments.metrics.ComputeCI import percentile_compute_with_inf, percentile_compute
 
 plt.rcParams['font.family'] = 'serif'
 plt.rcParams['font.serif'] = ['DejaVu Serif']

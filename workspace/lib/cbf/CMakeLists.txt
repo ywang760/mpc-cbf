@@ -37,24 +37,25 @@ target_link_libraries(cbf_detail_FovCBF PUBLIC ginac cln
 # target_link_libraries(cbf_detail_ConnectivityCBF PUBLIC ginac cln
 #         math_Helpers)
 
-add_library(cbf_optimization_CBFQPOperations SHARED src/optimization/CBFQPOperations.cpp)
-target_include_directories(cbf_optimization_CBFQPOperations PUBLIC include)
-target_link_libraries(cbf_optimization_CBFQPOperations PUBLIC
+# Add the new base QP generator
+add_library(cbf_optimization_CBFQPGeneratorBase SHARED src/optimization/CBFQPGeneratorBase.cpp)
+target_include_directories(cbf_optimization_CBFQPGeneratorBase PUBLIC include)
+target_link_libraries(cbf_optimization_CBFQPGeneratorBase PUBLIC
         qpcpp_QPOperations
-        cbf_detail_FovCBF)
-        # cbf_detail_ConnectivityCBF)
-
-add_library(cbf_optimization_CBFQPGenerator SHARED src/optimization/CBFQPGenerator.cpp)
-target_include_directories(cbf_optimization_CBFQPGenerator PUBLIC include)
-target_link_libraries(cbf_optimization_CBFQPGenerator PUBLIC
-        cbf_optimization_CBFQPOperations
         qpcpp_Problem
         math_Helpers)
+
+# Add FOV QP generator that inherits from the base
+add_library(cbf_optimization_FovQPGenerator SHARED src/optimization/FovQPGenerator.cpp)
+target_include_directories(cbf_optimization_FovQPGenerator PUBLIC include)
+target_link_libraries(cbf_optimization_FovQPGenerator PUBLIC
+        cbf_optimization_CBFQPGeneratorBase
+        cbf_detail_FovCBF)
 
 add_library(cbf_controller_CBFControl SHARED src/controller/CBFControl.cpp)
 target_include_directories(cbf_controller_CBFControl PUBLIC include)
 target_link_libraries(cbf_controller_CBFControl PUBLIC
-        cbf_optimization_CBFQPGenerator
+        cbf_optimization_FovQPGenerator
         qpcpp_solvers_CPLEX
         model_DoubleIntegratorXYYaw)
 
@@ -81,6 +82,7 @@ target_link_libraries(cbf_examples_CBFFormationControl_example PUBLIC
         math_Controls
         math_Random)
 
+# TODO: remove the deprecated examples
 #add_executable(cbf_examples_CBFControlStaticTarget_example examples/CBFControlStaticTarget_example.cpp)
 #target_include_directories(cbf_examples_CBFControlStaticTarget_example PUBLIC include ../../../third_party/json/single_include)
 #target_link_libraries(cbf_examples_CBFControlStaticTarget_example PUBLIC

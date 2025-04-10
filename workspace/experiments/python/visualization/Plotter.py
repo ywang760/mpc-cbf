@@ -1,15 +1,11 @@
 import json
-import numpy
 import numpy as np
-import PyQt5
-from PyQt5 import *
-from PyQt5 import QtCore, QtSvg, QtWidgets, QtGui
-import matplotlib
-matplotlib.use("Qt5Agg")
+# import matplotlib
+# matplotlib.use("Qt5Agg")
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 from matplotlib.patches import Ellipse, Circle
-from matplotlib import animation, rc, rcParams
+from matplotlib import animation
 import colorsys
 import argparse
 import os
@@ -377,7 +373,8 @@ def animation2D_XYYaw(traj, estimate_mean, estimate_cov, p_near, dt, Ts, bbox, p
 
     # call the animator.  blit=True means only re-draw the parts that have changed.
     anim = animation.FuncAnimation(fig, animate, frames=total_frame, interval=Ts*1e+3, blit=True)
-    anim.save(save_name, writer=animation.FFMpegWriter(fps=1/Ts))
+    # anim.save(save_name, writer=animation.FFMpegWriter(fps=1/Ts))
+    anim.save(save_name, writer=animation.PillowWriter(fps=1/Ts))
     return anim
 
 def plot2D_XYYaw(traj, goals, goal_radius=1, obs_time=None, save_name="./test.jpg"):
@@ -444,10 +441,12 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="argparse to read the config, states and output filenames"
     )
-    parser.add_argument("-c", "--config_filename", type=str, default="../experiments/instances/"+default_instance_type+"_instances/"+default_instance+"_config.json", help="path to config json file")
-    parser.add_argument("-s", "--states_filename", type=str, default="../tools/circle_0.json", help="path to simulation state json file")
-    parser.add_argument("-ov", "--output_video", type=str, default="../tools/snapshots/"+default_instance+".mp4", help="path to simulation animation file")
-    parser.add_argument("-of", "--output_figure", type=str, default="../tools/snapshots/"+default_instance, help="path to simulation figure file")
+    # TODO: properly construct the inputs
+    parser.add_argument("-c", "--config_filename", type=str, default="/usr/src/mpc-cbf/workspace/experiments/config/circle/circle4_config.json", help="path to config json file")
+    parser.add_argument("-s", "--states_filename", type=str, default="/usr/src/mpc-cbf/workspace/experiments/results/states.json", help="path to simulation state json file")
+    # Need to install ffmpeg to save the video as mp4 (use pillow to save as gif)
+    parser.add_argument("-ov", "--output_video", type=str, default="../../results"+default_instance+".gif", help="path to simulation animation file")
+    parser.add_argument("-of", "--output_figure", type=str, default="../../results"+default_instance, help="path to simulation figure file")
     parser.add_argument("-f", "--fov", type=int, default=default_fov, help="fov of simulation")
     args = parser.parse_args()
 
