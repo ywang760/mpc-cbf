@@ -6,7 +6,6 @@
 #include <math/Helpers.h>
 #include <functional>
 #include <ginac/ginac.h>
-#include <vector>
 
 namespace cbf
 {
@@ -64,6 +63,7 @@ namespace cbf
             std::pair<GiNaC::matrix, GiNaC::ex> initMinDistCBF();
             std::pair<GiNaC::matrix, GiNaC::ex> initMaxDistCBF();
             std::pair<GiNaC::matrix, GiNaC::ex> initVelCBF(GiNaC::ex bv);
+            // TODO: these two are public helper functions -> could move to a helper class
             GiNaC::ex matrixSubs(GiNaC::matrix a, Eigen::VectorXd state, Eigen::VectorXd agent_state);
             GiNaC::ex valueSubs(GiNaC::ex m, Eigen::VectorXd state, Eigen::VectorXd agent_state);
 

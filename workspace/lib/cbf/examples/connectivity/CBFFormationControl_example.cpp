@@ -1,15 +1,10 @@
 //
-// Created by lishuo on 9/2/24.
+// Created by yutong on 4/8/2025
 //
-// This program simulates multiple robots navigating to target positions while
-// maintaining safety using Control Barrier Functions (CBF) with field-of-view constraints.
-// It tracks other robots using particle filters when they're in the field of view.
 
 #include <model/DoubleIntegratorXYYaw.h>
-#include <cbf/detail/cbf.h>
-#include <cbf/controller/CBFControl.h>
-#include <particle_filter/detail/particle_filter.h>
-#include <particle_filter/pf_applications.h>
+#include <cbf/detail/ConnectivityCBF.h>
+#include <cbf/controller/ConnectivityControl.h>
 #include <nlohmann/json.hpp>
 #include <cxxopts.hpp>
 #include <fstream>
@@ -25,10 +20,9 @@ using VectorDIM = math::VectorDIM<double, DIM>;
 
 int main(int argc, char* argv[]) {
     // Type aliases for better readability
-    using FovCBF = cbf::FovCBF;
+    using ConnectivityCBF = cbf::ConnectivityCBF;
     using DoubleIntegratorXYYaw = model::DoubleIntegratorXYYaw<double>;
-    using CBFControl = cbf::CBFControl<double, DIM>;
-    using ParticleFilter = pf::ParticleFilter;
+    using ConnectivityControl = cbf::ConnectivityControl<double, DIM>;
     using json = nlohmann::json;
     using Matrix = math::Matrix<double>;
     using Vector = math::Vector<double>;
@@ -36,16 +30,16 @@ int main(int argc, char* argv[]) {
     // Parse command-line arguments
     cxxopts::Options options(
             "simulation",
-            "fovmpc simulation");
+            "connectivity simulation");
     options.add_options()
             ("instance_type", "instance type for simulations",
              cxxopts::value<std::string>()->default_value("circle"))
             ("num_robots", "number of robots in the simulation",
              cxxopts::value<int>()->default_value(std::to_string(2)))
-            ("fov", "fov degree",
-             cxxopts::value<int>()->default_value(std::to_string(120)))
             ("slack_decay", "slack variable cost decay rate",
              cxxopts::value<double>()->default_value(std::to_string(0.1)))
+            ("config_file", "path to experiment configuration file",              // TODO: changeg the config_file
+             cxxopts::value<std::string>()->default_value("/usr/src/mpc-cbf/workspace/experiments/config/circle/circle4_config.json"))
             ("write_filename", "write to json filename",
              cxxopts::value<std::string>()->default_value("/usr/src/mpc-cbf/workspace/experiments/results/states.json"));
     auto option_parse = options.parse(argc, argv);
@@ -55,21 +49,14 @@ int main(int argc, char* argv[]) {
     std::string instance_type = option_parse["instance_type"].as<std::string>();
     std::string instance_path = instance_type+"_instances/";
     const int num_robots_parse = option_parse["num_robots"].as<int>();
-    const int fov_beta_parse = option_parse["fov"].as<int>();
 
     // Configuration file path
-    std::string experiment_config_filename = "/usr/src/mpc-cbf/workspace/experiments/config/circle/circle4_config.json";
+    std::string experiment_config_filename = option_parse["config_file"].as<std::string>();
     std::fstream experiment_config_fc(experiment_config_filename.c_str(), std::ios_base::in);
     json experiment_config_json = json::parse(experiment_config_fc);
 
     // Extract simulation parameters
     double Ts = experiment_config_json["mpc_params"]["h"]; // Time step
-
-    // Field of view parameters
-    double fov_beta = double(fov_beta_parse) * M_PI / 180.0; // Convert to radians
-    std::cout << "fov_beta: " << double(fov_beta_parse) << "\n";
-    double fov_Ds = experiment_config_json["robot_params"]["collision_shape"]["aligned_box"][0]; // Safety distance
-    double fov_Rs = experiment_config_json["fov_cbf_params"]["Rs"];                              // Sensing range
 
     // Velocity and acceleration constraints
     VectorDIM v_min;
@@ -92,12 +79,6 @@ int main(int argc, char* argv[]) {
         experiment_config_json["mpc_params"]["physical_limits"]["a_max"][1],
         experiment_config_json["mpc_params"]["physical_limits"]["a_max"][2];
 
-    // filter params
-    int num_particles = 100;
-    Matrix initCov = 1.0*Eigen::MatrixXd::Identity(DIM-1, DIM-1);
-    Matrix processCov = 0.25*Eigen::MatrixXd::Identity(DIM-1, DIM-1);
-    Matrix measCov = 0.05*Eigen::MatrixXd::Identity(DIM-1, DIM-1);
-
     // json for record
     std::string JSON_FILENAME = option_parse["write_filename"].as<std::string>();
     json states;
@@ -106,18 +87,16 @@ int main(int argc, char* argv[]) {
     // init model
     std::shared_ptr<DoubleIntegratorXYYaw> pred_model_ptr = std::make_shared<DoubleIntegratorXYYaw>(Ts);
     // init cbf
-    std::shared_ptr<FovCBF> fov_cbf = std::make_unique<FovCBF>(fov_beta, fov_Ds, fov_Rs, v_min, v_max);
+    std::shared_ptr<ConnectivityCBF> connectivity_cbf = std::make_shared<ConnectivityCBF>();
     // cbf controller setting
     bool slack_mode = true;
-    int num_neighbors = experiment_config_json["tasks"]["so"].size() - 1;
     double slack_cost = 1000;
     double slack_decay_rate = option_parse["slack_decay"].as<double>();
     std::cout << "slack_decay: " << slack_decay_rate << "\n";
     // physical settings
     double pos_std = experiment_config_json["mpc_params"]["physical_limits"]["pos_std"];
     double vel_std = experiment_config_json["mpc_params"]["physical_limits"]["vel_std"];
-
-
+    
     // main loop
     // load the tasks
     std::vector<State> init_states;
@@ -127,6 +106,7 @@ int main(int argc, char* argv[]) {
     assert(num_robots_parse==num_robots);
     json so_json = experiment_config_json["tasks"]["so"];
     json sf_json = experiment_config_json["tasks"]["sf"];
+    int num_neighbors = experiment_config_json["tasks"]["so"].size() - 1;
     for (size_t i = 0; i < num_robots; ++i) {
         // load init states
         State init_state;
@@ -141,8 +121,8 @@ int main(int argc, char* argv[]) {
         target_pos << sf_json[i][0], sf_json[i][1], sf_json[i][2];
         target_positions.push_back(target_pos);
     }
-    // init filters
-    std::vector<std::vector<ParticleFilter>> filters;
+
+    // init neighbor_ids
     std::vector<std::vector<size_t>> neighbor_ids(num_robots, std::vector<size_t>(num_robots-1));
     for (size_t i = 0; i < num_robots; ++i) {
         size_t neighbor_idx = 0;
@@ -154,19 +134,6 @@ int main(int argc, char* argv[]) {
             neighbor_idx += 1;
         }
     }
-
-    for (size_t i = 0; i < num_robots; ++i){
-        filters.emplace_back(num_robots-1);
-        for (size_t j = 0; j < num_robots-1; ++j) {
-            size_t neighbor_id = neighbor_ids.at(i).at(j);
-            // init particle filter
-            Vector neighbor_xy(DIM-1);
-            neighbor_xy << init_states.at(neighbor_id).pos_(0), init_states.at(neighbor_id).pos_(1);
-            filters[i][j].init(num_particles, neighbor_xy, initCov, processCov, measCov);
-        }
-        assert(filters[i].size() == num_robots-1);
-    }
-    assert(filters.size() == num_robots);
 
     // Main simulation loop
     int loop_idx = 0;
@@ -188,11 +155,6 @@ int main(int argc, char* argv[]) {
                 size_t neighbor_id = neighbor_ids.at(robot_idx).at(j);
                 const VectorDIM& ego_pos = init_states.at(robot_idx).pos_;
                 const VectorDIM &neighbor_pos = init_states.at(neighbor_id).pos_;
-
-                // TODO: use pf to update estimate or use fixed estimate (for debugging)
-                // ParticleFilter &filter = filters.at(robot_idx).at(j);
-                // auto [estimate, cov] = pf::PFApplications::processFovUpdate<double, DIM>(
-                //     filter, ego_pos, neighbor_pos, fov_beta, fov_Rs);
 
                 // Fixed estimate for debugging
                 auto estimate = init_states.at(neighbor_id).pos_;
@@ -227,12 +189,13 @@ int main(int argc, char* argv[]) {
             const VectorDIM &target_pos = math::convertToClosestYaw<DIM>(init_states.at(robot_idx), target_positions.at(robot_idx));
             VectorDIM desired_u = math::criticallyDampedSpringControl<double, DIM>(init_states.at(robot_idx), target_pos, 1.);
 
-            // Apply CBF to modify control for safety
-            CBFControl cbf_control(fov_cbf, num_neighbors, slack_mode, slack_cost, slack_decay_rate);
+            // Apply CBF to modify control for safety and connectivity
+            ConnectivityControl connectivity_control(connectivity_cbf, num_neighbors, slack_mode, slack_cost, slack_decay_rate);
             VectorDIM cbf_u;
 
             // Optimize control with CBF constraints
-            bool success = cbf_control.optimize(cbf_u, desired_u, init_states.at(robot_idx), other_robot_positions, other_robot_covs, a_min, a_max);
+            bool success = connectivity_control.optimize(cbf_u, desired_u, init_states.at(robot_idx), 
+                                                   other_robot_positions, other_robot_covs, a_min, a_max);
             if (!success) {
                 std::cout << "optimization failed\n";
                 cbf_u = VectorDIM::Zero(); // Use zero control if optimization fails
@@ -257,13 +220,13 @@ int main(int argc, char* argv[]) {
             // Log robot state for visualization/analysis
             states["robots"][std::to_string(robot_idx)]["states"].push_back({x_t[0], x_t[1], x_t[2], x_t[3], x_t[4], x_t[5]});
             // Print out robot state, where x_t[0] is x, x_t[1] is y, x_t[2] is yaw, x_t[3] is vx, x_t[4] is vy, x_t[5] is yaw rate
-            std::cout << "Robot " << robot_idx << " state: "
-                      << "x: " << x_t[0] << ", "
-                      << "y: " << x_t[1] << ", "
-                      << "yaw: " << x_t[2] << ", "
-                      << "vx: " << x_t[3] << ", "
-                      << "vy: " << x_t[4] << ", "
-                      << "yaw rate: " << x_t[5] << "\n";
+            // std::cout << "Robot " << robot_idx << " state: "
+            //           << "x: " << x_t[0] << ", "
+            //           << "y: " << x_t[1] << ", "
+            //           << "yaw: " << x_t[2] << ", "
+            //           << "vx: " << x_t[3] << ", "
+            //           << "vy: " << x_t[4] << ", "
+            //           << "yaw rate: " << x_t[5] << "\n";
         }
 
         // Update each robot's state for the next iteration

@@ -1,3 +1,4 @@
+#include <vector>
 #include <cbf/detail/ConnectivityCBF.h>
 
 // Default alpha function for Control Barrier Functions (CBF)

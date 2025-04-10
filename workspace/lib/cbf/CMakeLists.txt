@@ -31,11 +31,10 @@ target_include_directories(cbf_detail_FovCBF PUBLIC include)
 target_link_libraries(cbf_detail_FovCBF PUBLIC ginac cln
         math_Helpers)
 
-# add connectivity CBF library
-# add_library(cbf_detail_ConnectivityCBF SHARED src/detail/ConnectivityCBF.cpp)
-# target_include_directories(cbf_detail_ConnectivityCBF PUBLIC include)
-# target_link_libraries(cbf_detail_ConnectivityCBF PUBLIC ginac cln
-#         math_Helpers)
+add_library(cbf_detail_ConnectivityCBF SHARED src/detail/ConnectivityCBF.cpp)
+target_include_directories(cbf_detail_ConnectivityCBF PUBLIC include)
+target_link_libraries(cbf_detail_ConnectivityCBF PUBLIC ginac cln
+        math_Helpers)
 
 add_library(cbf_optimization_CBFQPGeneratorBase SHARED src/optimization/CBFQPGeneratorBase.cpp)
 target_include_directories(cbf_optimization_CBFQPGeneratorBase PUBLIC include)
@@ -50,10 +49,23 @@ target_link_libraries(cbf_optimization_FovQPGenerator PUBLIC
         cbf_optimization_CBFQPGeneratorBase
         cbf_detail_FovCBF)
 
+add_library(cbf_optimization_ConnectivityQPGenerator SHARED src/optimization/ConnectivityQPGenerator.cpp)
+target_include_directories(cbf_optimization_ConnectivityQPGenerator PUBLIC include)
+target_link_libraries(cbf_optimization_ConnectivityQPGenerator PUBLIC
+        cbf_optimization_CBFQPGeneratorBase
+        cbf_detail_ConnectivityCBF)
+
 add_library(cbf_controller_FovControl SHARED src/controller/FovControl.cpp)
 target_include_directories(cbf_controller_FovControl PUBLIC include)
 target_link_libraries(cbf_controller_FovControl PUBLIC
         cbf_optimization_FovQPGenerator
+        qpcpp_solvers_CPLEX
+        model_DoubleIntegratorXYYaw)
+
+add_library(cbf_controller_ConnectivityControl SHARED src/controller/ConnectivityControl.cpp)
+target_include_directories(cbf_controller_ConnectivityControl PUBLIC include)
+target_link_libraries(cbf_controller_ConnectivityControl PUBLIC
+        cbf_optimization_ConnectivityQPGenerator
         qpcpp_solvers_CPLEX
         model_DoubleIntegratorXYYaw)
 
@@ -74,7 +86,7 @@ add_executable(cbf_examples_CBFFormationControl_example examples/connectivity/CB
 target_include_directories(cbf_examples_CBFFormationControl_example PUBLIC include ../../../third_party/json/single_include)
 target_link_libraries(cbf_examples_CBFFormationControl_example PUBLIC
         model_DoubleIntegratorXYYaw
-        cbf_controller_FovControl
+        cbf_controller_ConnectivityControl
         cxxopts
         math_Geometry
         math_Controls
