@@ -228,91 +228,6 @@ namespace cbf
         return std::make_pair(Ac1, Bc1);
     }
 
-    // Initialize the maximum distance Control Barrier Function
-    // This CBF ensures that the robot maintains a maximum distance (dmax) to preserve connectivity
-    // Returns:
-    //   A pair containing the CBF constraint matrix (Ac) and bound (Bc)
-    std::pair<GiNaC::matrix, GiNaC::ex> ConnectivityCBF::initConnectivityCBF()
-    {
-        // Calculate relative position to other agent
-        GiNaC::matrix d = x_agent.sub(GiNaC::matrix{{px}, {py}});
-
-        // Calculate squared distance to other agent
-        GiNaC::ex norm2 = GiNaC::pow(d(0, 0), 2) + GiNaC::pow(d(1, 0), 2);
-
-        // Define barrier function: h(x) = -||x - x_agent||^2 + dmax^2
-        // h > 0 when distance is less than maximum distance
-        GiNaC::ex b2 = -norm2 + GiNaC::pow(dmax, 2);
-
-        // Calculate gradient of barrier function with respect to state variables
-        GiNaC::matrix grad_b2 = GiNaC::matrix(STATE_VARS, 1);
-        grad_b2(0, 0) = GiNaC::diff(b2, px);
-        grad_b2(1, 0) = GiNaC::diff(b2, py);
-        grad_b2(2, 0) = GiNaC::diff(b2, th);
-        grad_b2(3, 0) = GiNaC::diff(b2, vx);
-        grad_b2(4, 0) = GiNaC::diff(b2, vy);
-        grad_b2(5, 0) = GiNaC::diff(b2, w);
-
-        // Calculate Lie derivative of h along f: L_f h = ∇h · f
-        GiNaC::ex lfb2 = 0.0;
-        for (int i = 0; i < STATE_VARS; i++)
-        {
-            lfb2 = lfb2 + grad_b2(i, 0) * f(i, 0);
-        }
-
-        // Calculate gradient of L_f h
-        GiNaC::matrix grad2_b2 = GiNaC::matrix(STATE_VARS, 1);
-        grad2_b2(0, 0) = GiNaC::diff(lfb2, px);
-        grad2_b2(1, 0) = GiNaC::diff(lfb2, py);
-        grad2_b2(2, 0) = GiNaC::diff(lfb2, th);
-        grad2_b2(3, 0) = GiNaC::diff(lfb2, vx);
-        grad2_b2(4, 0) = GiNaC::diff(lfb2, vy);
-        grad2_b2(5, 0) = GiNaC::diff(lfb2, w);
-
-        // Calculate second Lie derivative: L_f^2 h = ∇(L_f h) · f
-        GiNaC::ex lf2b2 = 0.0;
-        for (int i = 0; i < STATE_VARS; i++)
-        {
-            lf2b2 = lf2b2 + grad2_b2(i, 0) * f(i, 0);
-        }
-
-        // Calculate gradient of alpha(h) where alpha is the class of K functions
-        GiNaC::matrix grad_bc = GiNaC::matrix(STATE_VARS, 1);
-        GiNaC::ex alpha_b2 = alpha(b2, gamma);
-        grad_bc(0, 0) = GiNaC::diff(alpha_b2, px);
-        grad_bc(1, 0) = GiNaC::diff(alpha_b2, py);
-        grad_bc(2, 0) = GiNaC::diff(alpha_b2, th);
-        grad_bc(3, 0) = GiNaC::diff(alpha_b2, vx);
-        grad_bc(4, 0) = GiNaC::diff(alpha_b2, vy);
-        grad_bc(5, 0) = GiNaC::diff(alpha_b2, w);
-
-        // Calculate Lie derivative of alpha(h) along f
-        GiNaC::ex lfb_c = 0.0;
-        for (int i = 0; i < STATE_VARS; i++)
-        {
-            lfb_c = lfb_c + grad_bc(i, 0) * f(i, 0);
-        }
-
-        // Calculate L_g L_f h = ∇(L_f h) · g for each control input
-        GiNaC::matrix Ac2 = GiNaC::matrix(1, CONTROL_VARS);
-        for (int j = 0; j < CONTROL_VARS; j++)
-        {
-            GiNaC::ex Ac2j = 0.0;
-            for (int i = 0; i < STATE_VARS; i++)
-            {
-                Ac2j += grad2_b2(i, 0) * g(i, j);
-            }
-            Ac2(0, j) = Ac2j;
-        }
-
-        // Calculate the constraint bound for the maximum distance boundary
-        GiNaC::ex B1 = lf2b2;
-        GiNaC::ex B2 = lfb_c;
-        GiNaC::ex B3 = alpha(lfb2 + alpha_b2, gamma);
-        GiNaC::ex Bc2 = B1 + B2 + B3;
-
-        return std::make_pair(Ac2, Bc2);
-    }
 
     // Initialize velocity Control Barrier Functions
     // This creates CBFs to enforce velocity limits (min or max)
@@ -425,6 +340,115 @@ namespace cbf
     {
         // TODO: Implement this function
     }
+
+    std::pair<double, Eigen::VectorXd> getLambda2FromL(const Eigen::MatrixXd& robot_positions, Eigen::MatrixXd& L_num_out,
+        double Rs_value, double sigma_value)
+    {
+        Eigen::MatrixXd A_num = Eigen::MatrixXd::Zero(N, N);
+        for (int i = 0; i < N; ++i)
+        {
+            for (int j = 0; j < N; ++j)
+            {
+                if (i != j)
+                {
+                    double dx = robot_positions(i, 0) - robot_positions(j, 0);
+                    double dy = robot_positions(i, 1) - robot_positions(j, 1);
+                    double dij2 = dx * dx + dy * dy;
+    
+                    if (dij2 <= Rs_value * Rs_value)
+                    {
+                        double weight = std::exp(std::pow(Rs_value * Rs_value - dij2, 2) / sigma_value) - 1;
+                        A_num(i, j) = weight;
+                    }
+                }
+            }
+        }
+    
+        Eigen::MatrixXd D_num = Eigen::MatrixXd::Zero(N, N);
+        for (int i = 0; i < N; ++i)
+            D_num(i, i) = A_num.row(i).sum();
+    
+        Eigen::MatrixXd L_num = D_num - A_num;
+        L_num_out = L_num;
+    
+        Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> solver(L_num);
+        Eigen::VectorXd eigenvals = solver.eigenvalues();
+        return {eigenvals(1), eigenvals};
+    }
+
+    std::pair<Eigen::RowVectorXd, double> initConnCBF(
+        const Eigen::MatrixXd& robot_positions,  // N×2 矩阵，每行是 (px, py)
+        const Eigen::VectorXd& x_self,           // 当前机器人完整状态 [px, py, th, vx, vy, w]
+        double Rs_val,
+        double sigma_val,
+        double lambda2_min,
+        double gamma = 1.0)
+    {
+        int N = robot_positions.rows();
+        const int STATE_VARS = 6;        // px, py, th, vx, vy, w
+        const int CONTROL_VARS = 3;      // ax, ay, aw
+        
+        // 1. calculate lambda2 
+        Eigen::MatrixXd L_num;
+        Eigen::VectorXd eigenvals;
+        double lambda2_val;
+        std::tie(lambda2_val, eigenvals) = getLambda2FromL(robot_positions, L_num, Rs_val, sigma_val);
+    
+        // 2. initilize hx & α(h)
+        double hx = lambda2_val - lambda2_min;
+        double alpha_hx = gamma * hx;
+    
+        // 3. 使用有限差分计算 dh/dx, calculate ∇h
+        Eigen::VectorXd dh_dx(STATE_VARS);
+        double eps = 1e-6;
+        for (int i = 0; i < STATE_VARS; ++i)
+        {
+            Eigen::VectorXd x_plus = x_self;
+            Eigen::VectorXd x_minus = x_self;
+            x_plus(i) += eps;
+            x_minus(i) -= eps;
+    
+            // 替换 robot_positions 中第一个机器人坐标
+            Eigen::MatrixXd pos_plus = robot_positions;
+            Eigen::MatrixXd pos_minus = robot_positions;
+            pos_plus(0, 0) = x_plus(0);  // px
+            pos_plus(0, 1) = x_plus(1);  // py
+            pos_minus(0, 0) = x_minus(0);
+            pos_minus(0, 1) = x_minus(1);
+    
+            double lambda2_plus = getLambda2FromL(pos_plus, L_num, Rs_val, sigma_val).first;
+            double lambda2_minus = getLambda2FromL(pos_minus, L_num, Rs_val, sigma_val).first;
+    
+            dh_dx(i) = (lambda2_plus - lambda2_minus) / (2 * eps);
+        }
+    
+        // 4. 构造控制方向向量 g(x)
+        Eigen::MatrixXd g = Eigen::MatrixXd::Zero(STATE_VARS, CONTROL_VARS);
+        g(3, 0) = 1.0;  // vx ← ax
+        g(4, 1) = 1.0;  // vy ← ay
+        g(5, 2) = 1.0;  // w  ← aw
+    
+        // 5. Calculate Lg h = ∇h(x)^T · g(x)
+        Eigen::RowVectorXd Ac(1, CONTROL_VARS);
+        Ac.setZero();
+        for (int j = 0; j < CONTROL_VARS; ++j)
+        {
+            for (int i = 0; i < STATE_VARS; ++i)
+            {
+                Ac(0, j) += dh_dx(i) * g(i, j);
+            }
+        } 
+        // 6. 构造 Bc = -Lf h - α(h)，其中 Lf h = ∇h · f(x)
+        double lfhx = 0.0;
+        for (int i = 0; i < STATE_VARS; i++)
+        {
+            lfhx += dh_dx(i) * f(i);
+        }
+        double Bc = lfh + alpha_hx;                // Bc = -Lf h - α(h)
+        return std::make_pair(Ac, Bc);
+    }
+    
+
 
     // Get the maximum velocity constraint matrix for the current state
     // Parameters:

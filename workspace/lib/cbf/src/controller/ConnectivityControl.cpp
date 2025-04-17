@@ -67,6 +67,9 @@ namespace cbf {
         qp_generator_.addMaxVelConstraints(state);
         qp_generator_.addControlBoundConstraint(u_min, u_max);
 
+        // Add connectivity constraint
+        qp_generator_.addConnectivityConstraint(state, other_robot_positions);
+
         // solve QP
         Problem &problem = qp_generator_.problem();
         CPLEXSolver cplex_solver;
