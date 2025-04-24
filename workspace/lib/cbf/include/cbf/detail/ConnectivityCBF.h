@@ -31,7 +31,7 @@ namespace cbf
             GiNaC::symbol px, py, th, vx, vy, w, xt, yt;
 
             GiNaC::matrix state;
-            GiNaC::matrix agent_state;
+            GiNaC::matrix target_state;
             GiNaC::matrix A;        // state matrix
             GiNaC::matrix B;        // input matrix
             GiNaC::matrix x;        // state variables
@@ -64,18 +64,18 @@ namespace cbf
             std::pair<GiNaC::matrix, GiNaC::ex> initConnectivityCBF();
             std::pair<GiNaC::matrix, GiNaC::ex> initVelCBF(GiNaC::ex bv);
             // TODO: these two are public helper functions -> could move to a helper class
-            GiNaC::ex matrixSubs(GiNaC::matrix a, Eigen::VectorXd state, Eigen::VectorXd agent_state);
-            GiNaC::ex valueSubs(GiNaC::ex m, Eigen::VectorXd state, Eigen::VectorXd agent_state);
+            GiNaC::ex matrixSubs(GiNaC::matrix a, Eigen::VectorXd state, Eigen::VectorXd target_state);
+            GiNaC::ex valueSubs(GiNaC::ex m, Eigen::VectorXd state, Eigen::VectorXd target_state);
 
         public:
             ConnectivityCBF(double min_dist, double max_dist, Eigen::VectorXd vmin, Eigen::VectorXd vmax);
             ~ConnectivityCBF();
-            Eigen::VectorXd getSafetyConstraints(Eigen::VectorXd state, Eigen::VectorXd agent_state);
-            Eigen::VectorXd getConnectivityConstraints(Eigen::VectorXd state, Eigen::VectorXd agent_state);
+            Eigen::VectorXd getSafetyConstraints(Eigen::VectorXd state, Eigen::VectorXd target_state);
+            Eigen::VectorXd getConnectivityConstraints(Eigen::VectorXd state, Eigen::VectorXd target_state);
             Eigen::MatrixXd getMaxVelContraints(Eigen::VectorXd state);
             Eigen::MatrixXd getMinVelContraints(Eigen::VectorXd state);
-            double getSafetyBound(Eigen::VectorXd state, Eigen::VectorXd agent_state);
-            double getMaxDistBound(Eigen::VectorXd state, Eigen::VectorXd agent_state);
+            double getSafetyBound(Eigen::VectorXd state, Eigen::VectorXd target_state);
+            double getMaxDistBound(Eigen::VectorXd state, Eigen::VectorXd target_state);
             Eigen::VectorXd getMaxVelBounds(Eigen::VectorXd state);
             Eigen::VectorXd getMinVelBounds(Eigen::VectorXd state);
             void setAlpha(std::function<GiNaC::ex(GiNaC::ex, double)> newAlpha);

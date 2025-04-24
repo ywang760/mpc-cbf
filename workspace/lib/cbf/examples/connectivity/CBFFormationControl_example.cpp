@@ -27,87 +27,90 @@ int main(int argc, char* argv[]) {
     using Matrix = math::Matrix<double>;
     using Vector = math::Vector<double>;
 
+
     // Parse command-line arguments
     cxxopts::Options options(
-            "simulation",
-            "connectivity simulation");
+            "connectivity_simulation",
+            "Multi-robot connectivity formation control simulation");
     options.add_options()
-            ("instance_type", "instance type for simulations",
-             cxxopts::value<std::string>()->default_value("circle"))
-            ("num_robots", "number of robots in the simulation",
-             cxxopts::value<int>()->default_value(std::to_string(2)))
-            ("slack_decay", "slack variable cost decay rate",
-             cxxopts::value<double>()->default_value(std::to_string(0.1)))
-            ("config_file", "path to experiment configuration file",              // TODO: change the config_file
+            ("n,num_robots", "Number of robots in the simulation",
+             cxxopts::value<int>()->default_value("2"))
+            ("s,slack_mode", "Enable slack variables (true/false)",
+             cxxopts::value<bool>()->default_value("false"))
+            ("c,slack_cost", "Base cost for slack variables",
+             cxxopts::value<double>()->default_value("1000.0"))
+            ("d,slack_decay", "Slack variable cost decay rate",
+             cxxopts::value<double>()->default_value("0.1"))
+            ("m,min_dist", "Minimum safe distance between robots",
+             cxxopts::value<double>()->default_value("0.2"))
+            ("M,max_dist", "Maximum connectivity distance between robots",
+             cxxopts::value<double>()->default_value("2.0"))
+            ("f,config_file", "Path to experiment configuration file", // TODO: change the configuration file
              cxxopts::value<std::string>()->default_value("/usr/src/mpc-cbf/workspace/experiments/config/circle/circle2_config.json"))
-            ("write_filename", "write to json filename",
+            ("o,output_file", "Output JSON filename for simulation results",
              cxxopts::value<std::string>()->default_value("/usr/src/mpc-cbf/workspace/experiments/results/states.json"));
+    
     auto option_parse = options.parse(argc, argv);
 
     // Load experiment configuration
     std::cout << "Loading experiment settings...\n";
-    std::string instance_type = option_parse["instance_type"].as<std::string>();
-    std::string instance_path = instance_type+"_instances/";
     const int num_robots_parse = option_parse["num_robots"].as<int>();
 
     // Configuration file path
-    std::string experiment_config_filename = option_parse["config_file"].as<std::string>();
-    std::fstream experiment_config_fc(experiment_config_filename.c_str(), std::ios_base::in);
+    const std::string experiment_config_filename = option_parse["config_file"].as<std::string>();
+    std::ifstream experiment_config_fc(experiment_config_filename);
+    if (!experiment_config_fc.is_open()) {
+        std::cerr << "Error: Could not open configuration file: " << experiment_config_filename << std::endl;
+        return 1;
+    }
+    
     json experiment_config_json = json::parse(experiment_config_fc);
 
     // Extract simulation parameters
-    double Ts = experiment_config_json["mpc_params"]["h"]; // Time step
+    const double Ts = experiment_config_json["mpc_params"]["h"]; // Time step
 
-    // Velocity and acceleration constraints
-    VectorDIM v_min;
-    v_min << experiment_config_json["mpc_params"]["physical_limits"]["v_min"][0],
-            experiment_config_json["mpc_params"]["physical_limits"]["v_min"][1],
-            experiment_config_json["mpc_params"]["physical_limits"]["v_min"][2];
+    // Extract velocity and acceleration limits from config file
+    // Helper function to extract vector data from JSON
+    auto extractVectorFromJson = [&](const std::string& paramName) -> VectorDIM {
+        const auto& limits = experiment_config_json["mpc_params"]["physical_limits"][paramName];
+        return VectorDIM(limits[0], limits[1], limits[2]);
+    };
+    
+    // Extract velocity and acceleration limits using the helper function
+    VectorDIM v_min = extractVectorFromJson("v_min");
+    VectorDIM v_max = extractVectorFromJson("v_max");
+    VectorDIM a_min = extractVectorFromJson("a_min");
+    VectorDIM a_max = extractVectorFromJson("a_max");
 
-    VectorDIM v_max;
-    v_max << experiment_config_json["mpc_params"]["physical_limits"]["v_max"][0],
-        experiment_config_json["mpc_params"]["physical_limits"]["v_max"][1],
-        experiment_config_json["mpc_params"]["physical_limits"]["v_max"][2];
-
-    VectorDIM a_min;
-    a_min << experiment_config_json["mpc_params"]["physical_limits"]["a_min"][0],
-            experiment_config_json["mpc_params"]["physical_limits"]["a_min"][1],
-            experiment_config_json["mpc_params"]["physical_limits"]["a_min"][2];
-
-    VectorDIM a_max;
-    a_max << experiment_config_json["mpc_params"]["physical_limits"]["a_max"][0],
-        experiment_config_json["mpc_params"]["physical_limits"]["a_max"][1],
-        experiment_config_json["mpc_params"]["physical_limits"]["a_max"][2];
-
-    // json for record
-    std::string JSON_FILENAME = option_parse["write_filename"].as<std::string>();
+    // Setup for recording results
+    const std::string output_filename = option_parse["output_file"].as<std::string>();
     json states;
     states["dt"] = Ts;
     states["Ts"] = Ts;
-    // init model
+    
+    // Initialize model
     std::shared_ptr<DoubleIntegratorXYYaw> pred_model_ptr = std::make_shared<DoubleIntegratorXYYaw>(Ts);
-    // init cbf
-    // TODO: make these parameters configurable
-    double min_dist = 0.2;
-    double max_dist = 2.0;
-    std::shared_ptr<ConnectivityCBF> connectivity_cbf = std::make_shared<ConnectivityCBF>(min_dist, max_dist, v_min, v_max);
-    // cbf controller setting
-    bool slack_mode = false; // TODO: change this to be configurable
-    double slack_cost = 1000;
-    double slack_decay_rate = option_parse["slack_decay"].as<double>();
-    if (slack_mode)
-    {
-        std::cout << "slack mode is enabled\n";
-        std::cout << "slack_cost: " << slack_cost << "\n";
-        std::cout << "slack_decay: " << slack_decay_rate << "\n";
+    
+    // Initialize CBF with configurable parameters
+    const double min_dist = option_parse["min_dist"].as<double>();
+    const double max_dist = option_parse["max_dist"].as<double>();
+    std::shared_ptr<ConnectivityCBF> connectivity_cbf = 
+        std::make_shared<ConnectivityCBF>(min_dist, max_dist, v_min, v_max);
+    
+    // CBF controller settings
+    const bool slack_mode = option_parse["slack_mode"].as<bool>();
+    const double slack_cost = option_parse["slack_cost"].as<double>();
+    const double slack_decay_rate = option_parse["slack_decay"].as<double>();
+    
+    if (slack_mode) {
+        std::cout << "Slack mode is enabled with cost: " << slack_cost << " and decay rate: " << slack_decay_rate << "\n";
+    } else {
+        std::cout << "Slack mode is disabled\n";
     }
-    else
-    {
-        std::cout << "slack mode is disabled\n";
-    }
-    // physical settings
-    double pos_std = experiment_config_json["mpc_params"]["physical_limits"]["pos_std"];
-    double vel_std = experiment_config_json["mpc_params"]["physical_limits"]["vel_std"];
+    
+    // Physical settings for noise simulation
+    const double pos_std = experiment_config_json["mpc_params"]["physical_limits"]["pos_std"];
+    const double vel_std = experiment_config_json["mpc_params"]["physical_limits"]["vel_std"];
     
     // main loop
     // load the tasks
@@ -149,12 +152,9 @@ int main(int argc, char* argv[]) {
 
     // Main simulation loop
     int loop_idx = 0;
-    while (loop_idx < 400) {
+    while (loop_idx < 200) {
         // Print out current loop_idx if loop_idx is a multiple of 10
-        if (loop_idx % 10 == 0)
-        {
-            std::cout << "Timestep: " << loop_idx << "\n";
-        }
+        std::cout << "Timestep: " << loop_idx << "\n";
 
         // Process each robot in the simulation
         for (int robot_idx = 0; robot_idx < num_robots; ++robot_idx) {
@@ -166,13 +166,12 @@ int main(int argc, char* argv[]) {
             for (int j = 0; j < num_robots-1; ++j) {
                 size_t neighbor_id = neighbor_ids.at(robot_idx).at(j);
                 const VectorDIM& ego_pos = init_states.at(robot_idx).pos_;
-                const VectorDIM &neighbor_pos = init_states.at(neighbor_id).pos_;
 
                 // Fixed estimate for debugging
                 auto estimate = init_states.at(neighbor_id).pos_;
                 Matrix cov(DIM - 1, DIM - 1);
-                cov << 0.1, 0,
-                    0, 0.1;
+                cov << 0.01, 0,
+                    0, 0.01;
 
                 // Extend the estimate to include yaw dimension (set to 0) and store them
                 VectorDIM extended_estimate;
@@ -254,8 +253,8 @@ int main(int argc, char* argv[]) {
     }
 
     // Save simulation results to JSON file
-    std::cout << "writing to file " << JSON_FILENAME << ".\n";
-    std::ofstream o(JSON_FILENAME, std::ofstream::trunc);
+    std::cout << "writing to file " << output_filename << ".\n";
+    std::ofstream o(output_filename, std::ofstream::trunc);
     o << std::setw(4) << states << std::endl;
 
     return 0;
