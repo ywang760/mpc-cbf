@@ -445,15 +445,16 @@ if __name__ == "__main__":
     parser.add_argument("-c", "--config_filename", type=str, default="/usr/src/mpc-cbf/workspace/experiments/config/circle/circle2_config.json", help="path to config json file")
     parser.add_argument("-s", "--states_filename", type=str, default="/usr/src/mpc-cbf/workspace/experiments/results/states.json", help="path to simulation state json file")
     # Need to install ffmpeg to save the video as mp4 (use pillow to save as gif)
-    parser.add_argument("-ov", "--output_video", type=str, default="../../results"+default_instance+".gif", help="path to simulation animation file")
-    parser.add_argument("-of", "--output_figure", type=str, default="../../results"+default_instance, help="path to simulation figure file")
     parser.add_argument("-f", "--fov", type=int, default=default_fov, help="fov of simulation")
     args = parser.parse_args()
 
     config_json = args.config_filename
     states_json = load_states(args.states_filename)
-    output_video = args.output_video
-    output_figure = args.output_figure
+    num_robots = len(states_json["robots"])
+   
+    # TODO: change the default output paths
+    output_video = os.path.join(f"../../results_circle{num_robots}.gif")
+    output_figure = os.path.join(f"../../results_circle{num_robots}")
     
     # make directory if not exist
     if not os.path.exists(os.path.dirname(output_video)):
@@ -461,10 +462,7 @@ if __name__ == "__main__":
     if not os.path.exists(os.path.dirname(output_figure)):
         os.makedirs(os.path.dirname(output_figure))
 
-    num_robots = len(states_json["robots"])
     traj = np.array([states_json["robots"][str(_)]["states"] for _ in range(num_robots)])  # [n_robot, ts, dim]
-    # if "baseline" not in args.states_filename:
-    #     traj = traj[:,::10,:]
     neighbor_ids = []
     for i in range(num_robots):
         neighbor_ids.append([])
@@ -537,9 +535,6 @@ if __name__ == "__main__":
 
     colors = generate_rgb_colors(num_robots)
 
-    # goal_radius = 1.6
-    # success = instance_success(traj, goals, goal_radius, collision_shape)
-    # print("success: ", success)
     derivatives_plot(traj, Ts)
     plot2D_XYYaw(traj, goals, save_name=output_figure)
     _, total_frame, _ = traj.shape
@@ -547,4 +542,4 @@ if __name__ == "__main__":
     render_frame_indices = range(0, total_frame, frame_gap)
     # for frame_idx in render_frame_indices:
     #     snapshots2D_XYYaw(traj, goals, goal_radius, estimate_mean, estimate_cov, p_near, dt, Ts, bbox, frame_idx, pred_curve, FoV_beta, FoV_range, PredCurve=True, colors=colors, pre_save_name=output_figure)
-    animation2D_XYYaw(traj, estimate_mean, estimate_cov, p_near, dt, Ts, bbox, pred_curve, FoV_beta, FoV_range, Estimation=True, PredCurve=False, colors=colors, save_name=output_video)
+    animation2D_XYYaw(traj, estimate_mean, estimate_cov, p_near, dt, Ts, bbox, pred_curve, FoV_beta, FoV_range, Estimation=False, PredCurve=False, colors=colors, save_name=output_video)
