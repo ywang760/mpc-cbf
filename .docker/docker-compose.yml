@@ -6,5 +6,4 @@ services:
     stdin_open: true
     tty: true
     volumes:
-      - ../workspace:/usr/src/mpc-cbf/workspace
-      - ../.git:/usr/src/mpc-cbf/.git
+      - ../:/usr/src/mpc-cbf/
