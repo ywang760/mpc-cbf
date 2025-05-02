@@ -7,3 +7,4 @@ services:
     tty: true
     volumes:
       - ../workspace:/usr/src/mpc-cbf/workspace
+      - ../.git:/usr/src/mpc-cbf/.git
