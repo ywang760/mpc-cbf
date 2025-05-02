@@ -31,9 +31,9 @@
 Thumbs.db
 
 # Ignore Docker files
-.docker/
-.git/
-.gitignore
+# .docker/
+# .git/
+# .gitignore
 
 # Ignore workspace/ altogether
 workspace/
