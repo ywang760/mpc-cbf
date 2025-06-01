@@ -50,14 +50,8 @@ namespace cbf {
             other_xy << other_robot_positions.at(i)(0), other_robot_positions.at(i)(1);
             
             if (!slack_mode_) {
-                // Add connectivity constraint without slack
-                // qp_generator_.addConnectivityConstraint(state, other_xy); // TODO: bring back
-                // Add safety constraint without slack
                 qp_generator_.addSafetyConstraint(state, other_xy);
             } else {
-                // Add connectivity constraint with slack
-                // qp_generator_.addConnectivityConstraint(state, other_xy, true, i); // TODO: bring back
-                // Add safety constraint with slack
                 qp_generator_.addSafetyConstraint(state, other_xy, true, i);
             }
         }
@@ -67,9 +61,21 @@ namespace cbf {
         qp_generator_.addMaxVelConstraints(state);
         qp_generator_.addControlBoundConstraint(u_min, u_max);
 
-        // Add connectivity constraint
-        qp_generator_.addConnectivityConstraint(state, other_robot_positions);
+        // Convert from VectorDIM (Vector3d) to Vector (VectorXd)
+        std::vector<Vector> other_positions_dyn;
+        for (const auto& p : other_robot_positions) {
+            Vector v(p.size());
+            v = p;
+            other_positions_dyn.push_back(v);
+        }
 
+        // Add connectivity constraint
+        if (slack_mode_) {
+            qp_generator_.addConnConstraint(state, other_positions_dyn, true, num_neighbors);
+        } else {
+            qp_generator_.addConnConstraint(state, other_positions_dyn);
+        }
+        
         // solve QP
         Problem &problem = qp_generator_.problem();
         CPLEXSolver cplex_solver;

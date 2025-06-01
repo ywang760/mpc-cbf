@@ -11,33 +11,27 @@ namespace cbf {
     }
 
     // TODO: Implement the addConnectivityConstraint method
-    // template <typename T, unsigned int DIM>
-    // void ConnectivityQPGenerator<T, DIM>::addConnectivityConstraint(const Vector &state,
-    //                                                 const Vector &target_state,
-    //                                                 bool use_slack,
-    //                                                 std::size_t slack_idx) {
-    //     // Get connectivity constraint coefficients from the CBF implementation
-    //     Vector coefficients = -1.0 * cbf_->getConnectivityConstraints(state, target_state);
+    template <typename T, unsigned int DIM>
+    void ConnectivityQPGenerator<T, DIM>::addConnConstraint(const Vector& x_self,
+                                                            const std::vector<Vector>& other_positions,
+                                                            bool use_slack,
+                                                            std::size_t slack_idx)
+    {
+        // === Step 1: 获取约束项（内部已拼装 robot_states 且假定 self_idx = 0） ===
+        Vector coefficients = -1.0 * cbf_->getConnConstraints(x_self, other_positions);
+        T bound = cbf_->getConnBound(x_self, other_positions);
+        // === Step 2: 构造线性约束 ===
+        LinearConstraint linear_constraint(coefficients, std::numeric_limits<T>::lowest(), bound);
+        // === Step 3: 是否引入松弛变量 ===
+        if (use_slack && !this->slack_variables_.empty()) {
+            Row slack_coefficients = Row::Zero(this->slack_variables_.size());
+            slack_coefficients(slack_idx) = -1;
+            this->addLinearConstraintForControlInputWithSlackVariables(linear_constraint, slack_coefficients);
+        } else {
+            this->addLinearConstraintForControlInput(linear_constraint);
+        }
+    }
 
-    //     // Get the connectivity constraint bound from the CBF implementation
-    //     T bound = cbf_->getConnectivityBound(state, target_state);
-
-    //     // Create a linear constraint with lower bound negative infinity
-    //     LinearConstraint linear_constraint(coefficients, std::numeric_limits<T>::lowest(), bound);
-        
-    //     // Handle constraint with or without slack variable
-    //     if (use_slack && !this->slack_variables_.empty()) {
-    //         // Create a row vector for slack variable coefficients (all zeros except at slack_idx)
-    //         Row slack_coefficients = Row::Zero(this->slack_variables_.size());
-    //         slack_coefficients(slack_idx) = -1; // Negative coefficient allows constraint relaxation
-            
-    //         // Add the constraint with slack variable to the QP problem
-    //         this->addLinearConstraintForControlInputWithSlackVariables(linear_constraint, slack_coefficients);
-    //     } else {
-    //         // Add the constraint without slack variable to the QP problem
-    //         this->addLinearConstraintForControlInput(linear_constraint);
-    //     }
-    // }
 
     template <typename T, unsigned int DIM>
     void ConnectivityQPGenerator<T, DIM>::addSafetyConstraint(const Vector &state,

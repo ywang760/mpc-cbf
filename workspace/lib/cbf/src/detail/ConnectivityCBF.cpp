@@ -91,11 +91,6 @@ namespace cbf
         Ac_safe = res.first;  // Constraint matrix
         Bc_safe = res.second; // Constraint bound
 
-        // Maximum distance CBF: Ensures agents stay within communication/connectivity range
-        auto res2 = initConnectivityCBF();
-        Ac_connectivity = res2.first;
-        Bc_connectivity = res2.second;
-
         // Velocity constraint CBFs: Enforce maximum velocity limits
         // Setup max velocity constraint for x-direction
         GiNaC::ex bv1 = -state[3] + vmax(0);
@@ -281,6 +276,7 @@ namespace cbf
     //   Matrix with numerical values substituted
     GiNaC::ex ConnectivityCBF::matrixSubs(GiNaC::matrix a, Eigen::VectorXd state, Eigen::VectorXd agent_state)
     {
+        //逐步替换，比如第一行先把a里的px替换为state(0)，然后后面是基于这一步替换，再做把tmp中的py替换为state(1)...
         // Substitute each state variable with its numerical value
         GiNaC::ex tmp = GiNaC::subs(a, px == state(0));
         tmp = GiNaC::subs(tmp, py == state(1));
@@ -301,6 +297,8 @@ namespace cbf
     // Returns:
     //   Expression with numerical values substituted
     GiNaC::ex ConnectivityCBF::valueSubs(GiNaC::ex a, Eigen::VectorXd state, Eigen::VectorXd agent_state)
+// 将已经构造好的符号表达式（即带有 px, py 等符号变量的 GiNaC::matrix）中，
+// 替换变量为具体数值，从而得到可以求值的表达式或数值矩阵。
     {
         // Substitute each state variable with its numerical value
         GiNaC::ex tmp = GiNaC::subs(a, px == state(0));
@@ -336,121 +334,7 @@ namespace cbf
         return Ac;
     }
 
-    Eigen::VectorXd ConnectivityCBF::getConnectivityConstraints(Eigen::VectorXd state, Eigen::VectorXd agent_state)
-    {
-        // TODO: Implement this function
-    }
-
-    std::pair<double, Eigen::VectorXd> getLambda2FromL(const Eigen::MatrixXd& robot_positions, Eigen::MatrixXd& L_num_out,
-        double Rs_value, double sigma_value)
-    {
-        Eigen::MatrixXd A_num = Eigen::MatrixXd::Zero(N, N);
-        for (int i = 0; i < N; ++i)
-        {
-            for (int j = 0; j < N; ++j)
-            {
-                if (i != j)
-                {
-                    double dx = robot_positions(i, 0) - robot_positions(j, 0);
-                    double dy = robot_positions(i, 1) - robot_positions(j, 1);
-                    double dij2 = dx * dx + dy * dy;
-    
-                    if (dij2 <= Rs_value * Rs_value)
-                    {
-                        double weight = std::exp(std::pow(Rs_value * Rs_value - dij2, 2) / sigma_value) - 1;
-                        A_num(i, j) = weight;
-                    }
-                }
-            }
-        }
-    
-        Eigen::MatrixXd D_num = Eigen::MatrixXd::Zero(N, N);
-        for (int i = 0; i < N; ++i)
-            D_num(i, i) = A_num.row(i).sum();
-    
-        Eigen::MatrixXd L_num = D_num - A_num;
-        L_num_out = L_num;
-    
-        Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> solver(L_num);
-        Eigen::VectorXd eigenvals = solver.eigenvalues();
-        return {eigenvals(1), eigenvals};
-    }
-
-    std::pair<Eigen::RowVectorXd, double> initConnCBF(
-        const Eigen::MatrixXd& robot_positions,  // N×2 矩阵，每行是 (px, py)
-        const Eigen::VectorXd& x_self,           // 当前机器人完整状态 [px, py, th, vx, vy, w]
-        double Rs_val,
-        double sigma_val,
-        double lambda2_min,
-        double gamma = 1.0)
-    {
-        int N = robot_positions.rows();
-        const int STATE_VARS = 6;        // px, py, th, vx, vy, w
-        const int CONTROL_VARS = 3;      // ax, ay, aw
-        
-        // 1. calculate lambda2 
-        Eigen::MatrixXd L_num;
-        Eigen::VectorXd eigenvals;
-        double lambda2_val;
-        std::tie(lambda2_val, eigenvals) = getLambda2FromL(robot_positions, L_num, Rs_val, sigma_val);
-    
-        // 2. initilize hx & α(h)
-        double hx = lambda2_val - lambda2_min;
-        double alpha_hx = gamma * hx;
-    
-        // 3. 使用有限差分计算 dh/dx, calculate ∇h
-        Eigen::VectorXd dh_dx(STATE_VARS);
-        double eps = 1e-6;
-        for (int i = 0; i < STATE_VARS; ++i)
-        {
-            Eigen::VectorXd x_plus = x_self;
-            Eigen::VectorXd x_minus = x_self;
-            x_plus(i) += eps;
-            x_minus(i) -= eps;
-    
-            // 替换 robot_positions 中第一个机器人坐标
-            Eigen::MatrixXd pos_plus = robot_positions;
-            Eigen::MatrixXd pos_minus = robot_positions;
-            pos_plus(0, 0) = x_plus(0);  // px
-            pos_plus(0, 1) = x_plus(1);  // py
-            pos_minus(0, 0) = x_minus(0);
-            pos_minus(0, 1) = x_minus(1);
-    
-            double lambda2_plus = getLambda2FromL(pos_plus, L_num, Rs_val, sigma_val).first;
-            double lambda2_minus = getLambda2FromL(pos_minus, L_num, Rs_val, sigma_val).first;
-    
-            dh_dx(i) = (lambda2_plus - lambda2_minus) / (2 * eps);
-        }
-    
-        // 4. 构造控制方向向量 g(x)
-        Eigen::MatrixXd g = Eigen::MatrixXd::Zero(STATE_VARS, CONTROL_VARS);
-        g(3, 0) = 1.0;  // vx ← ax
-        g(4, 1) = 1.0;  // vy ← ay
-        g(5, 2) = 1.0;  // w  ← aw
-    
-        // 5. Calculate Lg h = ∇h(x)^T · g(x)
-        Eigen::RowVectorXd Ac(1, CONTROL_VARS);
-        Ac.setZero();
-        for (int j = 0; j < CONTROL_VARS; ++j)
-        {
-            for (int i = 0; i < STATE_VARS; ++i)
-            {
-                Ac(0, j) += dh_dx(i) * g(i, j);
-            }
-        } 
-        // 6. 构造 Bc = -Lf h - α(h)，其中 Lf h = ∇h · f(x)
-        double lfhx = 0.0;
-        for (int i = 0; i < STATE_VARS; i++)
-        {
-            lfhx += dh_dx(i) * f(i);
-        }
-        double Bc = lfh + alpha_hx;                // Bc = -Lf h - α(h)
-        return std::make_pair(Ac, Bc);
-    }
-    
-
-
-    // Get the maximum velocity constraint matrix for the current state
+        // Get the maximum velocity constraint matrix for the current state
     // Parameters:
     //   state: Current state vector
     // Returns:
@@ -514,6 +398,252 @@ namespace cbf
         }
 
         return Acs;
+    }
+
+    Eigen::RowVectorXd ConnectivityCBF::getConnConstraints(
+        const Eigen::VectorXd& x_self,
+        const std::vector<Eigen::VectorXd>& other_positions)
+    {
+        const int N = 1 + other_positions.size();
+        Eigen::MatrixXd robot_states(N, 6);
+        robot_states.setZero();
+        robot_states.row(0).head<2>() = x_self.head<2>();
+        robot_states.row(0).segment<2>(3) = x_self.segment<2>(3);
+        for (int i = 0; i < other_positions.size(); ++i) {
+            robot_states.row(i + 1).head<2>() = other_positions[i];
+        }
+        const double Rs = 3.0;
+        const double sigma = 0.5;
+        const double lambda2_min = 0.1;
+        const double gamma = 1.0;
+        auto [Ac, Bc] = initConnCBF(robot_states, x_self, 0, Rs, sigma, lambda2_min, gamma);
+        return Ac;
+    }
+
+
+    std::pair<double, Eigen::VectorXd> getLambda2FromL(
+    const Eigen::MatrixXd& robot_positions, 
+    double Rs_value, 
+    double sigma_value)
+    {
+        const int N = robot_positions.rows();
+        Eigen::MatrixXd A_num = Eigen::MatrixXd::Zero(N, N);
+        for (int i = 0; i < N; ++i)
+        {
+            for (int j = 0; j < N; ++j)
+            {
+                if (i != j)
+                {
+                    double dx = robot_positions(i, 0) - robot_positions(j, 0);
+                    double dy = robot_positions(i, 1) - robot_positions(j, 1);
+                    double dij2 = dx * dx + dy * dy;
+
+                    if (dij2 <= Rs_value * Rs_value)
+                    {
+                        double weight = std::exp(std::pow(Rs_value * Rs_value - dij2, 2) / sigma_value) - 1;
+                        A_num(i, j) = weight;
+                    }
+                }
+            }
+        }
+        Eigen::MatrixXd D_num = Eigen::MatrixXd::Zero(N, N);
+        for (int i = 0; i < N; ++i)
+            D_num(i, i) = A_num.row(i).sum();
+        Eigen::MatrixXd L_num = D_num - A_num;
+        Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> solver(L_num);
+        Eigen::VectorXd eigenvals = solver.eigenvalues();
+        Eigen::MatrixXd eigenvecs = solver.eigenvectors();
+        return {eigenvals(1), eigenvecs.col(1)};
+    }
+
+    void ConnectivityCBF::initSymbolLists(int N) {
+        px_list.clear(); py_list.clear(); v_list.clear();
+        for (int i = 0; i < N; ++i) {
+            px_list.emplace_back(GiNaC::symbol("px" + std::to_string(i)));
+            py_list.emplace_back(GiNaC::symbol("py" + std::to_string(i)));
+            v_list.emplace_back(GiNaC::symbol("v"  + std::to_string(i)));
+        }
+    }
+
+    GiNaC::matrix ConnectivityCBF::matrixSubsMatrix(
+        const GiNaC::matrix& expr_matrix,
+        const Eigen::MatrixXd& robot_positions,
+        const Eigen::VectorXd& eigenvec,
+        const Eigen::Vector2d& self_position)
+    {
+        GiNaC::exmap substitutions;
+        // 机器人位置和特征值向量替换
+        for (int i = 0; i < robot_positions.rows(); ++i) {
+            substitutions[px_list[i]] = robot_positions(i, 0);
+            substitutions[py_list[i]] = robot_positions(i, 1);
+            substitutions[v_list[i]]  = eigenvec(i);
+        }
+        // 当前机器人的自身位置
+        substitutions[px] = self_position(0);
+        substitutions[py] = self_position(1);
+        // 对整个矩阵统一替换
+        GiNaC::matrix result = GiNaC::ex_to<GiNaC::matrix>(expr_matrix.subs(substitutions));
+        return result;
+    }
+
+
+    GiNaC::matrix ConnectivityCBF::compute_dh_dx(int N, const GiNaC::ex& Rs, const GiNaC::ex& sigma)
+    {
+        initSymbolLists(N);
+        GiNaC::matrix grad(N, 2);
+        for (int i = 0; i < N; ++i) {
+            GiNaC::ex dLdx = 0, dLdy = 0;
+            for (int j = 0; j < N; ++j) {
+                if (i == j) continue;
+                GiNaC::ex dx = px_list[i] - px_list[j];
+                GiNaC::ex dy = py_list[i] - py_list[j];
+                GiNaC::ex dij2 = dx*dx + dy*dy;
+                GiNaC::ex diff = GiNaC::pow(Rs, 2) - dij2;
+                GiNaC::ex Aij = GiNaC::exp(GiNaC::pow(diff, 2) / sigma);
+                GiNaC::ex dAij_dx = -4 * Aij * diff / sigma * dx;
+                GiNaC::ex dAij_dy = -4 * Aij * diff / sigma * dy;
+                GiNaC::ex vdiff2 = GiNaC::pow(v_list[i] - v_list[j], 2);
+                dLdx += dAij_dx * vdiff2;
+                dLdy += dAij_dy * vdiff2;
+            }
+            grad(i, 0) = dLdx;
+            grad(i, 1) = dLdy;
+        }
+        return grad;
+    }
+
+
+
+    GiNaC::matrix ConnectivityCBF::compute_d2h_dx2(const GiNaC::matrix& dh_dx_sym, int self_idx)
+    {
+        GiNaC::matrix hess(2, 2);
+        hess(0, 0) = GiNaC::diff(dh_dx_sym(self_idx, 0), px);
+        hess(0, 1) = GiNaC::diff(dh_dx_sym(self_idx, 0), py);
+        hess(1, 0) = GiNaC::diff(dh_dx_sym(self_idx, 1), px);
+        hess(1, 1) = GiNaC::diff(dh_dx_sym(self_idx, 1), py);
+        return hess;
+    }
+
+    Eigen::VectorXd ConnectivityCBF::compute_dLf_h_dx(
+        const GiNaC::matrix& dh_dx_sym,
+        int self_idx,
+        const Eigen::MatrixXd& robot_positions,
+        const Eigen::VectorXd& eigenvec,
+        const Eigen::Vector2d& self_pos)
+    {
+        // === Step 1: 构造符号 Hessian 矩阵 ===
+        GiNaC::matrix hess_sym = compute_d2h_dx2(dh_dx_sym, self_idx);
+        GiNaC::matrix hess_eval = matrixSubsMatrix(hess_sym, robot_positions, eigenvec, self_pos);
+        // === Step 2: f(x) 使用符号表达式 ===
+        GiNaC::ex fx = vx;
+        GiNaC::ex fy = vy;
+        Eigen::Vector2d hess_term;
+        hess_term(0) = GiNaC::ex_to<GiNaC::numeric>(hess_eval(0, 0) * fx + hess_eval(0, 1) * fy).to_double();
+        hess_term(1) = GiNaC::ex_to<GiNaC::numeric>(hess_eval(1, 0) * fx + hess_eval(1, 1) * fy).to_double();
+        GiNaC::matrix dh_eval = matrixSubsMatrix(dh_dx_sym, robot_positions, eigenvec, self_pos);
+        Eigen::VectorXd dh_dx = Eigen::VectorXd::Zero(6);
+        dh_dx(0) = GiNaC::ex_to<GiNaC::numeric>(dh_eval(self_idx, 0)).to_double();
+        dh_dx(1) = GiNaC::ex_to<GiNaC::numeric>(dh_eval(self_idx, 1)).to_double();
+        // === Step 3: 手动写出符号的 Jf^T * ∇λ₂ ===
+        // ∂f/∂x 的转置作用就是把 ∇h 的 [∂h/∂px, ∂h/∂py, ∂h/∂th, ∂h/∂vx, ∂h/∂vy, ∂h/∂w] 乘以 Jf^T
+        // Jf = [∂f_i/∂x_j] 是常数，非零项：df1/dx4=1, df2/dx5=1, df3/dx6=1 → Jf^T乘上∇h就是把 dh_dx(3~5) 拷贝回来
+        Eigen::VectorXd jac_term = Eigen::VectorXd::Zero(6);
+        jac_term(0) = 0.0;
+        jac_term(1) = 0.0;
+        jac_term(2) = 0.0;
+        jac_term(3) = dh_dx(0);  // vx 对应 px
+        jac_term(4) = dh_dx(1);  // vy 对应 py
+        jac_term(5) = 0.0;
+        // === Step 4: 拼接总结果 ===
+        Eigen::VectorXd total = Eigen::VectorXd::Zero(6);
+        total(0) = hess_term(0);
+        total(1) = hess_term(1);
+        total.segment<6>(0) += jac_term;
+        return total;
+    }
+
+
+    std::pair<Eigen::RowVectorXd, double> ConnectivityCBF::initConnCBF(
+        const Eigen::MatrixXd& robot_states,  // N x 6 matrix
+        const Eigen::VectorXd& x_self,        // 当前机器人的状态 6x1
+        int self_idx,                         // 当前机器人在 robot_states 中的索引
+        double Rs_val,
+        double sigma_val,
+        double lambda2_min,
+        double gamma)
+    {
+        const int N = robot_states.rows();
+        const int STATE_VARS = 6;
+        const int CONTROL_VARS = 3;
+        // Step 1: h = λ₂ - λ₂_min
+        auto [lambda2_val, eigenvec] = getLambda2FromL(robot_states.leftCols(2), Rs_val, sigma_val);
+        double h = lambda2_val - lambda2_min;
+        double alpha_h = gamma * h;
+        // Step 2: 符号构造 ∇h
+        initSymbolLists(N);
+        GiNaC::matrix dh_dx_sym = compute_dh_dx(N, Rs_val, sigma_val);
+        GiNaC::matrix dh_dx_ginac = matrixSubsMatrix(dh_dx_sym, robot_states.leftCols(2), eigenvec); // N×2 数值表达式
+        // 转换为 Eigen 数值矩阵
+        Eigen::MatrixXd dh_dx_all(N, 2);
+        for (int i = 0; i < N; ++i)
+            for (int j = 0; j < 2; ++j)
+                dh_dx_all(i, j) = GiNaC::ex_to<GiNaC::numeric>(dh_dx_ginac(i, j)).to_double();
+        // 拼接 6 维梯度向量（只对 px, py 有非零导数）
+        Eigen::VectorXd dh_dx = Eigen::VectorXd::Zero(6);
+        dh_dx(0) = dh_dx_all(self_idx, 0);  // ∂h/∂px
+        dh_dx(1) = dh_dx_all(self_idx, 1);  // ∂h/∂py
+        // Step 3: L_f h = ∇h · f(x_self)
+        // 由于 f = A*x = [vx, vy, w, 0, 0, 0]，直接从 x_self 构造 f 的数值向量
+        Eigen::VectorXd f_x = Eigen::VectorXd::Zero(6);
+        f_x(0) = x_self(3); // vx
+        f_x(1) = x_self(4); // vy
+        f_x(2) = x_self(5); // w
+        double lfh = dh_dx.dot(f_x);
+        // ✅ Step 4: 用符号 Hessian 构造 ∇(L_f h)
+        Eigen::VectorXd dlfh_dx = compute_dLf_h_dx(
+            dh_dx_sym,
+            self_idx,
+            robot_states.leftCols(2),
+            eigenvec,
+            x_self.head<2>()
+        );
+        // Step 5: L_f² h = ∇(L_f h) · f
+        double lf2h = dlfh_dx.dot(f_x);
+        // Step 6: L_g L_f h = ∇(L_f h) · g
+        Eigen::MatrixXd g = Eigen::MatrixXd::Zero(STATE_VARS, CONTROL_VARS);
+        g(3, 0) = 1.0;
+        g(4, 1) = 1.0;
+        g(5, 2) = 1.0;
+        Eigen::RowVectorXd Ac = dlfh_dx.transpose() * g;
+        // Step 7: Bc = L_f² h + γ L_f h + γ² h
+        double Bc = lf2h + gamma * lfh + gamma * gamma * h;
+        return std::make_pair(Ac, Bc);
+    }
+
+
+    double ConnectivityCBF::getConnBound(
+        const Eigen::VectorXd& x_self,
+        const std::vector<Eigen::VectorXd>& other_positions)
+    {
+        // === 组装 robot_states: [self; others] ===
+        const int N = 1 + other_positions.size();
+        Eigen::MatrixXd robot_states(N, 6);
+        robot_states.setZero();
+        // 当前机器人：位置和速度（只填 vx, vy）
+        robot_states.row(0).head<2>() = x_self.head<2>();         // px, py
+        robot_states.row(0).segment<2>(3) = x_self.segment<2>(3); // vx, vy
+        // 其他机器人：只填 px, py，速度设为 0
+        for (int i = 0; i < other_positions.size(); ++i) {
+            robot_states.row(i + 1).head<2>() = other_positions[i];
+        }
+        // === 参数设置 ===
+        const double Rs = 3.0;
+        const double sigma = 0.5;
+        const double lambda2_min = 0.1;
+        const double gamma = 1.0;
+        // === 计算约束 ===
+        auto [Ac, Bc] = initConnCBF(robot_states, x_self, 0, Rs, sigma, lambda2_min, gamma);
+        return Bc;
     }
 
     // Get the minimum distance constraint bound for the current state and agent
