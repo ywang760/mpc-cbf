@@ -58,7 +58,7 @@ int main(int argc, char* argv[]) {
     const int fov_beta_parse = option_parse["fov"].as<int>();
 
     // Configuration file path
-    std::string experiment_config_filename = "/usr/src/mpc-cbf/workspace/experiments/config/circle/circle4_config.json";
+    std::string experiment_config_filename = "/usr/src/mpc-cbf/workspace/experiments/config/circle/circle2_config.json";
     std::fstream experiment_config_fc(experiment_config_filename.c_str(), std::ios_base::in);
     json experiment_config_json = json::parse(experiment_config_fc);
 

@@ -20,7 +20,7 @@ namespace cbf {
         double gamma;
         // Symbols
         GiNaC::symbol px, py, th, vx, vy, w, xt, yt;
-        std::vector<GiNaC::symbol> px_list, py_list, v_list;
+        std::vector<GiNaC::symbol> px_list, py_list, v_list; // TODO: what is this?
         // System dynamics
         GiNaC::matrix state, agent_state, A, B, x, x_agent, f, g;
         // Symbolic constraints and bounds
@@ -35,7 +35,7 @@ namespace cbf {
         // Internal initialization
         std::pair<GiNaC::matrix, GiNaC::ex> initSafetyCBF();
         std::pair<GiNaC::matrix, GiNaC::ex> initVelCBF(GiNaC::ex bv);
-        void initSymbolLists(int N);
+        void initSymbolLists(int N); // TODO: check this
         // Symbolic substitution utilities
         GiNaC::ex matrixSubs(GiNaC::matrix a, Eigen::VectorXd state, Eigen::VectorXd agent_state);
         GiNaC::ex valueSubs(GiNaC::ex m, Eigen::VectorXd state, Eigen::VectorXd agent_state);
@@ -44,13 +44,13 @@ namespace cbf {
                                        const Eigen::VectorXd& eigenvec,
                                        const Eigen::Vector2d& self_position = Eigen::Vector2d::Zero());
         // Lambda2-based constraint
-        std::pair<Eigen::RowVectorXd, double> initConnCBF(const Eigen::MatrixXd& robot_states,
-                                                          const Eigen::VectorXd& x_self,
-                                                          int self_idx,
-                                                          double Rs_val,
-                                                          double sigma_val,
-                                                          double lambda2_min,
-                                                          double gamma);
+        std::pair<Eigen::RowVectorXd, double> initConnectivityCBF(const Eigen::MatrixXd &robot_states,
+                                                                  const Eigen::VectorXd &x_self,
+                                                                  int self_idx,
+                                                                  double Rs_val,
+                                                                  double sigma_val,
+                                                                  double lambda2_min,
+                                                                  double gamma);
         GiNaC::matrix compute_dh_dx(int N, const GiNaC::ex& Rs, const GiNaC::ex& sigma);
         GiNaC::matrix compute_d2h_dx2(const GiNaC::matrix& dh_dx_sym, int self_idx);
         Eigen::VectorXd compute_dLf_h_dx(const GiNaC::matrix& dh_dx_sym,
@@ -71,10 +71,10 @@ namespace cbf {
         Eigen::VectorXd getMaxVelBounds(Eigen::VectorXd state);
         Eigen::VectorXd getMinVelBounds(Eigen::VectorXd state);
         // Connectivity constraint
-        Eigen::RowVectorXd getConnConstraints(const Eigen::VectorXd& x_self,
-                                              const std::vector<Eigen::VectorXd>& other_positions);
-        double getConnBound(const Eigen::VectorXd& x_self,
-                            const std::vector<Eigen::VectorXd>& other_positions);
+        Eigen::RowVectorXd getConnectivityConstraints(const Eigen::VectorXd &x_self,
+                                                      const std::vector<Eigen::VectorXd> &other_positions);
+        double getConnectivityBound(const Eigen::VectorXd &x_self,
+                                    const std::vector<Eigen::VectorXd> &other_positions);
         // Alpha setter
         void setAlpha(std::function<GiNaC::ex(GiNaC::ex, double)> newAlpha);
     };

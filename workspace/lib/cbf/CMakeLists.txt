@@ -70,9 +70,9 @@ target_link_libraries(cbf_controller_ConnectivityControl PUBLIC
         model_DoubleIntegratorXYYaw)
 
 # add examples
-add_executable(cbf_examples_CBFControl_example examples/fov/CBFControl_example.cpp)
-target_include_directories(cbf_examples_CBFControl_example PUBLIC include ../../../third_party/json/single_include)
-target_link_libraries(cbf_examples_CBFControl_example PUBLIC
+add_executable(cbf_examples_CBFFovControl_example examples/fov/CBFControl_example.cpp)
+target_include_directories(cbf_examples_CBFFovControl_example PUBLIC include ../../../third_party/json/single_include)
+target_link_libraries(cbf_examples_CBFFovControl_example PUBLIC
         model_DoubleIntegratorXYYaw
         cbf_controller_FovControl
         cxxopts
@@ -91,18 +91,3 @@ target_link_libraries(cbf_examples_CBFFormationControl_example PUBLIC
         math_Geometry
         math_Controls
         math_Random)
-
-# TODO: remove the deprecated examples
-#add_executable(cbf_examples_CBFControlStaticTarget_example examples/CBFControlStaticTarget_example.cpp)
-#target_include_directories(cbf_examples_CBFControlStaticTarget_example PUBLIC include ../../../third_party/json/single_include)
-#target_link_libraries(cbf_examples_CBFControlStaticTarget_example PUBLIC
-#        model_DoubleIntegratorXYYaw
-#        cbf_controller_FovControl)
-
-#add_executable(cbf_examples_CBFControlSlack_example examples/CBFControlSlack_example.cpp)
-#target_include_directories(cbf_examples_CBFControlSlack_example PUBLIC include ../../../third_party/json/single_include)
-#target_link_libraries(cbf_examples_CBFControlSlack_example PUBLIC
-#        model_DoubleIntegratorXYYaw
-#        cbf_controller_FovControl
-#        ParticleFilter
-#        cxxopts)

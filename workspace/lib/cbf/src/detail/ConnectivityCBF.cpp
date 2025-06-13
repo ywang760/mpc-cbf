@@ -276,7 +276,6 @@ namespace cbf
     //   Matrix with numerical values substituted
     GiNaC::ex ConnectivityCBF::matrixSubs(GiNaC::matrix a, Eigen::VectorXd state, Eigen::VectorXd agent_state)
     {
-        //逐步替换，比如第一行先把a里的px替换为state(0)，然后后面是基于这一步替换，再做把tmp中的py替换为state(1)...
         // Substitute each state variable with its numerical value
         GiNaC::ex tmp = GiNaC::subs(a, px == state(0));
         tmp = GiNaC::subs(tmp, py == state(1));
@@ -297,8 +296,6 @@ namespace cbf
     // Returns:
     //   Expression with numerical values substituted
     GiNaC::ex ConnectivityCBF::valueSubs(GiNaC::ex a, Eigen::VectorXd state, Eigen::VectorXd agent_state)
-// 将已经构造好的符号表达式（即带有 px, py 等符号变量的 GiNaC::matrix）中，
-// 替换变量为具体数值，从而得到可以求值的表达式或数值矩阵。
     {
         // Substitute each state variable with its numerical value
         GiNaC::ex tmp = GiNaC::subs(a, px == state(0));
@@ -400,9 +397,9 @@ namespace cbf
         return Acs;
     }
 
-    Eigen::RowVectorXd ConnectivityCBF::getConnConstraints(
-        const Eigen::VectorXd& x_self,
-        const std::vector<Eigen::VectorXd>& other_positions)
+    Eigen::RowVectorXd ConnectivityCBF::getConnectivityConstraints(
+        const Eigen::VectorXd &x_self,
+        const std::vector<Eigen::VectorXd> &other_positions)
     {
         const int N = 1 + other_positions.size();
         Eigen::MatrixXd robot_states(N, 6);
@@ -412,11 +409,12 @@ namespace cbf
         for (int i = 0; i < other_positions.size(); ++i) {
             robot_states.row(i + 1).head<2>() = other_positions[i];
         }
+        // TODO: pass down these from config
         const double Rs = 3.0;
         const double sigma = 0.5;
         const double lambda2_min = 0.1;
         const double gamma = 1.0;
-        auto [Ac, Bc] = initConnCBF(robot_states, x_self, 0, Rs, sigma, lambda2_min, gamma);
+        auto [Ac, Bc] = initConnectivityCBF(robot_states, x_self, 0, Rs, sigma, lambda2_min, gamma);
         return Ac;
     }
 
@@ -486,8 +484,7 @@ namespace cbf
         return result;
     }
 
-
-    GiNaC::matrix ConnectivityCBF::compute_dh_dx(int N, const GiNaC::ex& Rs, const GiNaC::ex& sigma)
+    GiNaC::matrix ConnectivityCBF::compute_dh_dx(int N, const GiNaC::ex &Rs, const GiNaC::ex &sigma)
     {
         initSymbolLists(N);
         GiNaC::matrix grad(N, 2);
@@ -562,11 +559,10 @@ namespace cbf
         return total;
     }
 
-
-    std::pair<Eigen::RowVectorXd, double> ConnectivityCBF::initConnCBF(
-        const Eigen::MatrixXd& robot_states,  // N x 6 matrix
-        const Eigen::VectorXd& x_self,        // 当前机器人的状态 6x1
-        int self_idx,                         // 当前机器人在 robot_states 中的索引
+    std::pair<Eigen::RowVectorXd, double> ConnectivityCBF::initConnectivityCBF(
+        const Eigen::MatrixXd &robot_states, // N x 6 matrix
+        const Eigen::VectorXd &x_self,       // 当前机器人的状态 6x1
+        int self_idx,                        // 当前机器人在 robot_states 中的索引
         double Rs_val,
         double sigma_val,
         double lambda2_min,
@@ -620,10 +616,9 @@ namespace cbf
         return std::make_pair(Ac, Bc);
     }
 
-
-    double ConnectivityCBF::getConnBound(
-        const Eigen::VectorXd& x_self,
-        const std::vector<Eigen::VectorXd>& other_positions)
+    double ConnectivityCBF::getConnectivityBound(
+        const Eigen::VectorXd &x_self,
+        const std::vector<Eigen::VectorXd> &other_positions)
     {
         // === 组装 robot_states: [self; others] ===
         const int N = 1 + other_positions.size();
@@ -642,7 +637,7 @@ namespace cbf
         const double lambda2_min = 0.1;
         const double gamma = 1.0;
         // === 计算约束 ===
-        auto [Ac, Bc] = initConnCBF(robot_states, x_self, 0, Rs, sigma, lambda2_min, gamma);
+        auto [Ac, Bc] = initConnectivityCBF(robot_states, x_self, 0, Rs, sigma, lambda2_min, gamma);
         return Bc;
     }
 
