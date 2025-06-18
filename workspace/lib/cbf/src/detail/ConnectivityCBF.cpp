@@ -399,19 +399,27 @@ namespace cbf
 
     Eigen::RowVectorXd ConnectivityCBF::getConnectivityConstraints(
         const Eigen::VectorXd &x_self,
-        const std::vector<Eigen::VectorXd> &other_positions)
+        const std::vector<Eigen::Vector3d> &other_positions)
     {
         const int N = 1 + other_positions.size();
         Eigen::MatrixXd robot_states(N, 6);
-        robot_states.setZero();
-        robot_states.row(0).head<2>() = x_self.head<2>();
-        robot_states.row(0).segment<2>(3) = x_self.segment<2>(3);
-        for (int i = 0; i < other_positions.size(); ++i) {
-            robot_states.row(i + 1).head<2>() = other_positions[i];
+        robot_states.setZero();  // 初始化为 0（可保留）
+
+        // 当前机器人位置和速度完整设置
+        robot_states(0, 0) = x_self(0);  // px
+        robot_states(0, 1) = x_self(1);  // py
+        robot_states(0, 2) = x_self(2);  // yaw
+        robot_states(0, 3) = x_self(3);  // vx
+        robot_states(0, 4) = x_self(4);  // vy
+        robot_states(0, 5) = x_self(5);  // yaw rate
+
+      for (int i = 0; i < other_positions.size(); ++i) {
+            robot_states(i + 1, 0) = other_positions[i][0];  // or .x()
+            robot_states(i + 1, 1) = other_positions[i][1];  // or .y()
         }
         // TODO: pass down these from config
         const double Rs = 3.0;
-        const double sigma = 0.5;
+        const double sigma = 120;
         const double lambda2_min = 0.1;
         const double gamma = 1.0;
         auto [Ac, Bc] = initConnectivityCBF(robot_states, x_self, 0, Rs, sigma, lambda2_min, gamma);
@@ -514,10 +522,10 @@ namespace cbf
     GiNaC::matrix ConnectivityCBF::compute_d2h_dx2(const GiNaC::matrix& dh_dx_sym, int self_idx)
     {
         GiNaC::matrix hess(2, 2);
-        hess(0, 0) = GiNaC::diff(dh_dx_sym(self_idx, 0), px);
-        hess(0, 1) = GiNaC::diff(dh_dx_sym(self_idx, 0), py);
-        hess(1, 0) = GiNaC::diff(dh_dx_sym(self_idx, 1), px);
-        hess(1, 1) = GiNaC::diff(dh_dx_sym(self_idx, 1), py);
+        hess(0, 0) = GiNaC::diff(dh_dx_sym(self_idx, 0), px_list[self_idx]);
+        hess(0, 1) = GiNaC::diff(dh_dx_sym(self_idx, 0), py_list[self_idx]);
+        hess(1, 0) = GiNaC::diff(dh_dx_sym(self_idx, 1), px_list[self_idx]);
+        hess(1, 1) = GiNaC::diff(dh_dx_sym(self_idx, 1), py_list[self_idx]);
         return hess;
     }
 
@@ -526,24 +534,39 @@ namespace cbf
         int self_idx,
         const Eigen::MatrixXd& robot_positions,
         const Eigen::VectorXd& eigenvec,
-        const Eigen::Vector2d& self_pos)
+        const Eigen::VectorXd& x_self)
     {
         // === Step 1: 构造符号 Hessian 矩阵 ===
         GiNaC::matrix hess_sym = compute_d2h_dx2(dh_dx_sym, self_idx);
-        GiNaC::matrix hess_eval = matrixSubsMatrix(hess_sym, robot_positions, eigenvec, self_pos);
-        // === Step 2: f(x) 使用符号表达式 ===
-        GiNaC::ex fx = vx;
-        GiNaC::ex fy = vy;
+        // 输出符号 Hessian 表达式（调试用）
+        GiNaC::matrix hess_eval = matrixSubsMatrix(hess_sym, robot_positions, eigenvec, x_self.head<2>());
+        // 输出数值化后的 Hessian 矩阵
+        //std::cout << "[CBF] Evaluated Hessian matrix (∇²h evaluated):" << std::endl;
+        // for (int i = 0; i < 2; ++i) {
+        //     for (int j = 0; j < 2; ++j) {
+        //         std::cout << "  H_eval(" << i << "," << j << ") = "
+        //                 << GiNaC::ex_to<GiNaC::numeric>(hess_eval(i, j)).to_double() << std::endl;
+        //     }
+        // }
+        // === Step 2: 计算 Hessian 项：∇²h · f(x) ===
+        double fx = x_self(3);
+        double fy = x_self(4);
         Eigen::Vector2d hess_term;
         hess_term(0) = GiNaC::ex_to<GiNaC::numeric>(hess_eval(0, 0) * fx + hess_eval(0, 1) * fy).to_double();
         hess_term(1) = GiNaC::ex_to<GiNaC::numeric>(hess_eval(1, 0) * fx + hess_eval(1, 1) * fy).to_double();
-        GiNaC::matrix dh_eval = matrixSubsMatrix(dh_dx_sym, robot_positions, eigenvec, self_pos);
+        //std::cout << "[CBF] Step 2: Hessian contribution ∇²h·f = (" << hess_term(0) << ", " << hess_term(1) << ")" << std::endl;
+
+        // === Step 3: ∇h 数值化，替换变量获得数值梯度 ===
+        GiNaC::matrix dh_eval = matrixSubsMatrix(dh_dx_sym, robot_positions, eigenvec, x_self.head<2>());
         Eigen::VectorXd dh_dx = Eigen::VectorXd::Zero(6);
+        // 这里只对 px 和 py 非零，其他导数为零
         dh_dx(0) = GiNaC::ex_to<GiNaC::numeric>(dh_eval(self_idx, 0)).to_double();
         dh_dx(1) = GiNaC::ex_to<GiNaC::numeric>(dh_eval(self_idx, 1)).to_double();
-        // === Step 3: 手动写出符号的 Jf^T * ∇λ₂ ===
-        // ∂f/∂x 的转置作用就是把 ∇h 的 [∂h/∂px, ∂h/∂py, ∂h/∂th, ∂h/∂vx, ∂h/∂vy, ∂h/∂w] 乘以 Jf^T
-        // Jf = [∂f_i/∂x_j] 是常数，非零项：df1/dx4=1, df2/dx5=1, df3/dx6=1 → Jf^T乘上∇h就是把 dh_dx(3~5) 拷贝回来
+        //std::cout << "[CBF] Step 3: ∇h(px, py) = (" << dh_dx(0) << ", " << dh_dx(1) << ")" << std::endl;
+
+         // === Step 4: 构造 Jf^T ∇h 项 ===
+        // 由于 f(x) = [vx, vy, w]，其雅可比矩阵 Jf 关于状态向量 x 的非零偏导为：
+        // ∂vx/∂x4=1, ∂vy/∂x5=1, ∂w/∂x6=1，对应 transpose 后影响的就是 dh_dx 中 vx, vy 项
         Eigen::VectorXd jac_term = Eigen::VectorXd::Zero(6);
         jac_term(0) = 0.0;
         jac_term(1) = 0.0;
@@ -551,7 +574,11 @@ namespace cbf
         jac_term(3) = dh_dx(0);  // vx 对应 px
         jac_term(4) = dh_dx(1);  // vy 对应 py
         jac_term(5) = 0.0;
-        // === Step 4: 拼接总结果 ===
+        // std::cout << "[CBF] Step 4: Jf^T ∇h = (";
+        // for (int i = 0; i < 6; ++i) std::cout << jac_term(i) << (i < 5 ? ", " : "");
+        // std::cout << ")" << std::endl;
+
+        // === Step 5: 拼接最终结果 ∇(L_f h) = ∇²h·f + Jfᵀ∇h ===
         Eigen::VectorXd total = Eigen::VectorXd::Zero(6);
         total(0) = hess_term(0);
         total(1) = hess_term(1);
@@ -573,13 +600,20 @@ namespace cbf
         const int CONTROL_VARS = 3;
         // Step 1: h = λ₂ - λ₂_min
         auto [lambda2_val, eigenvec] = getLambda2FromL(robot_states.leftCols(2), Rs_val, sigma_val);
+        //std::cout << "[CBF] λ₂ = " << lambda2_val << std::endl;
+        eigenvec = eigenvec / eigenvec.norm();
         double h = lambda2_val - lambda2_min;
-        double alpha_h = gamma * h;
+        std::cout << "1[CBF] h = λ₂ - λ₂_min = " << h << std::endl;
         // Step 2: 符号构造 ∇h
         initSymbolLists(N);
         GiNaC::matrix dh_dx_sym = compute_dh_dx(N, Rs_val, sigma_val);
         GiNaC::matrix dh_dx_ginac = matrixSubsMatrix(dh_dx_sym, robot_states.leftCols(2), eigenvec); // N×2 数值表达式
-        // 转换为 Eigen 数值矩阵
+        //std::cout << "[CBF] ∇h evaluated:" << std::endl;
+        // for (int i = 0; i < N; ++i)
+        //     std::cout << "  grad[" << i << "] = (" 
+        //             << GiNaC::ex_to<GiNaC::numeric>(dh_dx_ginac(i, 0)).to_double() << ", "
+        //             << GiNaC::ex_to<GiNaC::numeric>(dh_dx_ginac(i, 1)).to_double() << ")" << std::endl;
+        //转换为 Eigen 数值矩阵
         Eigen::MatrixXd dh_dx_all(N, 2);
         for (int i = 0; i < N; ++i)
             for (int j = 0; j < 2; ++j)
@@ -595,30 +629,59 @@ namespace cbf
         f_x(1) = x_self(4); // vy
         f_x(2) = x_self(5); // w
         double lfh = dh_dx.dot(f_x);
+        //std::cout << "[CBF] L_f h = ∇h · f = " << lfh << std::endl;
         // ✅ Step 4: 用符号 Hessian 构造 ∇(L_f h)
         Eigen::VectorXd dlfh_dx = compute_dLf_h_dx(
             dh_dx_sym,
             self_idx,
             robot_states.leftCols(2),
             eigenvec,
-            x_self.head<2>()
+            x_self
         );
+        //std::cout << "[CBF] ∇(L_f h): dlfh_dx = ";
+       //std::cout << dlfh_dx.transpose() << std::endl;
         // Step 5: L_f² h = ∇(L_f h) · f
         double lf2h = dlfh_dx.dot(f_x);
+        //std::cout << "[CBF] L_f² h = ∇(L_f h) · f = " << lf2h << std::endl;
         // Step 6: L_g L_f h = ∇(L_f h) · g
         Eigen::MatrixXd g = Eigen::MatrixXd::Zero(STATE_VARS, CONTROL_VARS);
         g(3, 0) = 1.0;
         g(4, 1) = 1.0;
-        g(5, 2) = 1.0;
-        Eigen::RowVectorXd Ac = dlfh_dx.transpose() * g;
+        Eigen::RowVectorXd Ac = dlfh_dx.transpose() * g; // size = 2
+        Ac(2) = 0.0; // 防止角速度影响控制约束
         // Step 7: Bc = L_f² h + γ L_f h + γ² h
-        double Bc = lf2h + gamma * lfh + gamma * gamma * h;
+        double gamma1 = 5.0;
+        double gamma2 = 10.0;
+        double alpha_h = gamma1 * h + gamma2 * h * h * h;
+        double Bc = lf2h + gamma1 * lfh + alpha_h;
+        //std::cout << "[CBF] Ac (∇(L_f h)·g): " << Ac << std::endl;
+        //std::cout << "[CBF] Bc = L_f² h + γ L_f h + γ² h = " << Bc << std::endl;
         return std::make_pair(Ac, Bc);
+
+        //         // ✅ Step 7: 使用一致方式计算 Bc
+        // // alpha(h)
+        // GiNaC::ex h_sym = h;  // 直接用 double 值代入
+        // GiNaC::ex alpha_h_expr = alpha(h_sym, gamma);
+        // double alpha_h = GiNaC::ex_to<GiNaC::numeric>(alpha_h_expr).to_double();
+
+        // // L_f α(h) = α'(h) * L_f h, 以 fifthAlpha = γ h^5 为例，其导数为 5γ h^4
+        // double d_alpha_h = 5.0 * gamma * std::pow(h, 4);
+        // double lf_alpha_h = d_alpha_h * lfh;
+
+        // // α(L_f h + α(h))
+        // GiNaC::ex nested_expr = alpha(lfh + alpha_h, gamma);
+        // double nested_alpha = GiNaC::ex_to<GiNaC::numeric>(nested_expr).to_double();
+
+        // // Final Bc
+        // double Bc = lf2h + lf_alpha_h + nested_alpha;
+        // std::cout << "[CBF] Bc = L_f² h + L_f(α(h)) + α(L_f h + α(h)) = " << Bc << std::endl;
+
+        // return std::make_pair(Ac, Bc);
     }
 
     double ConnectivityCBF::getConnectivityBound(
         const Eigen::VectorXd &x_self,
-        const std::vector<Eigen::VectorXd> &other_positions)
+        const std::vector<Eigen::Vector3d> &other_positions)
     {
         // === 组装 robot_states: [self; others] ===
         const int N = 1 + other_positions.size();
@@ -629,11 +692,11 @@ namespace cbf
         robot_states.row(0).segment<2>(3) = x_self.segment<2>(3); // vx, vy
         // 其他机器人：只填 px, py，速度设为 0
         for (int i = 0; i < other_positions.size(); ++i) {
-            robot_states.row(i + 1).head<2>() = other_positions[i];
+            robot_states.row(i + 1).head<2>() = other_positions[i].head<2>();
         }
         // === 参数设置 ===
         const double Rs = 3.0;
-        const double sigma = 0.5;
+        const double sigma = 120;
         const double lambda2_min = 0.1;
         const double gamma = 1.0;
         // === 计算约束 ===

@@ -61,19 +61,11 @@ namespace cbf {
         qp_generator_.addMaxVelConstraints(state);
         qp_generator_.addControlBoundConstraint(u_min, u_max);
 
-        // Convert from VectorDIM (Vector3d) to Vector (VectorXd) // TODO: is this necessary?
-        std::vector<Vector> other_positions_dyn;
-        for (const auto& p : other_robot_positions) {
-            Vector v(p.size());
-            v = p;
-            other_positions_dyn.push_back(v);
-        }
-
-        // Add connectivity constraints
+        // Add connectivity constraint
         if (slack_mode_) {
-            qp_generator_.addConnectivityConstraint(state, other_positions_dyn, true, num_neighbors);
+            qp_generator_.addConnConstraint(state, other_robot_positions, true, num_neighbors);
         } else {
-            qp_generator_.addConnectivityConstraint(state, other_positions_dyn);
+            qp_generator_.addConnConstraint(state, other_robot_positions);
         }
         
         // solve QP

@@ -11,14 +11,15 @@ namespace cbf {
     }
 
     template <typename T, unsigned int DIM>
-    void ConnectivityQPGenerator<T, DIM>::addConnectivityConstraint(const Vector &x_self,
-                                                                    const std::vector<Vector> &other_positions,
-                                                                    bool use_slack,
-                                                                    std::size_t slack_idx)
+    void ConnectivityQPGenerator<T, DIM>::addConnectivityConstraint(const Vector& x_self,
+                                                            const std::vector<VectorDIM>& other_positions,
+                                                            bool use_slack,
+                                                            std::size_t slack_idx)
     {
         // === Step 1: 获取约束项（内部已拼装 robot_states 且假定 self_idx = 0） ===
         Vector coefficients = -1.0 * cbf_->getConnectivityConstraints(x_self, other_positions);
         T bound = cbf_->getConnectivityBound(x_self, other_positions);
+        std::cout << "[CHECK] CBF constraint: Ac = " << coefficients.transpose() << ", Bc = " << bound << std::endl;
         // === Step 2: 构造线性约束 ===
         LinearConstraint linear_constraint(coefficients, std::numeric_limits<T>::lowest(), bound);
         // === Step 3: 是否引入松弛变量 ===
