@@ -57,8 +57,9 @@ namespace cbf {
                                          int self_idx,
                                          const Eigen::MatrixXd& robot_positions,
                                          const Eigen::VectorXd& eigenvec,
-                                         const Eigen::Vector2d& self_pos);
+                                         const Eigen::VectorXd& x_self);
     public:
+        using Vector3d = math::VectorDIM<double, 3>;
         ConnectivityCBF(double min_dist, double max_dist, Eigen::VectorXd vmin, Eigen::VectorXd vmax);
         ~ConnectivityCBF();
         // Basic constraints
@@ -72,9 +73,9 @@ namespace cbf {
         Eigen::VectorXd getMinVelBounds(Eigen::VectorXd state);
         // Connectivity constraint
         Eigen::RowVectorXd getConnConstraints(const Eigen::VectorXd& x_self,
-                                              const std::vector<Eigen::VectorXd>& other_positions);
+                                              const std::vector<Vector3d>& other_positions);
         double getConnBound(const Eigen::VectorXd& x_self,
-                            const std::vector<Eigen::VectorXd>& other_positions);
+                            const std::vector<Vector3d>& other_positions);
         // Alpha setter
         void setAlpha(std::function<GiNaC::ex(GiNaC::ex, double)> newAlpha);
     };

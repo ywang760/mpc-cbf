@@ -35,13 +35,13 @@ int main(int argc, char* argv[]) {
             ("instance_type", "instance type for simulations",
              cxxopts::value<std::string>()->default_value("circle"))
             ("num_robots", "number of robots in the simulation",
-             cxxopts::value<int>()->default_value(std::to_string(2)))
+             cxxopts::value<int>()->default_value(std::to_string(3)))
             ("slack_decay", "slack variable cost decay rate",
              cxxopts::value<double>()->default_value(std::to_string(0.1)))
             ("config_file", "path to experiment configuration file",              // TODO: change the config_file
-             cxxopts::value<std::string>()->default_value("/usr/src/mpc-cbf/workspace/experiments/config/circle/circle2_config.json"))
+             cxxopts::value<std::string>()->default_value("/usr/src/mpc-cbf/workspace/experiments/config/circle/circle3_config.json"))
             ("write_filename", "write to json filename",
-             cxxopts::value<std::string>()->default_value("/usr/src/mpc-cbf/workspace/experiments/results/states.json"));
+             cxxopts::value<std::string>()->default_value("/usr/src/mpc-cbf/workspace/experiments/results/states3.json"));
     auto option_parse = options.parse(argc, argv);
 
     // Load experiment configuration
@@ -149,7 +149,7 @@ int main(int argc, char* argv[]) {
 
     // Main simulation loop
     int loop_idx = 0;
-    while (loop_idx < 400) {
+    while (loop_idx < 50) {
         // Print out current loop_idx if loop_idx is a multiple of 10
         if (loop_idx % 10 == 0)
         {
@@ -199,8 +199,12 @@ int main(int argc, char* argv[]) {
 
             // Compute desired control using spring control toward target
             const VectorDIM &target_pos = math::convertToClosestYaw<DIM>(init_states.at(robot_idx), target_positions.at(robot_idx));
-            VectorDIM desired_u = math::criticallyDampedSpringControl<double, DIM>(init_states.at(robot_idx), target_pos, 1.);
-
+            VectorDIM desired_u = math::criticallyDampedSpringControl<double, DIM>(init_states.at(robot_idx), target_pos, 0.5);
+            //VectorDIM desired_u = VectorDIM::Zero();
+            // if (robot_idx == 1) {  // 只给中间机器人加控制指令
+            //     const VectorDIM &target_pos = math::convertToClosestYaw<DIM>(init_states.at(robot_idx), target_positions.at(robot_idx));
+            //     desired_u = math::criticallyDampedSpringControl<double, DIM>(init_states.at(robot_idx), target_pos, 0.5);
+            // }
             // Apply CBF to modify control for safety and connectivity
             ConnectivityControl connectivity_control(connectivity_cbf, num_neighbors, slack_mode, slack_cost, slack_decay_rate);
             VectorDIM cbf_u;
@@ -211,8 +215,26 @@ int main(int argc, char* argv[]) {
             if (!success) {
                 std::cout << "Optimization failed for robot " << robot_idx << " at timestep " << loop_idx << "\n";
                 cbf_u = VectorDIM::Zero(); // Use zero control if optimization fails
+             }else {
+                auto cbf_ptr = connectivity_control.getCBF(); // 新增接口访问 cbf_
+                const auto& state = init_states.at(robot_idx);
+                Eigen::VectorXd x_self(6);
+                x_self << state.pos_, state.vel_;  // 前 3 是位置，后 3 是速度
+                // ✅ 调用连通性约束
+                Eigen::RowVectorXd Ac = -1.0 * cbf_ptr->getConnConstraints(x_self, other_robot_positions);
+                auto Bc = cbf_ptr->getConnBound(x_self, other_robot_positions);
+                std::cout << "[CBF CHECK] robot " << robot_idx << ", timestep " << loop_idx << std::endl;
+                std::cout << "  desired_u = " << desired_u.transpose() << std::endl;
+                std::cout << "  actual_u  = " << cbf_u.transpose() << std::endl;
+                std::cout << "  Ac * desired_u = " << Ac.dot(desired_u) << ", Bc = " << Bc << std::endl;
+                std::cout << "  Ac * actual_u  = " << Ac.dot(cbf_u)    << ", Bc = " << Bc << std::endl;
+                if (Ac.dot(desired_u) > Bc)
+                    std::cout << "  ➤ CBF modified the control input.\n";
+                else
+                    std::cout << "  ➤ CBF did NOT need to modify the control input.\n";
             }
 
+        
             // Apply control to robot model to get next state
             State next_state = pred_model_ptr->applyInput(init_states.at(robot_idx), cbf_u);
 
