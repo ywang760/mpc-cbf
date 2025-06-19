@@ -57,6 +57,12 @@ namespace cbf {
                       const VectorDIM& u_min, 
                       const VectorDIM& u_max);
 
+        const std::shared_ptr<cbf::ConnectivityCBF>& getCBF() const {
+            return qp_generator_.getCBF();
+        }
+
+
+
     private:
         QPGenerator qp_generator_;
         bool slack_mode_;
