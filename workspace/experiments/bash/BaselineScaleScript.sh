@@ -17,6 +17,7 @@ for (( exp_idx = 0; exp_idx < ${max_exp}; exp_idx++ )); do
   (for (( num_r = ${min_r}; num_r <= ${max_r}; num_r++ )); do
     for fov in 120 240 360; do
         echo experiment instance type:${instances} num_robot:${num_r}, exp_idx:${exp_idx}
+        mkdir -p "/usr/src/mpc-cbf/workspace/experiments/instances/results/log${date}/"
         ./cbf_examples_CBFControl_example --instance_type ${instances} --num_robots ${num_r} --fov ${fov} --slack_decay ${default_slack_decay} --write_filename "/usr/src/mpc-cbf/workspace/experiments/instances/results/log${date}/baseline_${instances}${num_r}_fov${fov}_decay${default_slack_decay}_States_${exp_idx}.json"
     done
   done) &
