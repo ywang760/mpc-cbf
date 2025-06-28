@@ -44,13 +44,13 @@ namespace cbf {
                                        const Eigen::VectorXd& eigenvec,
                                        const Eigen::Vector2d& self_position = Eigen::Vector2d::Zero());
         // Lambda2-based constraint
-        std::pair<Eigen::RowVectorXd, double> initConnCBF(const Eigen::MatrixXd& robot_states,
-                                                          const Eigen::VectorXd& x_self,
-                                                          int self_idx,
-                                                          double Rs_val,
-                                                          double sigma_val,
-                                                          double lambda2_min,
-                                                          double gamma);
+std::tuple<Eigen::RowVectorXd, double, double> initConnCBF(const Eigen::MatrixXd& robot_states,
+                                                            const Eigen::VectorXd& x_self,
+                                                            int self_idx,
+                                                            double Rs_val,
+                                                            double sigma_val,
+                                                            double lambda2_min,
+                                                            double gamma);
         GiNaC::matrix compute_dh_dx(int N, const GiNaC::ex& Rs, const GiNaC::ex& sigma);
         GiNaC::matrix compute_d2h_dx2(const GiNaC::matrix& dh_dx_sym, int self_idx);
         Eigen::VectorXd compute_dLf_h_dx(const GiNaC::matrix& dh_dx_sym,
@@ -73,7 +73,8 @@ namespace cbf {
         Eigen::VectorXd getMinVelBounds(Eigen::VectorXd state);
         // Connectivity constraint
         Eigen::RowVectorXd getConnConstraints(const Eigen::VectorXd& x_self,
-                                              const std::vector<Vector3d>& other_positions);
+                                              const std::vector<Eigen::Vector3d>& other_positions,
+                                              double& h_out);
         double getConnBound(const Eigen::VectorXd& x_self,
                             const std::vector<Vector3d>& other_positions);
         // Alpha setter

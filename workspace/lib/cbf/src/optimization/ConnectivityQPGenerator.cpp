@@ -18,7 +18,8 @@ namespace cbf {
                                                             std::size_t slack_idx)
     {
         // === Step 1: 获取约束项（内部已拼装 robot_states 且假定 self_idx = 0） ===
-        Vector coefficients = -1.0 * cbf_->getConnConstraints(x_self, other_positions);
+        double h = 0.0;  // ✅ 声明并初始化 h
+        Vector coefficients = -1.0 * cbf_->getConnConstraints(x_self, other_positions, h);
         T bound = cbf_->getConnBound(x_self, other_positions);
         std::cout << "[CHECK] CBF constraint: Ac = " << coefficients.transpose() << ", Bc = " << bound << std::endl;
         // === Step 2: 构造线性约束 ===

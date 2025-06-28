@@ -1,5 +1,7 @@
 #include <vector>
 #include <cbf/detail/ConnectivityCBF.h>
+#include <fstream> 
+#include <tuple>
 
 // Default alpha function for Control Barrier Functions (CBF)
 // Implements a linear scaling of the barrier function
@@ -400,9 +402,9 @@ namespace cbf
         return Acs;
     }
 
-    Eigen::RowVectorXd ConnectivityCBF::getConnConstraints(
-        const Eigen::VectorXd& x_self,
-        const std::vector<Vector3d>& other_positions)
+    Eigen::RowVectorXd cbf::ConnectivityCBF::getConnConstraints(const Eigen::VectorXd& x_self,
+                                      const std::vector<Eigen::Vector3d>& other_positions,
+                                      double& h_out)  // 新增引用参数
     {
         const int N = 1 + other_positions.size();
         Eigen::MatrixXd robot_states(N, 6);
@@ -425,7 +427,8 @@ namespace cbf
         const double sigma = 120;
         const double lambda2_min = 0.1;
         const double gamma = 1.0;
-        auto [Ac, Bc] = initConnCBF(robot_states, x_self, 0, Rs, sigma, lambda2_min, gamma);
+        auto [Ac, Bc, h] = this->initConnCBF(robot_states, x_self, 0, Rs, sigma, lambda2_min, gamma);
+        h_out = h;
         return Ac;
     }
 
@@ -591,7 +594,7 @@ namespace cbf
     }
 
 
-    std::pair<Eigen::RowVectorXd, double> ConnectivityCBF::initConnCBF(
+    std::tuple<Eigen::RowVectorXd, double, double> ConnectivityCBF::initConnCBF(
         const Eigen::MatrixXd& robot_states,  // N x 6 matrix
         const Eigen::VectorXd& x_self,        // 当前机器人的状态 6x1
         int self_idx,                         // 当前机器人在 robot_states 中的索引
@@ -655,13 +658,15 @@ namespace cbf
         Eigen::RowVectorXd Ac = dlfh_dx.transpose() * g; // size = 2
         Ac(2) = 0.0; // 防止角速度影响控制约束
         // Step 7: Bc = L_f² h + γ L_f h + γ² h
-        double gamma1 = 5.0;
-        double gamma2 = 10.0;
-        double alpha_h = gamma1 * h + gamma2 * h * h * h;
-        double Bc = lf2h + gamma1 * lfh + alpha_h;
+        double gamma1 = 1.0;
+        double gamma2 = 1.0;
+        double psi1 = lfh + gamma1 * h; // psi1 = L_f h + alpha1(h), assuming linear alpha1
+        double Bc = lf2h                // L_f^2 h
+                    + gamma1 * lfh      // Assuming linear alpha11: L_f(α(h)) = γ L_f h
+                    + gamma2 * psi1;    // Assuming linear alpha2:
         //std::cout << "[CBF] Ac (∇(L_f h)·g): " << Ac << std::endl;
         //std::cout << "[CBF] Bc = L_f² h + γ L_f h + γ² h = " << Bc << std::endl;
-        return std::make_pair(Ac, Bc);
+        return std::make_tuple(Ac, Bc, h);
 
         //         // ✅ Step 7: 使用一致方式计算 Bc
         // // alpha(h)
@@ -706,7 +711,7 @@ namespace cbf
         const double lambda2_min = 0.1;
         const double gamma = 1.0;
         // === 计算约束 ===
-        auto [Ac, Bc] = initConnCBF(robot_states, x_self, 0, Rs, sigma, lambda2_min, gamma);
+        auto [Ac, Bc, h] = initConnCBF(robot_states, x_self, 0, Rs, sigma, lambda2_min, gamma);
         return Bc;
     }
 
