@@ -70,20 +70,25 @@ target_link_libraries(cbf_controller_ConnectivityControl PUBLIC
         model_DoubleIntegratorXYYaw)
 
 # add examples
-add_executable(cbf_examples_CBFControl_example examples/fov/CBFControl_example.cpp)
-target_include_directories(cbf_examples_CBFControl_example PUBLIC include ../../../third_party/json/single_include)
-target_link_libraries(cbf_examples_CBFControl_example PUBLIC
-        model_DoubleIntegratorXYYaw
-        cbf_controller_FovControl
-        cxxopts
-        ParticleFilter
-        PFApplications
-        math_Geometry
-        math_Controls
-        math_Random)
+# add_executable(cbf_examples_CBFControl_example examples/fov/CBFControl_example.cpp)
+# target_include_directories(cbf_examples_CBFControl_example PUBLIC include ../../../third_party/json/single_include)
+# target_link_libraries(cbf_examples_CBFControl_example PUBLIC
+#         model_DoubleIntegratorXYYaw
+#         cbf_controller_FovControl
+#         cxxopts
+#         ParticleFilter
+#         PFApplications
+#         math_Geometry
+#         math_Controls
+#         math_Random)
 
 add_executable(cbf_examples_CBFFormationControl_example examples/connectivity/CBFFormationControl_example.cpp)
-target_include_directories(cbf_examples_CBFFormationControl_example PUBLIC include ../../../third_party/json/single_include)
+target_include_directories(cbf_examples_CBFFormationControl_example PUBLIC
+    ../PID                  
+    include
+    ../../../third_party/json/single_include)
+
+
 target_link_libraries(cbf_examples_CBFFormationControl_example PUBLIC
         model_DoubleIntegratorXYYaw
         cbf_controller_ConnectivityControl
@@ -106,3 +111,4 @@ target_link_libraries(cbf_examples_CBFFormationControl_example PUBLIC
 #        cbf_controller_FovControl
 #        ParticleFilter
 #        cxxopts)
+

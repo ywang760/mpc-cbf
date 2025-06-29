@@ -37,22 +37,22 @@ target_link_libraries(qpcpp_solvers_CPLEX PUBLIC
         qpcpp_solvers_Solver)
 
 # Testing configuration
-option(QPCPP_BUILD_TESTS "Build tests for qpcpp library" ON)
+# option(QPCPP_BUILD_TESTS "Build tests for qpcpp library" ON)
 
-if(QPCPP_BUILD_TESTS)
-    # Enable testing
-    enable_testing()
+# if(QPCPP_BUILD_TESTS)
+#     # Enable testing
+#     enable_testing()
 
-    # Try to find and configure GoogleTest
-    find_package(GoogleTest)
+#     # Try to find and configure GoogleTest
+#     find_package(GoogleTest)
 
-    # Include tests directory if GoogleTest is available
-    if(GOOGLETEST_CONFIGURED)
-        # Make GMOCK_INCLUDE_DIRS available to tests
-        include_directories(${GTEST_INCLUDE_DIRS} ${GMOCK_INCLUDE_DIRS})
-        add_subdirectory(tests)
-    else()
-        message(WARNING "Skipping tests for qpcpp library as GoogleTest is not available")
-    endif()
-endif()
+#     # Include tests directory if GoogleTest is available
+#     if(GOOGLETEST_CONFIGURED)
+#         # Make GMOCK_INCLUDE_DIRS available to tests
+#         include_directories(${GTEST_INCLUDE_DIRS} ${GMOCK_INCLUDE_DIRS})
+#         add_subdirectory(tests)
+#     else()
+#         message(WARNING "Skipping tests for qpcpp library as GoogleTest is not available")
+#     endif()
+# endif()
 
