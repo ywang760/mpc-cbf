@@ -21,7 +21,7 @@ namespace common
         /*----- Eigen matrix ---------------------------------------------------*/
         template <typename Derived>
         std::string toString(const Eigen::MatrixBase<Derived> &M,
-                             int precision = 2)
+                             int precision = 6)
         {
             std::ostringstream ss;
             ss << "(" << M.rows() << "×" << M.cols() << ")\n";
@@ -43,7 +43,7 @@ namespace common
 
         /*----- GiNaC matrix ---------------------------------------------------*/
         inline std::string toString(const GiNaC::matrix &M,
-                                    int precision = 2)
+                                    int precision = 6)
         {
             std::ostringstream ss;
             ss << "(" << M.rows() << "×" << M.cols() << ")\n";
@@ -81,7 +81,7 @@ namespace common
     inline void logMatrix(std::string_view label,
                           const Eigen::MatrixBase<Derived> &M,
                           spdlog::level::level_enum lvl = spdlog::level::info,
-                          int precision = 2)
+                          int precision = 6)
     {
         auto msg = fmt::format("{} {}", label, detail::toString(M, precision));
         spdlog::log(spdlog::source_loc{__FILE__, __LINE__, SPDLOG_FUNCTION},
@@ -91,7 +91,7 @@ namespace common
     inline void logMatrix(std::string_view label,
                           const GiNaC::matrix &M,
                           spdlog::level::level_enum lvl = spdlog::level::info,
-                          int precision = 2)
+                          int precision = 6)
     {
         auto msg = fmt::format("{} {}", label, detail::toString(M, precision));
         spdlog::log(spdlog::source_loc{__FILE__, __LINE__, SPDLOG_FUNCTION},
@@ -103,7 +103,7 @@ namespace common
     inline void logVector(std::string_view label,
                           const Eigen::MatrixBase<Derived> &v,
                           spdlog::level::level_enum lvl = spdlog::level::info,
-                          int precision = 2)
+                          int precision = 6)
     {
         static_assert(Derived::ColsAtCompileTime == 1 ||
                           Derived::ColsAtCompileTime == Eigen::Dynamic,
@@ -130,7 +130,7 @@ namespace fmt
         Derived, Char,
         std::enable_if_t<std::is_base_of_v<Eigen::EigenBase<Derived>, Derived>, void>>
     {
-        int precision_ = 2;
+        int precision_ = 6;
 
         constexpr auto parse(basic_format_parse_context<Char> &ctx)
         {
@@ -159,7 +159,7 @@ namespace fmt
     template <typename Char>
     struct formatter<GiNaC::matrix, Char>
     {
-        int precision_ = 2;
+        int precision_ = 6;
 
         constexpr auto parse(basic_format_parse_context<Char> &ctx)
         {

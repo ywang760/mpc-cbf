@@ -20,7 +20,7 @@ VectorDIM<T, DIM> criticallyDampedSpringControl(
     const double spring_constant) {
     
     VectorDIM<T, DIM> Fs;
-    Fs = spring_constant * target - current_state.pos_;
+    Fs = spring_constant * (target - current_state.pos_);
     VectorDIM<T, DIM> Fd;
     Fd = -current_state.vel_ * 2 * sqrt(spring_constant);
     return Fs + Fd;

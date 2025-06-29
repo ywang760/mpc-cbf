@@ -3,8 +3,14 @@ project(cbf)
 set_property(GLOBAL PROPERTY cbf_ADDED "ON")
 
 set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/../../cmake ${CMAKE_MODULE_PATH})
 
 # add local library
+get_property(is_common_ADDED GLOBAL PROPERTY common_ADDED)
+if(NOT is_common_ADDED)
+    add_subdirectory(../common ${CMAKE_CURRENT_BINARY_DIR}/common)
+endif()
+
 get_property(is_model_ADDED GLOBAL PROPERTY model_ADDED)
 if(NOT is_model_ADDED)
     add_subdirectory(../model ${CMAKE_CURRENT_BINARY_DIR}/model)
@@ -34,7 +40,8 @@ target_link_libraries(cbf_detail_FovCBF PUBLIC ginac cln
 add_library(cbf_detail_ConnectivityCBF SHARED src/detail/ConnectivityCBF.cpp)
 target_include_directories(cbf_detail_ConnectivityCBF PUBLIC include)
 target_link_libraries(cbf_detail_ConnectivityCBF PUBLIC ginac cln
-        math_Helpers)
+        math_Helpers
+        common_Logging)
 
 add_library(cbf_optimization_CBFQPGeneratorBase SHARED src/optimization/CBFQPGeneratorBase.cpp)
 target_include_directories(cbf_optimization_CBFQPGeneratorBase PUBLIC include)
@@ -70,6 +77,7 @@ target_link_libraries(cbf_controller_ConnectivityControl PUBLIC
         model_DoubleIntegratorXYYaw)
 
 # add examples
+
 add_executable(cbf_examples_CBFFovControl_example examples/fov/CBFControl_example.cpp)
 target_include_directories(cbf_examples_CBFFovControl_example PUBLIC include ../../../third_party/json/single_include)
 target_link_libraries(cbf_examples_CBFFovControl_example PUBLIC
@@ -90,4 +98,25 @@ target_link_libraries(cbf_examples_CBFFormationControl_example PUBLIC
         cxxopts
         math_Geometry
         math_Controls
-        math_Random)
+        math_Random
+        spdlog::spdlog_header_only)
+
+# Testing configuration
+option(CBF_BUILD_TESTS "Build tests for cbf library" ON)
+
+if(CBF_BUILD_TESTS)
+    # Enable testing
+    enable_testing()
+
+    # Try to find and configure GoogleTest
+    find_package(GoogleTest)
+
+    # Include tests directory if GoogleTest is available
+    if(GOOGLETEST_CONFIGURED)
+        # Make GMOCK_INCLUDE_DIRS available to tests
+        include_directories(${GTEST_INCLUDE_DIRS} ${GMOCK_INCLUDE_DIRS})
+        add_subdirectory(tests)
+    else()
+        message(WARNING "Skipping tests for cbf library as GoogleTest is not available")
+    endif()
+endif()
