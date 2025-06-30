@@ -91,11 +91,7 @@ target_link_libraries(cbf_examples_CBFFovControl_example PUBLIC
         math_Random)
 
 add_executable(cbf_examples_CBFFormationControl_example examples/connectivity/CBFFormationControl_example.cpp)
-# TODO: remove the ../PID from include_directories, add it as library
-target_include_directories(cbf_examples_CBFFormationControl_example PUBLIC
-    ../PID                  
-    include
-    ../../../third_party/json/single_include)
+target_include_directories(cbf_examples_CBFFormationControl_example PUBLIC include ../../../third_party/json/single_include)
 target_link_libraries(cbf_examples_CBFFormationControl_example PUBLIC
         model_DoubleIntegratorXYYaw
         cbf_controller_ConnectivityControl

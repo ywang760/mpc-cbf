@@ -30,9 +30,9 @@ add_library(math_Geometry SHARED src/Geometry.cpp)
 target_include_directories(math_Geometry PUBLIC include ${EIGEN3_INCLUDE_DIR})
 target_link_libraries(math_Geometry PUBLIC math_Types model_DoubleIntegrator)
 
-add_library(math_Controls INTERFACE)
-target_include_directories(math_Controls INTERFACE include)
-target_link_libraries(math_Controls INTERFACE math_Types model_DoubleIntegrator)
+add_library(math_Controls SHARED src/Controls.cpp)
+target_include_directories(math_Controls PUBLIC include)
+target_link_libraries(math_Controls PUBLIC math_Types model_DoubleIntegrator)
 
 add_library(math_Random SHARED src/Random.cpp)
 target_include_directories(math_Random PUBLIC include)

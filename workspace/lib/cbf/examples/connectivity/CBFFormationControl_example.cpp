@@ -13,8 +13,6 @@
 #include <math/Controls.h>
 #include <math/Random.h>
 #include <spdlog/spdlog.h>
-#include <PID3D.h>
-
 
 // Define state dimensions and types
 constexpr unsigned int DIM = 3U;
@@ -141,11 +139,10 @@ int main(int argc, char *argv[])
     json states;
     states["dt"] = Ts;
     states["Ts"] = Ts;
-    
-    // === Create one PID3D controller per robot ===
-    
-    std::vector<pid::PID3D<double>> pid_controllers;
-    pid::PIDParams<double> pid_params{10.0, 0.1, 5.0, Ts};  // 你可以根据需要调参数
+
+    // === Create one PID controller per robot ===
+    std::vector<math::PID<double, 3U>> pid_controllers;
+    math::PIDParams<double, 3U> pid_params{10.0, 0.1, 5.0, Ts}; // 你可以根据需要调参数
 
     for (size_t i = 0; i < num_robots; ++i) {
         pid_controllers.emplace_back(pid_params);
