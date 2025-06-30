@@ -1,5 +1,5 @@
 //
-// Created by yutong on 4/8/2025
+// Created by Yichun on 6/27/2025
 //
 
 #include <model/DoubleIntegratorXYYaw.h>
@@ -13,6 +13,8 @@
 #include <math/Controls.h>
 #include <math/Random.h>
 #include <spdlog/spdlog.h>
+#include <PID3D.h>
+
 
 // Define state dimensions and types
 constexpr unsigned int DIM = 3U;
@@ -138,6 +140,15 @@ int main(int argc, char *argv[])
     json states;
     states["dt"] = Ts;
     states["Ts"] = Ts;
+    
+    // === Create one PID3D controller per robot ===
+    
+    std::vector<pid::PID3D<double>> pid_controllers;
+    pid::PIDParams<double> pid_params{10.0, 0.1, 5.0, Ts};  // 你可以根据需要调参数
+
+    for (size_t i = 0; i < num_robots; ++i) {
+        pid_controllers.emplace_back(pid_params);
+    }
 
     // Main simulation loop
     int loop_idx = 0;
@@ -148,8 +159,6 @@ int main(int argc, char *argv[])
         {
             SPDLOG_INFO("Timestep: {}", loop_idx);
         }
-        ConnectivityControl connectivity_control(connectivity_cbf, num_neighbors, slack_mode, slack_cost, slack_decay_rate);
-
         // Process each robot in the simulation
         for (int robot_idx = 0; robot_idx < num_robots; ++robot_idx)
         {
@@ -168,10 +177,23 @@ int main(int argc, char *argv[])
             }
 
             // Compute desired control using spring control toward target
-            const VectorDIM &target_pos = target_positions.at(robot_idx);
-            VectorDIM desired_u = math::criticallyDampedSpringControl<double, DIM>(init_states.at(robot_idx), target_pos, 0.5);
-            //  Apply CBF to modify control for safety and connectivity
 
+            // Uncomment the following 2 lines if you want to use critically damped spring control
+            // const VectorDIM &target_pos = target_positions.at(robot_idx);
+            // VectorDIM desired_u = math::criticallyDampedSpringControl<double, DIM>(init_states.at(robot_idx), target_pos, 0.5);
+
+            VectorDIM ref_pos = target_positions.at(robot_idx);
+            VectorDIM ref_vel = VectorDIM::Zero();  // 目标速度为0
+            VectorDIM ref_acc = VectorDIM::Zero();  // 目标加速度为0
+            VectorDIM desired_u = pid_controllers.at(robot_idx).control(
+                init_states.at(robot_idx),
+                ref_pos,
+                ref_vel,
+                ref_acc
+            );
+            
+            // Apply CBF to modify control for safety and connectivity
+            ConnectivityControl connectivity_control(connectivity_cbf, num_neighbors, slack_mode, slack_cost, slack_decay_rate);
             VectorDIM cbf_u;
             bool success = connectivity_control.optimize(cbf_u, desired_u, init_states.at(robot_idx),
                                                          other_robot_positions, a_min, a_max);
