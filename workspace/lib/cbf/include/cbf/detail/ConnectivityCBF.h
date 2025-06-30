@@ -7,6 +7,7 @@
 #include <functional>
 #include <ginac/ginac.h>
 #include <vector>
+#include <common/logging.hpp>
 
 namespace cbf {
 
@@ -18,9 +19,10 @@ namespace cbf {
         int STATE_VARS;
         int CONTROL_VARS;
         double gamma;
+        double epsilon;
         // Symbols
         GiNaC::symbol px, py, th, vx, vy, w, xt, yt;
-        std::vector<GiNaC::symbol> px_list, py_list, v_list; // TODO: what is this?
+        std::vector<GiNaC::symbol> px_list, py_list, eigenvec_list;
         // System dynamics
         GiNaC::matrix state, agent_state, A, B, x, x_agent, f, g;
         // Symbolic constraints and bounds
@@ -35,22 +37,14 @@ namespace cbf {
         // Internal initialization
         std::pair<GiNaC::matrix, GiNaC::ex> initSafetyCBF();
         std::pair<GiNaC::matrix, GiNaC::ex> initVelCBF(GiNaC::ex bv);
-        void initSymbolLists(int N); // TODO: check this
+        void initSymbolLists(int N);
         // Symbolic substitution utilities
         GiNaC::ex matrixSubs(GiNaC::matrix a, Eigen::VectorXd state, Eigen::VectorXd agent_state);
         GiNaC::ex valueSubs(GiNaC::ex m, Eigen::VectorXd state, Eigen::VectorXd agent_state);
-        GiNaC::matrix matrixSubsMatrix(const GiNaC::matrix& expr_matrix,
-                                       const Eigen::MatrixXd& robot_positions,
-                                       const Eigen::VectorXd& eigenvec,
-                                       const Eigen::Vector2d& self_position = Eigen::Vector2d::Zero());
-        // Lambda2-based constraint
-        std::pair<Eigen::RowVectorXd, double> initConnectivityCBF(const Eigen::MatrixXd &robot_states,
-                                                                  const Eigen::VectorXd &x_self,
-                                                                  int self_idx,
-                                                                  double Rs_val,
-                                                                  double sigma_val,
-                                                                  double lambda2_min,
-                                                                  double gamma);
+        GiNaC::matrix matrixSubsMatrix(const GiNaC::matrix &expr_matrix,
+                                       const Eigen::MatrixXd &robot_positions,
+                                       const Eigen::VectorXd &eigenvec,
+                                       const Eigen::Vector2d &self_position = Eigen::Vector2d::Zero());
         GiNaC::matrix compute_dh_dx(int N, const GiNaC::ex& Rs, const GiNaC::ex& sigma);
         GiNaC::matrix compute_d2h_dx2(const GiNaC::matrix& dh_dx_sym, int self_idx);
         Eigen::VectorXd compute_dLf_h_dx(const GiNaC::matrix& dh_dx_sym,
@@ -71,11 +65,14 @@ namespace cbf {
         Eigen::MatrixXd getMinVelContraints(Eigen::VectorXd state);
         Eigen::VectorXd getMaxVelBounds(Eigen::VectorXd state);
         Eigen::VectorXd getMinVelBounds(Eigen::VectorXd state);
-        // Connectivity constraint
-        Eigen::RowVectorXd getConnectivityConstraints(const Eigen::VectorXd &x_self,
-                                                      const std::vector<Eigen::Vector3d> &other_positions);
-        double getConnectivityBound(const Eigen::VectorXd &x_self,
-                                    const std::vector<Eigen::VectorXd> &other_positions);
+        std::pair<Eigen::VectorXd, double> initConnectivityCBF(const Eigen::MatrixXd &robot_states,
+                                                               const Eigen::VectorXd &x_self,
+                                                               int self_idx);
+        // Connectivity constraint //TODO: deprecated
+        // Eigen::VectorXd getConnectivityConstraints(const Eigen::VectorXd &x_self,
+        //                                               const std::vector<Eigen::VectorXd> &other_positions);
+        // double getConnectivityBound(const Eigen::VectorXd &x_self,
+        //                             const std::vector<Eigen::VectorXd> &other_positions);
         // Alpha setter
         void setAlpha(std::function<GiNaC::ex(GiNaC::ex, double)> newAlpha);
     };

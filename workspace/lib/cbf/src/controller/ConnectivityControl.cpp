@@ -12,13 +12,13 @@ namespace cbf {
     }
 
     template <typename T, unsigned int DIM>
-    bool ConnectivityControl<T, DIM>::optimize(VectorDIM& cbf_u,
-                                      const VectorDIM &desired_u,
-                                      const State &current_state,
-                                      const std::vector<VectorDIM> &other_robot_positions,
-                                      const std::vector<Matrix> &other_robot_covs,
-                                      const VectorDIM& u_min,
-                                      const VectorDIM& u_max) {
+    bool ConnectivityControl<T, DIM>::optimize(VectorDIM &cbf_u,
+                                               const VectorDIM &desired_u,
+                                               const State &current_state,
+                                               const std::vector<VectorDIM> &other_robot_positions,
+                                               const VectorDIM &u_min,
+                                               const VectorDIM &u_max)
+    {
 
         VectorDIM current_pos = current_state.pos_;
         VectorDIM current_vel = current_state.vel_;
@@ -63,9 +63,9 @@ namespace cbf {
 
         // Add connectivity constraint
         if (slack_mode_) {
-            qp_generator_.addConnConstraint(state, other_robot_positions, true, num_neighbors);
+            qp_generator_.addConnectivityConstraint(state, other_robot_positions, true, num_neighbors);
         } else {
-            qp_generator_.addConnConstraint(state, other_robot_positions);
+            qp_generator_.addConnectivityConstraint(state, other_robot_positions);
         }
         
         // solve QP

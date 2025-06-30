@@ -11,15 +11,35 @@ namespace cbf {
     }
 
     template <typename T, unsigned int DIM>
-    void ConnectivityQPGenerator<T, DIM>::addConnectivityConstraint(const Vector& x_self,
-                                                            const std::vector<VectorDIM>& other_positions,
-                                                            bool use_slack,
-                                                            std::size_t slack_idx)
+    void ConnectivityQPGenerator<T, DIM>::addConnectivityConstraint(const Vector &x_self,
+                                                                    const std::vector<VectorDIM> &other_positions,
+                                                                    bool use_slack,
+                                                                    std::size_t slack_idx)
     {
+        // TODO: right now move them here
+        // === 组装 robot_states: [self; others] ===
+        const int N = 1 + other_positions.size();
+        Eigen::MatrixXd robot_states(N, 6);
+        robot_states.setZero();
+
+        // 当前机器人位置和速度完整设置
+        robot_states(0, 0) = x_self(0); // px
+        robot_states(0, 1) = x_self(1); // py
+        robot_states(0, 2) = x_self(2); // yaw
+        robot_states(0, 3) = x_self(3); // vx
+        robot_states(0, 4) = x_self(4); // vy
+        robot_states(0, 5) = x_self(5); // yaw rate
+
+        for (int i = 0; i < other_positions.size(); ++i)
+        {
+            robot_states.row(i + 1).segment(0, 2) = other_positions[i].segment(0, 2).transpose(); // px, py
+        }
+        // === 计算约束 ===
+        auto [Ac, Bc] = cbf_->initConnectivityCBF(robot_states, x_self, 0);
+
         // === Step 1: 获取约束项（内部已拼装 robot_states 且假定 self_idx = 0） ===
-        Vector coefficients = -1.0 * cbf_->getConnectivityConstraints(x_self, other_positions);
-        T bound = cbf_->getConnectivityBound(x_self, other_positions);
-        std::cout << "[CHECK] CBF constraint: Ac = " << coefficients.transpose() << ", Bc = " << bound << std::endl;
+        Vector coefficients = -1.0 * Ac;
+        T bound = Bc;
         // === Step 2: 构造线性约束 ===
         LinearConstraint linear_constraint(coefficients, std::numeric_limits<T>::lowest(), bound);
         // === Step 3: 是否引入松弛变量 ===

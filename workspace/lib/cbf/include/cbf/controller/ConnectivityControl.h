@@ -43,7 +43,6 @@ namespace cbf {
          * @param desired_u Desired control input without CBF constraints
          * @param current_state Current state of the robot
          * @param other_robot_positions Positions of other robots in the network
-         * @param other_robot_covs Covariances of other robot positions (for uncertainty handling)
          * @param u_min Minimum allowable control inputs
          * @param u_max Maximum allowable control inputs
          * @return true if optimization was successful
@@ -53,7 +52,6 @@ namespace cbf {
                       const VectorDIM &desired_u,
                       const State &current_state,
                       const std::vector<VectorDIM> &other_robot_positions,
-                      const std::vector<Matrix> &other_robot_covs,
                       const VectorDIM& u_min, 
                       const VectorDIM& u_max);
 
