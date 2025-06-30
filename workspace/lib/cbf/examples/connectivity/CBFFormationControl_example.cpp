@@ -1,5 +1,5 @@
 //
-// Created by yutong on 4/8/2025
+// Created by Yichun on 6/27/2025
 //
 
 #include <model/DoubleIntegratorXYYaw.h>
@@ -12,6 +12,8 @@
 #include <math/Geometry.h>
 #include <math/Controls.h>
 #include <math/Random.h>
+#include <PID3D.h>
+
 
 // Define state dimensions and types
 constexpr unsigned int DIM = 3U;
@@ -35,13 +37,13 @@ int main(int argc, char* argv[]) {
             ("instance_type", "instance type for simulations",
              cxxopts::value<std::string>()->default_value("circle"))
             ("num_robots", "number of robots in the simulation",
-             cxxopts::value<int>()->default_value(std::to_string(2)))
+             cxxopts::value<int>()->default_value(std::to_string(3)))
             ("slack_decay", "slack variable cost decay rate",
              cxxopts::value<double>()->default_value(std::to_string(0.1)))
             ("config_file", "path to experiment configuration file",              // TODO: change the config_file
-             cxxopts::value<std::string>()->default_value("/usr/src/mpc-cbf/workspace/experiments/config/circle/circle2_config.json"))
+             cxxopts::value<std::string>()->default_value("/usr/src/mpc-cbf/workspace/experiments/config/circle/circle3_config.json"))
             ("write_filename", "write to json filename",
-             cxxopts::value<std::string>()->default_value("/usr/src/mpc-cbf/workspace/experiments/results/states.json"));
+             cxxopts::value<std::string>()->default_value("/usr/src/mpc-cbf/workspace/experiments/results/states3.json"));
     auto option_parse = options.parse(argc, argv);
 
     // Load experiment configuration
@@ -147,9 +149,20 @@ int main(int argc, char* argv[]) {
         }
     }
 
+    // === Create one PID3D controller per robot ===
+    std::vector<pid::PID3D<double>> pid_controllers;
+    pid::PIDParams<double> pid_params{10.0, 0.1, 5.0, Ts};  // 你可以根据需要调参数
+
+    for (size_t i = 0; i < num_robots; ++i) {
+        pid_controllers.emplace_back(pid_params);
+    }
+
     // Main simulation loop
     int loop_idx = 0;
-    while (loop_idx < 400) {
+    double h_this_timestep = 0.0;
+    std::ofstream clear_log("cbf_h_log.txt");
+    clear_log.close();
+    while (loop_idx < 100) {
         // Print out current loop_idx if loop_idx is a multiple of 10
         if (loop_idx % 10 == 0)
         {
@@ -198,9 +211,18 @@ int main(int argc, char* argv[]) {
             }
 
             // Compute desired control using spring control toward target
-            const VectorDIM &target_pos = math::convertToClosestYaw<DIM>(init_states.at(robot_idx), target_positions.at(robot_idx));
-            VectorDIM desired_u = math::criticallyDampedSpringControl<double, DIM>(init_states.at(robot_idx), target_pos, 1.);
-
+            //const VectorDIM &target_pos = math::convertToClosestYaw<DIM>(init_states.at(robot_idx), target_positions.at(robot_idx));
+            // VectorDIM desired_u = math::criticallyDampedSpringControl<double, DIM>(init_states.at(robot_idx), target_pos, 0.5);
+            VectorDIM ref_pos = target_positions.at(robot_idx);
+            VectorDIM ref_vel = VectorDIM::Zero();  // 目标速度为0
+            VectorDIM ref_acc = VectorDIM::Zero();  // 目标加速度为0
+            VectorDIM desired_u = pid_controllers.at(robot_idx).control(
+                init_states.at(robot_idx),
+                ref_pos,
+                ref_vel,
+                ref_acc
+            );
+            
             // Apply CBF to modify control for safety and connectivity
             ConnectivityControl connectivity_control(connectivity_cbf, num_neighbors, slack_mode, slack_cost, slack_decay_rate);
             VectorDIM cbf_u;
@@ -211,10 +233,34 @@ int main(int argc, char* argv[]) {
             if (!success) {
                 std::cout << "Optimization failed for robot " << robot_idx << " at timestep " << loop_idx << "\n";
                 cbf_u = VectorDIM::Zero(); // Use zero control if optimization fails
+             }else {
+                auto cbf_ptr = connectivity_control.getCBF(); // 新增接口访问 cbf_
+                const auto& state = init_states.at(robot_idx);
+                Eigen::VectorXd x_self(6);
+                x_self << state.pos_, state.vel_;  // 前 3 是位置，后 3 是速度
+                // ✅ 调用连通性约束
+                double h_val = 0.0;
+                Eigen::RowVectorXd Ac = -1.0 * cbf_ptr->getConnConstraints(x_self, other_robot_positions, h_val);
+                // ✅ 只在 robot 0 上保存 h
+                if (robot_idx == 0) {
+                    h_this_timestep = h_val;
+                }
+                auto Bc = cbf_ptr->getConnBound(x_self, other_robot_positions);
+                std::cout << "[CBF CHECK] robot " << robot_idx << ", timestep " << loop_idx << std::endl;
+                std::cout << "  desired_u = " << desired_u.transpose() << std::endl;
+                std::cout << "  actual_u  = " << cbf_u.transpose() << std::endl;
+                std::cout << "  Ac * desired_u = " << Ac.dot(desired_u) << ", Bc = " << Bc << std::endl;
+                std::cout << "  Ac * actual_u  = " << Ac.dot(cbf_u)    << ", Bc = " << Bc << std::endl;
+                if (Ac.dot(desired_u) > Bc)
+                    std::cout << "  ➤ CBF modified the control input.\n";
+                else
+                    std::cout << "  ➤ CBF did NOT need to modify the control input.\n";
             }
 
+        
             // Apply control to robot model to get next state
             State next_state = pred_model_ptr->applyInput(init_states.at(robot_idx), cbf_u);
+          // State next_state = pred_model_ptr->applyInput(init_states.at(robot_idx), desired_u);
 
             // Extract position and velocity, normalize yaw angle
             Vector x_t_pos = next_state.pos_;
@@ -250,7 +296,14 @@ int main(int argc, char* argv[]) {
             init_states.at(robot_idx).vel_(1) = current_states.at(robot_idx)(4);
             init_states.at(robot_idx).vel_(2) = current_states.at(robot_idx)(5);
         }
-        loop_idx += 1;
+        std::ofstream fout("cbf_h_log.txt", std::ios::app);
+        if (fout.is_open()) {
+            fout << "timestep " << loop_idx << ", h = " << h_this_timestep << std::endl;
+            fout.close();
+        } else {
+            std::cerr << "[Error] Unable to open cbf_h_log.txt for writing!" << std::endl;
+        }
+                loop_idx += 1;
     }
 
     // Save simulation results to JSON file
