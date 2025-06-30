@@ -11,9 +11,9 @@ import argparse
 import os
 
 # visualization parameters
-preview_fov_range = 0.5
+# preview_fov_range = 0.5
 preview_skip_step = 5
-enable_preview = True
+enable_preview = False
 
 def generate_rgb_colors(num_colors):
     output = []
@@ -111,10 +111,11 @@ def snapshots2D_XYYaw(traj, goals, goal_radius, estimate_mean, estimate_cov, p_n
     p = [ax.plot([x[i, frame_idx]], [y[i, frame_idx]], c=colors[i], marker='o', markersize=6, linestyle='None', alpha=0.6) for i in range(n_agent)]
 
     fov = []
-    for i in range(n_agent):
-        pos = [x[i, frame_idx], y[i, frame_idx]]
-        fov_x, fov_y = fov_xy(pos, yaw[i, frame_idx], fov_beta, fov_range)
-        fov.append(ax.fill(np.concatenate(([pos[0]], fov_x, [pos[0]])), np.concatenate(([pos[1]], fov_y, [pos[1]])), color=colors[i], alpha=0.2))
+    if enable_preview:
+        for i in range(n_agent):
+            pos = [x[i, frame_idx], y[i, frame_idx]]
+            fov_x, fov_y = fov_xy(pos, yaw[i, frame_idx], fov_beta, fov_range)
+            fov.append(ax.fill(np.concatenate(([pos[0]], fov_x, [pos[0]])), np.concatenate(([pos[1]], fov_y, [pos[1]])), color=colors[i], alpha=0.2))
 
     # Add the rectangles (boxes)
     boxes = []
@@ -236,10 +237,11 @@ def animation2D_XYYaw(traj, estimate_mean, estimate_cov, p_near, dt, Ts, bbox, p
                                c='dodgerblue', alpha=0.6)
 
     fov = []
-    for i in range(n_agent):
-        pos = [x[i, 0], y[i, 0]]
-        fov_x, fov_y = fov_xy(pos, yaw[i, 0], fov_beta, fov_range)
-        fov.append(ax.fill(np.concatenate(([pos[0]], fov_x, [pos[0]])), np.concatenate(([pos[1]], fov_y, [pos[1]])), color=colors[i], alpha=0.2))
+    if enable_preview:
+        for i in range(n_agent):
+            pos = [x[i, 0], y[i, 0]]
+            fov_x, fov_y = fov_xy(pos, yaw[i, 0], fov_beta, fov_range)
+            fov.append(ax.fill(np.concatenate(([pos[0]], fov_x, [pos[0]])), np.concatenate(([pos[1]], fov_y, [pos[1]])), color=colors[i], alpha=0.2))
 
     # Add the rectangles (boxes)
     boxes = []
@@ -319,11 +321,12 @@ def animation2D_XYYaw(traj, estimate_mean, estimate_cov, p_near, dt, Ts, bbox, p
         for i in range(n_agent):
             boxes[i].set_xy((x[i][ts] - bbox[0], y[i][ts] - bbox[1]))
 
-        for i in range(n_agent):
-            pos = [x[i, ts], y[i, ts]]
-            fov_x, fov_y = fov_xy(pos, yaw[i, ts], fov_beta, fov_range)
-            fov[i][0].set_xy(np.column_stack((np.concatenate(([pos[0]], fov_x, [pos[0]])),
-                                              np.concatenate(([pos[1]], fov_y, [pos[1]])))))
+        if enable_preview:
+            for i in range(n_agent):
+                pos = [x[i, ts], y[i, ts]]
+                fov_x, fov_y = fov_xy(pos, yaw[i, ts], fov_beta, fov_range)
+                fov[i][0].set_xy(np.column_stack((np.concatenate(([pos[0]], fov_x, [pos[0]])),
+                                                np.concatenate(([pos[1]], fov_y, [pos[1]])))))
 
         trail_offset = trailing_buf_size if ts > trailing_buf_size else ts
         if Trailing:
@@ -443,7 +446,7 @@ if __name__ == "__main__":
     )
     # TODO: properly construct the inputs
     parser.add_argument("-c", "--config_filename", type=str, default="/usr/src/mpc-cbf/workspace/experiments/config/circle/circle2_config.json", help="path to config json file")
-    parser.add_argument("-s", "--states_filename", type=str, default="/usr/src/mpc-cbf/workspace/experiments/results/states.json", help="path to simulation state json file")
+    parser.add_argument("-s", "--states_filename", type=str, default="/usr/src/mpc-cbf/workspace/experiments/results/states1.json", help="path to simulation state json file")
     # Need to install ffmpeg to save the video as mp4 (use pillow to save as gif)
     parser.add_argument("-ov", "--output_video", type=str, default="../../results"+default_instance+".gif", help="path to simulation animation file")
     parser.add_argument("-of", "--output_figure", type=str, default="../../results"+default_instance, help="path to simulation figure file")
@@ -547,4 +550,4 @@ if __name__ == "__main__":
     render_frame_indices = range(0, total_frame, frame_gap)
     # for frame_idx in render_frame_indices:
     #     snapshots2D_XYYaw(traj, goals, goal_radius, estimate_mean, estimate_cov, p_near, dt, Ts, bbox, frame_idx, pred_curve, FoV_beta, FoV_range, PredCurve=True, colors=colors, pre_save_name=output_figure)
-    animation2D_XYYaw(traj, estimate_mean, estimate_cov, p_near, dt, Ts, bbox, pred_curve, FoV_beta, FoV_range, Estimation=True, PredCurve=False, colors=colors, save_name=output_video)
+    animation2D_XYYaw(traj, estimate_mean, estimate_cov, p_near, dt, Ts, bbox, pred_curve, FoV_beta, FoV_range, Estimation=False, PredCurve=False, colors=colors, save_name=output_video)
