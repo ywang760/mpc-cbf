@@ -42,8 +42,9 @@ int main(int argc, char *argv[])
         "connectivity simulation");
 
     options.add_options()("config_file", "Path to experiment configuration file",
-                          cxxopts::value<std::string>()->default_value(DF_CFG))("write_filename", "Write output JSON to this file",
-                                                                                cxxopts::value<std::string>()->default_value(DF_OUT));
+                          cxxopts::value<std::string>()->default_value(DF_CFG))
+                         ("write_filename", "Write output JSON to this file",
+                          cxxopts::value<std::string>()->default_value(DF_OUT));
 
     auto option_parse = options.parse(argc, argv);
     // Load experiment configuration
