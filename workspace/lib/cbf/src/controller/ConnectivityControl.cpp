@@ -63,9 +63,9 @@ namespace cbf {
 
         // Add connectivity constraint
         if (slack_mode_) {
-            qp_generator_.addConnectivityConstraint(state, other_robot_positions, true, num_neighbors);
+            qp_generator_.addConnConstraint(state, other_robot_positions, true, num_neighbors);
         } else {
-            qp_generator_.addConnectivityConstraint(state, other_robot_positions);
+            qp_generator_.addConnConstraint(state, other_robot_positions);
         }
         
         // solve QP

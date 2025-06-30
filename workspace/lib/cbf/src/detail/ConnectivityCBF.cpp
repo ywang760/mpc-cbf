@@ -592,7 +592,7 @@ namespace cbf
     // TODO: ideally this should return a symbolic expression
     // return std::pair<GiNaC::matrix, GiNaC::ex>
     // Ac should be a vector of shape 1 x CONTROL_VARS, Bc should be a scalar
-    std::pair<Eigen::VectorXd, double> ConnectivityCBF::initConnectivityCBF(
+    std::pair<Eigen::VectorXd, double> ConnectivityCBF::initConnCBF(
         const Eigen::MatrixXd &robot_states, // N x 6 matrix
         const Eigen::VectorXd &x_self,       // 当前机器人的状态 6x1
         int self_idx)                        // 当前机器人在 robot_states 中的索引
@@ -675,13 +675,13 @@ namespace cbf
         // return std::make_pair(Ac, Bc);
     }
 
-    // TODO: Deprecated: check initConnectivityCBF
+    // TODO: Deprecated: check initConnCBF
     // Eigen::VectorXd ConnectivityCBF::getConnConstraints(
     //     const Eigen::VectorXd &x_self,
     //     const std::vector<Eigen::VectorXd> &other_positions)
     // {
     // }
-    // double ConnectivityCBF::getConnectivityBound(
+    // double ConnectivityCBF::getConnBound(
     //     const Eigen::VectorXd &x_self,
     //     const std::vector<Eigen::VectorXd> &other_positions)
     // {

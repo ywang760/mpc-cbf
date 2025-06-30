@@ -65,13 +65,13 @@ namespace cbf {
         Eigen::MatrixXd getMinVelContraints(Eigen::VectorXd state);
         Eigen::VectorXd getMaxVelBounds(Eigen::VectorXd state);
         Eigen::VectorXd getMinVelBounds(Eigen::VectorXd state);
-        std::pair<Eigen::VectorXd, double> initConnectivityCBF(const Eigen::MatrixXd &robot_states,
-                                                               const Eigen::VectorXd &x_self,
-                                                               int self_idx);
+        std::pair<Eigen::VectorXd, double> initConnCBF(const Eigen::MatrixXd &robot_states,
+                                                       const Eigen::VectorXd &x_self,
+                                                       int self_idx);
         // Connectivity constraint //TODO: deprecated
-        // Eigen::VectorXd getConnectivityConstraints(const Eigen::VectorXd &x_self,
+        // Eigen::VectorXd getConnConstraints(const Eigen::VectorXd &x_self,
         //                                               const std::vector<Eigen::VectorXd> &other_positions);
-        // double getConnectivityBound(const Eigen::VectorXd &x_self,
+        // double getConnBound(const Eigen::VectorXd &x_self,
         //                             const std::vector<Eigen::VectorXd> &other_positions);
         // Alpha setter
         void setAlpha(std::function<GiNaC::ex(GiNaC::ex, double)> newAlpha);

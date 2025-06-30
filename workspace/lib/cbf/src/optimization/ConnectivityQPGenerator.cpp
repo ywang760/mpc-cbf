@@ -11,10 +11,10 @@ namespace cbf {
     }
 
     template <typename T, unsigned int DIM>
-    void ConnectivityQPGenerator<T, DIM>::addConnectivityConstraint(const Vector &x_self,
-                                                                    const std::vector<VectorDIM> &other_positions,
-                                                                    bool use_slack,
-                                                                    std::size_t slack_idx)
+    void ConnectivityQPGenerator<T, DIM>::addConnConstraint(const Vector &x_self,
+                                                            const std::vector<VectorDIM> &other_positions,
+                                                            bool use_slack,
+                                                            std::size_t slack_idx)
     {
         // TODO: right now move them here
         // === 组装 robot_states: [self; others] ===
@@ -35,7 +35,7 @@ namespace cbf {
             robot_states.row(i + 1).segment(0, 2) = other_positions[i].segment(0, 2).transpose(); // px, py
         }
         // === 计算约束 ===
-        auto [Ac, Bc] = cbf_->initConnectivityCBF(robot_states, x_self, 0);
+        auto [Ac, Bc] = cbf_->initConnCBF(robot_states, x_self, 0);
 
         // === Step 1: 获取约束项（内部已拼装 robot_states 且假定 self_idx = 0） ===
         Vector coefficients = -1.0 * Ac;

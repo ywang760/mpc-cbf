@@ -84,9 +84,9 @@ TEST_F(InitCBFTest, TwoRobotRail)
 
     int self_idx = 0;
     Eigen::VectorXd x_self = states.row(self_idx).transpose();
-    auto res = connectivity_cbf->initConnectivityCBF(states,
-                                                    x_self,
-                                                    self_idx);
+    auto res = connectivity_cbf->initConnCBF(states,
+                                             x_self,
+                                             self_idx);
 
     // Expected results
     Eigen::VectorXd expected_Ac(3);
@@ -103,7 +103,7 @@ TEST_F(InitCBFTest, TwoRobotRail)
 //     int self_idx = static_cast<int>(urand(0, N - 1));
 //     Eigen::VectorXd x_self = states.row(self_idx).transpose();
 
-//     auto res = cbf.initConnectivityCBF(states,
+//     auto res = cbf.initConnCBF(states,
 //                                        x_self,
 //                                        self_idx);
 

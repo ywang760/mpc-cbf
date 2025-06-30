@@ -187,7 +187,7 @@ int main(int argc, char *argv[])
             //     x_self << state.pos_, state.vel_;  // 前 3 是位置，后 3 是速度
             //     // ✅ 调用连通性约束
             //     Eigen::VectorXd Ac = -1.0 * cbf_ptr->getConnConstraints(x_self, other_robot_positions);
-            //     auto Bc = cbf_ptr->getConnectivityBound(x_self, other_robot_positions);
+            //     auto Bc = cbf_ptr->getConnBound(x_self, other_robot_positions);
             //     std::cout << "[CBF CHECK] robot " << robot_idx << ", timestep " << loop_idx << std::endl;
             //     std::cout << "  desired_u = " << desired_u.transpose() << std::endl;
             //     std::cout << "  actual_u  = " << cbf_u.transpose() << std::endl;
