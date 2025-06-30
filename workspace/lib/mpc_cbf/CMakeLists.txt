@@ -52,6 +52,16 @@ target_link_libraries(mpc_cbf_controller_BezierIMPCCBF PUBLIC
         separating_hyperplanes_Voronoi)
 
 # add examples
+add_executable(mpc_cbf_examples_BezierIMPCCBFPFXYYaw_example examples/BezierIMPCCBFPFXYYaw_example.cpp)
+target_include_directories(mpc_cbf_examples_BezierIMPCCBFPFXYYaw_example PUBLIC include ../../../third_party/json/single_include)
+target_link_libraries(mpc_cbf_examples_BezierIMPCCBFPFXYYaw_example PUBLIC
+        mpc_cbf_controller_BezierIMPCCBF
+        model_DoubleIntegratorXYYaw
+        math_collision_shapes_AlignedBoxCollisionShape
+        cxxopts
+        ParticleFilter)
+
+# TODO: remove the deprecated examples
 #add_executable(mpc_cbf_examples_BezierMPCCBFXYYaw_example examples/BezierMPCCBFXYYaw_example.cpp)
 #target_include_directories(mpc_cbf_examples_BezierMPCCBFXYYaw_example PUBLIC include ../../../third_party/json/single_include)
 #target_link_libraries(mpc_cbf_examples_BezierMPCCBFXYYaw_example PUBLIC
@@ -66,12 +76,3 @@ target_link_libraries(mpc_cbf_controller_BezierIMPCCBF PUBLIC
 #        model_DoubleIntegratorXYYaw
 #        math_collision_shapes_AlignedBoxCollisionShape
 #        cxxopts)
-
-add_executable(mpc_cbf_examples_BezierIMPCCBFPFXYYaw_example examples/BezierIMPCCBFPFXYYaw_example.cpp)
-target_include_directories(mpc_cbf_examples_BezierIMPCCBFPFXYYaw_example PUBLIC include ../../../third_party/json/single_include)
-target_link_libraries(mpc_cbf_examples_BezierIMPCCBFPFXYYaw_example PUBLIC
-        mpc_cbf_controller_BezierIMPCCBF
-        model_DoubleIntegratorXYYaw
-        math_collision_shapes_AlignedBoxCollisionShape
-        cxxopts
-        ParticleFilter)
