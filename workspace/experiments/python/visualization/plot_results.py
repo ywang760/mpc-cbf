@@ -1,9 +1,11 @@
+import argparse
 import json
-import numpy as np
-import matplotlib.pyplot as plt
-from matplotlib.patches import Ellipse
-import matplotlib.animation as animation
 import os
+
+import matplotlib.animation as animation
+import matplotlib.pyplot as plt
+import numpy as np
+
 
 def load_json(path):
     with open(path, 'r') as f:
@@ -40,21 +42,33 @@ def plot_trajectory(ax, traj, colors):
 
 def main():
     # === 1. 设定文件路径 ===
-    config_file = "/usr/src/mpc-cbf/workspace/experiments/config/circle/circle3_config.json"
-    states_file = "/usr/src/mpc-cbf/workspace/experiments/results/states.json"
-    # 输出静态图
-    output_static = "/usr/src/mpc-cbf/workspace/experiments/plot_circle3.png"
-    # 输出动画文件
-    output_anim = "/usr/src/mpc-cbf/workspace/experiments/anim_circle3.mp4"
+    parser = argparse.ArgumentParser(description="Plot formation connectivity and trajectories")
+    parser.add_argument("--config", type=str, required=True)
+    parser.add_argument("--states", type=str, required=True)
+    parser.add_argument("--output_dir", type=str, required=True)
+    
+    args = parser.parse_args()
+    config_file = args.config
+    states_file = args.states
+    
+    output_dir = args.output_dir
+    os.makedirs(output_dir, exist_ok=True)
+    output_static = os.path.join(output_dir, os.path.basename(config_file).replace('.json', '.png'))
+    output_anim = os.path.join(output_dir, os.path.basename(config_file).replace('.json', '.mp4'))
+
+    # config_file = "/usr/src/mpc-cbf/workspace/experiments/config/circle/circle3_config.json"
+    # states_file = "/usr/src/mpc-cbf/workspace/experiments/results/formation/states.json"
+    # output_static = "/usr/src/mpc-cbf/workspace/experiments/results/formation/viz/plot_circle3.png"
+    # output_anim = "/usr/src/mpc-cbf/workspace/experiments/results/formation/viz/anim_circle3.mp4"
 
     # === 2. 读取配置和状态数据 ===
-    cfg = load_json(config_file)           # 读取 circle3_config.json
-    st = load_json(states_file)            # 读取 states.json
+    cfg = load_json(config_file)
+    st = load_json(states_file)
 
     # 初始和最终的机器人数组
     sf = np.array(cfg['tasks']['sf'])
     so = np.array(cfg['tasks']['so'])
-    max_dist = cfg['connectivity_params']['max_distance']
+    max_dist = cfg['cbf_params']['d_max']
 
     # robots 数据结构：假设 st['robots'][key]['states'] 是一个帧序列
     robots = st['robots']

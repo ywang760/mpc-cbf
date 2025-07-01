@@ -31,7 +31,7 @@ int main(int argc, char *argv[])
 
     spdlog::set_pattern("[%H:%M:%S] [%^%l%$] [%s:%# %!] %v");
 
-    const std::string DF_CFG = "/usr/src/mpc-cbf/workspace/experiments/config/examples/robots2_1.json";
+    const std::string DF_CFG = "/usr/src/mpc-cbf/workspace/experiments/config/formation/robots2_2.json";
     const std::string DF_OUT = "/usr/src/mpc-cbf/workspace/experiments/results/formation/states.json";
 
     // Parse command-line arguments
