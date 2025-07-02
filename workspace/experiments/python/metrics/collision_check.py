@@ -61,8 +61,11 @@ def instance_success(traj, goals, radius, collision_shape):
             for j in range(i+1, n_robot):
                 pos_2 = traj[j, t, :3]  # [3, ]
                 if collision_check(pos_1[0], pos_1[1], pos_2[0], pos_2[1], collision_shape):
+                    d = np.linalg.norm(pos_1[:2] - pos_2[:2])
                     print("collision happens at timestep: ", t)
-                    print(f"robot {i} at ({pos_1[0]}, {pos_1[1]}) collides with robot {j} at ({pos_2[0]}, {pos_2[1]})")
+                    print(
+                        f"robot {i} at ({pos_1[0]}, {pos_1[1]}) collides with robot {j} at ({pos_2[0]}, {pos_2[1]}), distance: {d:.2f}"
+                    )
                     return False, float('inf')
 
     return True, ts

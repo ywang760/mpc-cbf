@@ -77,6 +77,7 @@ namespace cbf {
             success = true;
         } else {
             success = false;
+            SPDLOG_WARN("QP solver failed with status: {}", qpcpp::SolveStatusToStr(solve_status));
         }
 
         cbf_u = qp_generator_.generatorCBFControlInput();

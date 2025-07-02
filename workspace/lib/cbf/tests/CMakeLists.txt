@@ -9,6 +9,7 @@ endif()
 # TODO: add more test sources as needed
 set(TEST_SOURCES
     TestInitConnectivity.cpp
+    TestInitSafetyCBF.cpp
 )
 
 add_executable(cbf_tests ${TEST_SOURCES})
@@ -17,7 +18,6 @@ target_compile_definitions(cbf_tests PRIVATE
     SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_DEBUG
 )
 
-# TODO: add more target link libraries as needed
 target_link_libraries(cbf_tests
     PUBLIC
     cbf_detail_ConnectivityCBF

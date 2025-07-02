@@ -184,19 +184,19 @@ int main(int argc, char *argv[])
             // Compute desired control using spring control toward target
 
             // Uncomment the following 2 lines if you want to use critically damped spring control
-            // const VectorDIM &target_pos = target_positions.at(robot_idx);
-            // VectorDIM desired_u = math::criticallyDampedSpringControl<double, DIM>(init_states.at(robot_idx), target_pos, 0.5);
+            const VectorDIM &target_pos = target_positions.at(robot_idx);
+            VectorDIM desired_u = math::criticallyDampedSpringControl<double, DIM>(init_states.at(robot_idx), target_pos, 0.5);
 
-            VectorDIM ref_pos = target_positions.at(robot_idx);
-            VectorDIM ref_vel = VectorDIM::Zero();  // 目标速度为0
-            VectorDIM ref_acc = VectorDIM::Zero();  // 目标加速度为0
-            VectorDIM desired_u = pid_controllers.at(robot_idx).control(
-                init_states.at(robot_idx),
-                ref_pos,
-                ref_vel,
-                ref_acc
-            );
-            
+            // VectorDIM ref_pos = target_positions.at(robot_idx);
+            // VectorDIM ref_vel = VectorDIM::Zero();  // 目标速度为0
+            // VectorDIM ref_acc = VectorDIM::Zero();  // 目标加速度为0
+            // VectorDIM desired_u = pid_controllers.at(robot_idx).control(
+            //     init_states.at(robot_idx),
+            //     ref_pos,
+            //     ref_vel,
+            //     ref_acc
+            // );
+
             // Apply CBF to modify control for safety and connectivity
             ConnectivityControl connectivity_control(connectivity_cbf, num_neighbors, slack_mode, slack_cost, slack_decay_rate);
             VectorDIM cbf_u;
@@ -204,8 +204,8 @@ int main(int argc, char *argv[])
                                                          other_robot_positions, a_min, a_max);
             if (!success)
             {
-                SPDLOG_INFO("Optimization failed for robot {} at timestep {}", robot_idx, loop_idx);
-                cbf_u = VectorDIM::Zero(); // Use zero control if optimization fails
+                SPDLOG_WARN("Optimization failed for robot {} at timestep {}", robot_idx, loop_idx);
+                cbf_u = VectorDIM::Zero(); // Fallback to zero control if optimization fails
             }
             //  else {
             //     auto cbf_ptr = connectivity_control.getCBF(); // 新增接口访问 cbf_

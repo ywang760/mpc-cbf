@@ -189,7 +189,6 @@ int main(int argc, char* argv[]) {
                 const VectorDIM& ego_pos = init_states.at(robot_idx).pos_;
                 const VectorDIM &neighbor_pos = init_states.at(neighbor_id).pos_;
 
-                // TODO: use pf to update estimate or use fixed estimate (for debugging)
                 // ParticleFilter &filter = filters.at(robot_idx).at(j);
                 // auto [estimate, cov] = pf::PFApplications::processFovUpdate<double, DIM>(
                 //     filter, ego_pos, neighbor_pos, fov_beta, fov_Rs);

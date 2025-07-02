@@ -38,7 +38,7 @@ static Eigen::MatrixXd randomRobotStates(int N, double radius)
 
 // ---------- Test fixture ----------------------------------------------------
 
-class InitCBFTest : public ::testing::Test
+class InitConnCBFTest : public ::testing::Test
 {
 
     using ConnectivityCBF = cbf::ConnectivityCBF;
@@ -75,7 +75,7 @@ protected:
 
 // ---------- TEST CASES ------------------------------------------------------
 
-TEST_F(InitCBFTest, TwoRobotRail)
+TEST_F(InitConnCBFTest, TwoRobotRail)
 {
     /* Robots on x-axis, 1 m apart (within R_s) */
     Eigen::MatrixXd states(2, 6);
@@ -110,14 +110,3 @@ TEST_F(InitCBFTest, TwoRobotRail)
 //     checkResult(res, 6);
 // }
 
-
-// ---------------------------------------------------------------------------
-
-int main(int argc, char **argv)
-{
-    ::testing::InitGoogleTest(&argc, argv);
-    spdlog::set_pattern("[%H:%M:%S] [%^%l%$] [%s:%# %!] %v");
-
-    SPDLOG_INFO("Starting Connectivity CBF tests...");
-    return RUN_ALL_TESTS();
-}

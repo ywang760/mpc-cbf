@@ -40,7 +40,6 @@ namespace cbf
     //   max_dist: Maximum allowed distance between agents (connectivity range)
     //   vmin: Minimum velocity limits for each control dimension
     //   vmax: Maximum velocity limits for each control dimension
-    //  epsilon: lambda2_min for connectivity CBF
     ConnectivityCBF::ConnectivityCBF(double min_dist, double max_dist, Eigen::VectorXd vmin, Eigen::VectorXd vmax)
         : dmin(min_dist), dmax(max_dist), vmin(vmin), vmax(vmax),
           px("px"), py("py"), th("th"), vx("vx"), vy("vy"), w("w"), xt("xt"), yt("yt")
@@ -48,7 +47,7 @@ namespace cbf
         // Define dimensions of the state and control spaces
         STATE_VARS = 6;
         CONTROL_VARS = 3;
-        gamma = 0.1;   // Convergence rate parameter (in alpha functions)
+        gamma = 5.0;   // More aggressive convergence rate (increased from 1.0)
         epsilon = 0.1; // lambda2_min for connectivity CBF
 
         // System dynamics matrix (state transition matrix)
@@ -83,8 +82,8 @@ namespace cbf
         f = A.mul(state);
         g = B;
 
-        // Set default alpha function to fifth-order for better performance
-        alpha = fifthAlpha;
+        // Set default alpha function to cubic for better performance
+        alpha = myAlpha;
 
         // Initialize all Control Barrier Functions (CBFs)
 
@@ -141,6 +140,7 @@ namespace cbf
     // This CBF ensures that the robot maintains a minimum safe distance (dmin) from other agents
     // Returns:
     //   A pair containing the CBF constraint matrix (Ac) and bound (Bc)
+    // TODO: current the CBF has no knowledge of the other agents' velocity. SHOULD IT?
     std::pair<GiNaC::matrix, GiNaC::ex> ConnectivityCBF::initSafetyCBF()
     {
         // Calculate relative position to other agent
