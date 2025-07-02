@@ -42,7 +42,9 @@ int main(int argc, char *argv[])
     options.add_options()("config_file", "Path to experiment configuration file",
                           cxxopts::value<std::string>()->default_value(DF_CFG))
                          ("write_filename", "Write output JSON to this file",
-                          cxxopts::value<std::string>()->default_value(DF_OUT));
+                          cxxopts::value<std::string>()->default_value(DF_OUT))
+                         ("max_steps", "Maximum number of simulation steps",
+                          cxxopts::value<int>()->default_value("100"));
 
     auto option_parse = options.parse(argc, argv);
     // Load experiment configuration
@@ -142,7 +144,12 @@ int main(int argc, char *argv[])
 
     // === Create one PID controller per robot ===
     std::vector<math::PID<double, 3U>> pid_controllers;
-    math::PIDParams<double, 3U> pid_params{10.0, 0.1, 5.0, Ts}; // 你可以根据需要调参数
+    math::PIDParams<double, 3U> pid_params{
+        experiment_config_json["pid_params"]["kp"],
+        experiment_config_json["pid_params"]["ki"],
+        experiment_config_json["pid_params"]["kd"],
+        Ts
+    };
 
     for (size_t i = 0; i < num_robots; ++i) {
         pid_controllers.emplace_back(pid_params);
@@ -150,7 +157,7 @@ int main(int argc, char *argv[])
 
     // Main simulation loop
     int loop_idx = 0;
-    while (loop_idx < 100)
+    while (loop_idx < option_parse["max_steps"].as<int>())
     {
         // Print out current loop_idx if loop_idx is a multiple of 10
         if (loop_idx % 10 == 0)
