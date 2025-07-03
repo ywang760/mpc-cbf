@@ -42,7 +42,7 @@ namespace cbf
     //   vmax: Maximum velocity limits for each control dimension
     ConnectivityCBF::ConnectivityCBF(double min_dist, double max_dist, Eigen::VectorXd vmin, Eigen::VectorXd vmax)
         : dmin(min_dist), dmax(max_dist), vmin(vmin), vmax(vmax),
-          px("px"), py("py"), th("th"), vx("vx"), vy("vy"), w("w"), xt("xt"), yt("yt")
+          px("px"), py("py"), th("th"), vx("vx"), vy("vy"), w("w"), px_n("px_n"), py_n("py_n"), vx_n("vx_n"), vy_n("vy_n")
     {
         // Define dimensions of the state and control spaces
         STATE_VARS = 6;
@@ -68,13 +68,15 @@ namespace cbf
              {0, 1, 0},
              {0, 0, 1}};
 
-        // Create state vector and transpose it for proper matrix operations
+        // Create state vector of the ego agent
         state = {{px, py, th, vx, vy, w}};
         state = state.transpose();
 
-        // Create agent state vector and transpose it
-        x_agent = {{xt, yt}};
-        x_agent = x_agent.transpose();
+        // Create state vector of the neighbor agent
+        p_n = {{px_n, py_n}};
+        p_n = p_n.transpose();
+        v_n = {{vx_n, vy_n}};
+        v_n = v_n.transpose();
 
         // Define system dynamics (f + g*u)
         // f = A*x (drift term)
@@ -140,90 +142,54 @@ namespace cbf
     // This CBF ensures that the robot maintains a minimum safe distance (dmin) from other agents
     // Returns:
     //   A pair containing the CBF constraint matrix (Ac) and bound (Bc)
-    // TODO: current the CBF has no knowledge of the other agents' velocity. SHOULD IT?
     std::pair<GiNaC::matrix, GiNaC::ex> ConnectivityCBF::initSafetyCBF()
     {
-        // Calculate relative position to other agent
-        GiNaC::matrix d = x_agent.sub(GiNaC::matrix{{px}, {py}});
 
-        // Calculate squared distance to other agent
-        GiNaC::ex norm2 = GiNaC::pow(d(0, 0), 2) + GiNaC::pow(d(1, 0), 2);
+        GiNaC::ex dx = px - px_n; // x-distance to other agent
+        GiNaC::ex dy = py - py_n; // y-distance to other agent
+        GiNaC::ex dvx = vx - vx_n; // x-velocity difference to other agent
+        GiNaC::ex dvy = vy - vy_n; // y-velocity difference
 
-        // Define barrier function: h(x) = ||x - x_agent||^2 - dmin^2
-        // h > 0 when distance is greater than minimum distance
-        GiNaC::ex b1 = norm2 - GiNaC::pow(dmin, 2);
+        // Calculate barrier function: h(p) = ||p - p_n||^2 - dmin^2
+        GiNaC::ex h = dx * dx + dy * dy - GiNaC::pow(dmin, 2);
 
-        // Calculate gradient of barrier function with respect to state variables
-        GiNaC::matrix grad_b1 = GiNaC::matrix(STATE_VARS, 1);
-        grad_b1(0, 0) = GiNaC::diff(b1, px);
-        grad_b1(1, 0) = GiNaC::diff(b1, py);
-        grad_b1(2, 0) = GiNaC::diff(b1, th);
-        grad_b1(3, 0) = GiNaC::diff(b1, vx);
-        grad_b1(4, 0) = GiNaC::diff(b1, vy);
-        grad_b1(5, 0) = GiNaC::diff(b1, w);
+        // First Lie derivative of the barrier function: L_f h = ∇h · f 
+        // This could be analytically derived
+        GiNaC::ex Lf_h = 2 * (dx * dvx + dy * dvy);
 
-        // Calculate Lie derivative of h along f: L_f h = ∇h · f
-        GiNaC::ex lfb1 = 0.0;
-        for (int i = 0; i < STATE_VARS; i++)
-        {
-            lfb1 = lfb1 + grad_b1(i, 0) * f(i, 0);
-        }
-
-        // Calculate gradient of L_f h
-        GiNaC::matrix grad2_b1 = GiNaC::matrix(STATE_VARS, 1);
-        grad2_b1(0, 0) = GiNaC::diff(lfb1, px);
-        grad2_b1(1, 0) = GiNaC::diff(lfb1, py);
-        grad2_b1(2, 0) = GiNaC::diff(lfb1, th);
-        grad2_b1(3, 0) = GiNaC::diff(lfb1, vx);
-        grad2_b1(4, 0) = GiNaC::diff(lfb1, vy);
-        grad2_b1(5, 0) = GiNaC::diff(lfb1, w);
-
-        // Calculate second Lie derivative: L_f^2 h = ∇(L_f h) · f
-        GiNaC::ex lf2b1 = 0.0;
-        for (int i = 0; i < STATE_VARS; i++)
-        {
-            lf2b1 = lf2b1 + grad2_b1(i, 0) * f(i, 0);
-        }
+        // Second Lie derivative of the barrier function: L_f^2 h = ∇(L_f h) · f
+        // This could also be analytically derived
+        GiNaC::ex Lf2_h = 2 * (dvx * dvx + dvy * dvy); // L_f^2 h = 2 * (dvx*dvx + dvy*dvy)
 
         // Calculate gradient of alpha(h) where alpha is the class of K functions
-        GiNaC::matrix grad_bc = GiNaC::matrix(STATE_VARS, 1);
-        GiNaC::ex alpha_b = alpha(b1, gamma);
-        grad_bc(0, 0) = GiNaC::diff(alpha_b, px);
-        grad_bc(1, 0) = GiNaC::diff(alpha_b, py);
-        grad_bc(2, 0) = GiNaC::diff(alpha_b, th);
-        grad_bc(3, 0) = GiNaC::diff(alpha_b, vx);
-        grad_bc(4, 0) = GiNaC::diff(alpha_b, vy);
-        grad_bc(5, 0) = GiNaC::diff(alpha_b, w);
+        GiNaC::matrix grad_alpha = GiNaC::matrix(STATE_VARS, 1);
+        GiNaC::ex alpha_b = alpha(h, gamma);
+        grad_alpha(0, 0) = GiNaC::diff(alpha_b, px);
+        grad_alpha(1, 0) = GiNaC::diff(alpha_b, py);
+        grad_alpha(2, 0) = GiNaC::diff(alpha_b, th);
+        grad_alpha(3, 0) = GiNaC::diff(alpha_b, vx);
+        grad_alpha(4, 0) = GiNaC::diff(alpha_b, vy);
+        grad_alpha(5, 0) = GiNaC::diff(alpha_b, w);
 
         // Calculate Lie derivative of alpha(h) along f
-        GiNaC::ex lfb_c = 0.0;
+        GiNaC::ex Lf_alpha = 0.0;
         for (int i = 0; i < STATE_VARS; i++)
         {
-            lfb_c = lfb_c + grad_bc(i, 0) * f(i, 0);
+            Lf_alpha = Lf_alpha + grad_alpha(i, 0) * f(i, 0);
         }
 
-        // Calculate L_g L_f h = ∇(L_f h) · g for each control input
-        // This forms the constraint matrix Ac for the QP solver
-        GiNaC::matrix Ac1 = GiNaC::matrix(1, CONTROL_VARS);
-        for (int j = 0; j < CONTROL_VARS; j++)
-        {
-            GiNaC::ex Ac1j = 0.0;
-            for (int i = 0; i < STATE_VARS; i++)
-            {
-                Ac1j += grad2_b1(i, 0) * g(i, j);
-            }
-            Ac1(0, j) = Ac1j;
-        }
+        // Calculate Ac = L_g L_f h = ∇(L_f h) · g
+        // This can be analytically derived as well
+        // TODO: expand to account for DIM=3
+        GiNaC::matrix Ac = GiNaC::matrix(1, CONTROL_VARS);
+        Ac(0, 0) = 2 * dx;
+        Ac(0, 1) = 2 * dy;
 
         // Calculate the constraint bound: L_f^2 h + L_f alpha(h) + alpha(L_f h + alpha(h))
-        // This ensures the relative degree 2 CBF condition is satisfied
-        GiNaC::ex B1 = lf2b1;
-        GiNaC::ex B2 = lfb_c;
-        GiNaC::ex psi1 = lfb1 + alpha_b;
-        GiNaC::ex B3 = alpha(psi1, gamma);
-        GiNaC::ex Bc1 = B1 + B2 + B3;
+        GiNaC::ex psi1 = Lf_h + alpha_b;
+        GiNaC::ex Bc = Lf2_h + Lf_alpha + alpha(psi1, gamma);
 
-        return std::make_pair(Ac1, Bc1);
+        return std::make_pair(Ac, Bc);
     }
 
     // Initialize velocity Control Barrier Functions
@@ -273,10 +239,10 @@ namespace cbf
     // Parameters:
     //   a: Symbolic matrix
     //   state: Current state vector
-    //   agent_state: Other agent state vector
+    //   neighbor_state: Other agent state vector
     // Returns:
     //   Matrix with numerical values substituted
-    GiNaC::ex ConnectivityCBF::matrixSubs(GiNaC::matrix a, Eigen::VectorXd state, Eigen::VectorXd agent_state)
+    GiNaC::ex ConnectivityCBF::matrixSubs(GiNaC::matrix a, Eigen::VectorXd state, Eigen::VectorXd neighbor_state)
     {
         // Substitute each state variable with its numerical value
         GiNaC::ex tmp = GiNaC::subs(a, px == state(0));
@@ -285,8 +251,12 @@ namespace cbf
         tmp = GiNaC::subs(tmp, vx == state(3));
         tmp = GiNaC::subs(tmp, vy == state(4));
         tmp = GiNaC::subs(tmp, w == state(5));
-        tmp = GiNaC::subs(tmp, xt == agent_state(0));
-        tmp = GiNaC::subs(tmp, yt == agent_state(1));
+        tmp = GiNaC::subs(tmp, px_n == neighbor_state(0));
+        tmp = GiNaC::subs(tmp, py_n == neighbor_state(1));
+        // pz_n (th_n) is omitted for now
+        tmp = GiNaC::subs(tmp, vx_n == neighbor_state(3));
+        tmp = GiNaC::subs(tmp, vy_n == neighbor_state(4));
+        // w_n (angular velocity of neighbor) is omitted for now
         return tmp;
     }
 
@@ -294,10 +264,10 @@ namespace cbf
     // Parameters:
     //   a: Symbolic expression
     //   state: Current state vector
-    //   agent_state: Other agent state vector
+    //   neighbor_state: Other agent state vector
     // Returns:
     //   Expression with numerical values substituted
-    GiNaC::ex ConnectivityCBF::valueSubs(GiNaC::ex a, Eigen::VectorXd state, Eigen::VectorXd agent_state)
+    GiNaC::ex ConnectivityCBF::valueSubs(GiNaC::ex a, Eigen::VectorXd state, Eigen::VectorXd neighbor_state)
     {
         // Substitute each state variable with its numerical value
         GiNaC::ex tmp = GiNaC::subs(a, px == state(0));
@@ -306,21 +276,25 @@ namespace cbf
         tmp = GiNaC::subs(tmp, vx == state(3));
         tmp = GiNaC::subs(tmp, vy == state(4));
         tmp = GiNaC::subs(tmp, w == state(5));
-        tmp = GiNaC::subs(tmp, xt == agent_state(0));
-        tmp = GiNaC::subs(tmp, yt == agent_state(1));
+        tmp = GiNaC::subs(tmp, px_n == neighbor_state(0));
+        tmp = GiNaC::subs(tmp, py_n == neighbor_state(1));
+        // pz_n (th_n) is omitted for now
+        tmp = GiNaC::subs(tmp, vx_n == neighbor_state(3));
+        tmp = GiNaC::subs(tmp, vy_n == neighbor_state(4));
+        // w_n (angular velocity of neighbor) is omitted for now
         return tmp;
     }
 
     // Get the minimum distance constraint vector for the current state and agent
     // Parameters:
     //   state: Current state vector
-    //   agent_state: Other agent state vector
+    //   neighbor_state: Other agent state vector
     // Returns:
     //   Constraint vector for the QP solver
-    Eigen::VectorXd ConnectivityCBF::getSafetyConstraints(Eigen::VectorXd state, Eigen::VectorXd agent_state)
+    Eigen::VectorXd ConnectivityCBF::getSafetyConstraints(Eigen::VectorXd state, Eigen::VectorXd neighbor_state)
     {
         // Substitute numerical values into symbolic matrix and convert to Eigen vector
-        GiNaC::ex matrix_expr = matrixSubs(Ac_safe, state, agent_state);
+        GiNaC::ex matrix_expr = matrixSubs(Ac_safe, state, neighbor_state);
         Eigen::VectorXd Ac;
         Ac.resize(CONTROL_VARS);
         Ac.setZero();
@@ -341,7 +315,7 @@ namespace cbf
     Eigen::MatrixXd ConnectivityCBF::getMaxVelContraints(Eigen::VectorXd state)
     {
         // Create dummy agent (not needed for velocity constraints)
-        Eigen::Vector2d dummy_agent;
+        Eigen::VectorXd dummy_agent(6);
         dummy_agent.setZero();
 
         // Get constraint matrices for each velocity component
@@ -374,7 +348,7 @@ namespace cbf
     Eigen::MatrixXd ConnectivityCBF::getMinVelContraints(Eigen::VectorXd state)
     {
         // Create dummy agent (not needed for velocity constraints)
-        Eigen::Vector2d dummy_agent;
+        Eigen::VectorXd dummy_agent(6);
         dummy_agent.setZero();
 
         // Get constraint matrices for each velocity component
@@ -690,13 +664,13 @@ namespace cbf
     // Get the minimum distance constraint bound for the current state and agent
     // Parameters:
     //   state: Current state vector
-    //   agent_state: Other agent state vector
+    //   neighbor_state: Other agent state vector
     // Returns:
     //   Bound value for the minimum distance constraint
-    double ConnectivityCBF::getSafetyBound(Eigen::VectorXd state, Eigen::VectorXd agent_state)
+    double ConnectivityCBF::getSafetyBound(Eigen::VectorXd state, Eigen::VectorXd neighbor_state)
     {
         // Substitute numerical values and evaluate
-        GiNaC::ex expr = valueSubs(Bc_safe, state, agent_state);
+        GiNaC::ex expr = valueSubs(Bc_safe, state, neighbor_state);
         double Bc = GiNaC::ex_to<GiNaC::numeric>(expr).to_double();
 
         return Bc;
@@ -705,13 +679,13 @@ namespace cbf
     // Get the maximum distance constraint bound for the current state and agent
     // Parameters:
     //   state: Current state vector
-    //   agent_state: Other agent state vector
+    //   neighbor_state: Other agent state vector
     // Returns:
     //   Bound value for the maximum distance constraint
-    double ConnectivityCBF::getMaxDistBound(Eigen::VectorXd state, Eigen::VectorXd agent_state)
+    double ConnectivityCBF::getMaxDistBound(Eigen::VectorXd state, Eigen::VectorXd neighbor_state)
     {
         // Substitute numerical values and evaluate
-        GiNaC::ex expr = valueSubs(Bc_connectivity, state, agent_state);
+        GiNaC::ex expr = valueSubs(Bc_connectivity, state, neighbor_state);
         double Bc = GiNaC::ex_to<GiNaC::numeric>(expr).to_double();
 
         return Bc;
@@ -725,7 +699,7 @@ namespace cbf
     Eigen::VectorXd ConnectivityCBF::getMaxVelBounds(Eigen::VectorXd state)
     {
         // Create dummy agent (not needed for velocity constraints)
-        Eigen::Vector2d dummy_agent;
+        Eigen::VectorXd dummy_agent(6);
         dummy_agent.setZero();
 
         // Get bounds for each velocity component
@@ -754,7 +728,7 @@ namespace cbf
     Eigen::VectorXd ConnectivityCBF::getMinVelBounds(Eigen::VectorXd state)
     {
         // Create dummy agent (not needed for velocity constraints)
-        Eigen::Vector2d dummy_agent;
+        Eigen::VectorXd dummy_agent(6);
         dummy_agent.setZero();
 
         // Get bounds for each velocity component

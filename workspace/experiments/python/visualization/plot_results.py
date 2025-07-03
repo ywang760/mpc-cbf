@@ -46,11 +46,16 @@ def main():
     parser.add_argument("--config", type=str, required=True)
     parser.add_argument("--states", type=str, required=True)
     parser.add_argument("--output_dir", type=str, required=True)
-    
+    parser.add_argument(
+        "--create_anim",
+        action="store_true",
+        help="Show animation in a window (requires GUI backend)",
+    )
+
     args = parser.parse_args()
     config_file = args.config
     states_file = args.states
-    
+
     output_dir = args.output_dir
     os.makedirs(output_dir, exist_ok=True)
     output_static = os.path.join(output_dir, os.path.basename(config_file).replace('.json', '.png'))
@@ -173,32 +178,34 @@ def main():
         return artists
 
     # 构造动画对象：共 T 帧，interval=200ms
-    anim = animation.FuncAnimation(
-        fig,
-        update_frame,
-        frames=T,
-        init_func=init_frame,
-        blit=False,      # blit=True 在某些环境下需额外处理 background；如果卡，可改为 False
-        interval=200,    # 每帧间隔毫秒数，可根据需要调整
-        repeat=False
-    )
 
-    # === 5. 保存动画 ===
-    # 如果要保存为 mp4，需要系统上安装了 ffmpeg 或者 avconv
-    os.makedirs(os.path.dirname(output_anim) or '.', exist_ok=True)
-    try:
-        # 保存为 MP4，帧率为 5 帧/秒 (fps=1000/interval ≈ 5)
-        anim.save(output_anim, writer='ffmpeg', fps=5)
-        print(f"Animation saved to {output_anim}")
-    except Exception as e:
-        print("Failed to save as MP4: ", e)
-        # 如果想保存为 GIF，可以尝试下面的方式（需 imagemagick 支持）：
-        gif_path = output_anim.replace('.mp4', '.gif')
+    if args.create_anim:
+        anim = animation.FuncAnimation(
+            fig,
+            update_frame,
+            frames=T,
+            init_func=init_frame,
+            blit=False,  # blit=True 在某些环境下需额外处理 background；如果卡，可改为 False
+            interval=200,  # 每帧间隔毫秒数，可根据需要调整
+            repeat=False,
+        )
+
+        # === 5. 保存动画 ===
+        # 如果要保存为 mp4，需要系统上安装了 ffmpeg 或者 avconv
+        os.makedirs(os.path.dirname(output_anim) or ".", exist_ok=True)
         try:
-            anim.save(gif_path, writer='imagemagick', fps=5)
-            print(f"Animation also saved to {gif_path}")
-        except Exception as e2:
-            print("Also failed to save as GIF:", e2)
+            # 保存为 MP4，帧率为 5 帧/秒 (fps=1000/interval ≈ 5)
+            anim.save(output_anim, writer="ffmpeg", fps=5)
+            print(f"Animation saved to {output_anim}")
+        except Exception as e:
+            print("Failed to save as MP4: ", e)
+            # 如果想保存为 GIF，可以尝试下面的方式（需 imagemagick 支持）：
+            gif_path = output_anim.replace(".mp4", ".gif")
+            try:
+                anim.save(gif_path, writer="imagemagick", fps=5)
+                print(f"Animation also saved to {gif_path}")
+            except Exception as e2:
+                print("Also failed to save as GIF:", e2)
 
 if __name__ == '__main__':
     main()
