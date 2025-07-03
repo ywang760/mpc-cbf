@@ -59,13 +59,14 @@ namespace cbf {
 
         for (size_t i = 0; i < num_neighbors; ++i)
         {
-            Vector other_xy(2);
-            other_xy << other_robot_positions.at(i)(0), other_robot_positions.at(i)(1);
+            Vector neighbor_state(6);
+            neighbor_state << current_states.at(i + (i >= ego_robot_idx ? 1 : 0)).pos_, 
+                              current_states.at(i + (i >= ego_robot_idx ? 1 : 0)).vel_;
 
             if (!slack_mode_) {
-                qp_generator_.addSafetyConstraint(state, other_xy);
+                qp_generator_.addSafetyConstraint(state, neighbor_state);
             } else {
-                qp_generator_.addSafetyConstraint(state, other_xy, true, i);
+                qp_generator_.addSafetyConstraint(state, neighbor_state, true, i);
             }
         }
 
@@ -75,11 +76,11 @@ namespace cbf {
         qp_generator_.addControlBoundConstraint(u_min, u_max);
 
         // Add connectivity constraint
-        if (slack_mode_) {
-            qp_generator_.addConnConstraint(state, other_robot_positions, true, num_neighbors);
-        } else {
-            qp_generator_.addConnConstraint(state, other_robot_positions);
-        }
+        // if (slack_mode_) {
+        //     qp_generator_.addConnConstraint(state, other_robot_positions, true, num_neighbors);
+        // } else {
+        //     qp_generator_.addConnConstraint(state, other_robot_positions);
+        // }
 
         // solve QP
         Problem &problem = qp_generator_.problem();

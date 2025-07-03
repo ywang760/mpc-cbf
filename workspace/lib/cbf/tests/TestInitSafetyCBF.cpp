@@ -16,7 +16,6 @@ class InitSafetyCBFTest : public ::testing::Test
 {
 
     using ConnectivityCBF = cbf::ConnectivityCBF;
-    
 
 protected:
     // CBF parameters
@@ -26,10 +25,9 @@ protected:
     Eigen::VectorXd v_max = Eigen::VectorXd::Constant(3, 1.0);  // max velocity limits (1.0 for all 3 dims)
 
     std::shared_ptr<ConnectivityCBF> connectivity_cbf = std::make_shared<ConnectivityCBF>(min_dist, max_dist, v_min, v_max);
-
     void checkResult(const std::pair<Eigen::VectorXd, double> &res,
-                    const Eigen::VectorXd &expected_Ac,
-                    double expected_Bc) const
+                     const Eigen::VectorXd &expected_Ac,
+                     double expected_Bc) const
     {
         const Eigen::VectorXd &Ac = res.first;
         double Bc = res.second;
@@ -54,15 +52,15 @@ TEST_F(InitSafetyCBFTest, TwoRobotInSafeRegion)
     Eigen::VectorXd state(6);
     state << 0.0, 0.0, 0.0, 0.0, 0.0, 0.0; // ego robot pos, vel
 
-    Eigen::VectorXd other_state(2);
-    other_state << 1.0, 0.0; // other robot pos
+    Eigen::VectorXd other_state(6);
+    other_state << 1.0, 0.0, 0.0, 0.0, 0.0, 0.0; // other robot pos, vel
 
     // Get safety constraints
     auto Ac = connectivity_cbf->getSafetyConstraints(state, other_state);
     auto Bc = connectivity_cbf->getSafetyBound(state, other_state);
 
     auto res = std::pair<Eigen::VectorXd, double>(Ac, Bc);
-    
+
     // Since distance is greater than min_dist, we expect that Bc to be positive
     // The constraint becomes Ac * u + Bc >= 0
     // Any u will keep the system safe, so the constraint is inactive
@@ -78,16 +76,15 @@ TEST_F(InitSafetyCBFTest, TwoRobotInSafeRegionWithHugeVelocity)
 {
     Eigen::VectorXd state(6);
     state << 0.0, 0.0, 0.0, 100.0, 100.0, 0.0; // ego robot pos, vel
-
-    Eigen::VectorXd other_state(2);
-    other_state << 1.0, 0.0; // other robot pos
+    Eigen::VectorXd other_state(6);
+    other_state << 1.0, 0.0, 0.0, 0.0, 0.0, 0.0; // other robot pos, vel
 
     // Get safety constraints
     auto Ac = connectivity_cbf->getSafetyConstraints(state, other_state);
     auto Bc = connectivity_cbf->getSafetyBound(state, other_state);
 
     auto res = std::pair<Eigen::VectorXd, double>(Ac, Bc);
-    
+
     // In this case, since there's huge velocity, we expect that Bc to be negative
     // The CBF is active to ensure safety
     EXPECT_LT(Bc, 0.0);
@@ -103,15 +100,15 @@ TEST_F(InitSafetyCBFTest, TwoRobotOnSafetyBound)
     Eigen::VectorXd state(6);
     state << 0.0, 0.0, 0.0, 0.0, 0.0, 0.0; // ego robot pos, vel
 
-    Eigen::VectorXd other_state(2);
-    other_state << 0.8, 0.0; // other robot pos (on safety bound)
+    Eigen::VectorXd other_state(6);
+    other_state << 0.8, 0.0, 0.0, 0.0, 0.0, 0.0; // other robot pos, vel
 
     // Get safety constraints
     auto Ac = connectivity_cbf->getSafetyConstraints(state, other_state);
     auto Bc = connectivity_cbf->getSafetyBound(state, other_state);
 
     auto res = std::pair<Eigen::VectorXd, double>(Ac, Bc);
-    
+
     // Since distance is equal to min_dist, we expect that Bc to be zero.
     EXPECT_EQ(Bc, 0.0);
 
@@ -126,15 +123,15 @@ TEST_F(InitSafetyCBFTest, TwoRobotInUnsafeRegion)
     Eigen::VectorXd state(6);
     state << 0.0, 0.0, 0.0, 0.0, 0.0, 0.0; // ego robot pos, vel
 
-    Eigen::VectorXd other_state(2);
-    other_state << 0.5, 0.0; // other robot pos (unsafe)
+    Eigen::VectorXd other_state(6);
+    other_state << 0.5, 0.0, 0.0, 0.0, 0.0, 0.0; // other robot pos, vel
 
     // Get safety constraints
     auto Ac = connectivity_cbf->getSafetyConstraints(state, other_state);
     auto Bc = connectivity_cbf->getSafetyBound(state, other_state);
 
     auto res = std::pair<Eigen::VectorXd, double>(Ac, Bc);
-    
+
     // Since distance is less than min_dist, we expect that Bc to be negative
     // The constraint Ac * u + Bc >= 0 should be satisfied
     EXPECT_LT(Bc, 0.0);
