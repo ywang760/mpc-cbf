@@ -23,15 +23,6 @@ RUN apt-get update && apt-get install -y \
     git \
     ninja-build \
     ffmpeg
-    
-# Setup g++-9 as the compiler
-# RUN apt-get update && apt-get install -y \
-#     g++-9 \
-#     gcc-9
-# RUN update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-9 100 && \
-#     update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-9 100
-# ENV CC=gcc-9
-# ENV CXX=g++-9
 
 # Copy the current directory contents into the container
 COPY . .
@@ -39,10 +30,12 @@ COPY . .
 # Initialize the submodules
 RUN git submodule update --init --recursive
 
+# Configure Git to trust the workspace path
+RUN git config --global --add safe.directory /usr/src/mpc-cbf
+
 # Setup CPLEX
 ENV CPLEX_HOME=/opt/ibm/ILOG/CPLEX_Studio2211
 ENV PATH=$CPLEX_HOME/cplex/bin/x86-64_linux:$PATH
-ENV LD_LIBRARY_PATH=$CPLEX_HOME/cplex/lib/x86-64_linux:${LD_LIBRARY_PATH:-""}
 ENV CPLEX_INSTALLER=cplex_studio*.linux*.bin
 RUN echo "Starting CPLEX installation"
 WORKDIR /usr/src/mpc-cbf/.docker
@@ -55,10 +48,6 @@ RUN set -x && \
     echo "No installer found for CPLEX"; \
     fi
 RUN rm -rf /usr/src/mpc-cbf/.docker/cplex
-
-# # Build the cbf library
-# WORKDIR /usr/src/mpc-cbf/lib/cbf
-# RUN mkdir build && cd build && cmake -G Ninja .. && ninja
 
 # Initialize shell
 WORKDIR /usr/src/mpc-cbf

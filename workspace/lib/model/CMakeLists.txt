@@ -26,21 +26,21 @@ target_include_directories(model_DoubleIntegratorXYYaw_example PUBLIC include ..
 target_link_libraries(model_DoubleIntegratorXYYaw_example PUBLIC model_DoubleIntegratorXYYaw)
 
 # Testing configuration
-# option(MODEL_BUILD_TESTS "Build tests for model library" ON)
+option(MODEL_BUILD_TESTS "Build tests for model library" ON)
 
-# if(MODEL_BUILD_TESTS)
-#     # Enable testing
-#     enable_testing()
+if(MODEL_BUILD_TESTS)
+    # Enable testing
+    enable_testing()
 
-#     # Try to find and configure GoogleTest
-#     find_package(GoogleTest)
+    # Try to find and configure GoogleTest
+    find_package(GoogleTest)
 
-#     # Include tests directory if GoogleTest is available
-#     if(GOOGLETEST_CONFIGURED)
-#         # Make GMOCK_INCLUDE_DIRS available to tests
-#         include_directories(${GTEST_INCLUDE_DIRS} ${GMOCK_INCLUDE_DIRS})
-#         add_subdirectory(tests)
-#     else()
-#         message(WARNING "Skipping tests for model library as GoogleTest is not available")
-#     endif()
-# endif()
+    # Include tests directory if GoogleTest is available
+    if(GOOGLETEST_CONFIGURED)
+        # Make GMOCK_INCLUDE_DIRS available to tests
+        include_directories(${GTEST_INCLUDE_DIRS} ${GMOCK_INCLUDE_DIRS})
+        add_subdirectory(tests)
+    else()
+        message(WARNING "Skipping tests for model library as GoogleTest is not available")
+    endif()
+endif()
