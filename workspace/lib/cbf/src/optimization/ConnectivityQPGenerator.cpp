@@ -52,17 +52,17 @@ namespace cbf {
         }
     }
 
-
     template <typename T, unsigned int DIM>
     void ConnectivityQPGenerator<T, DIM>::addSafetyConstraint(const Vector &state,
-                                                   const Vector &target_state,
-                                                   bool use_slack,
-                                                   std::size_t slack_idx) {
+                                                              const Vector &neighbor_state,
+                                                              bool use_slack,
+                                                              std::size_t slack_idx)
+    {
         // Get safety constraint coefficients from the CBF implementation
-        Vector coefficients = -1.0 * cbf_->getSafetyConstraints(state, target_state);
+        Vector coefficients = -1.0 * cbf_->getSafetyConstraints(state, neighbor_state);
 
         // Get the safety constraint bound from the CBF implementation
-        T bound = cbf_->getSafetyBound(state, target_state);
+        T bound = cbf_->getSafetyBound(state, neighbor_state);
 
         // Create a linear constraint with lower bound negative infinity
         LinearConstraint linear_constraint(coefficients, std::numeric_limits<T>::lowest(), bound);

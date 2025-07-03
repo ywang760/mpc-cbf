@@ -42,7 +42,7 @@ namespace cbf
     //   vmax: Maximum velocity limits for each control dimension
     ConnectivityCBF::ConnectivityCBF(double min_dist, double max_dist, Eigen::VectorXd vmin, Eigen::VectorXd vmax)
         : dmin(min_dist), dmax(max_dist), vmin(vmin), vmax(vmax),
-          px("px"), py("py"), th("th"), vx("vx"), vy("vy"), w("w"), xt("xt"), yt("yt")
+          px("px"), py("py"), th("th"), vx("vx"), vy("vy"), w("w"), px_n("px_n"), py_n("py_n"), vx_n("vx_n"), vy_n("vy_n")
     {
         // Define dimensions of the state and control spaces
         STATE_VARS = 6;
@@ -68,13 +68,15 @@ namespace cbf
              {0, 1, 0},
              {0, 0, 1}};
 
-        // Create state vector and transpose it for proper matrix operations
+        // Create state vector of the ego agent
         state = {{px, py, th, vx, vy, w}};
         state = state.transpose();
 
-        // Create agent state vector and transpose it
-        x_agent = {{xt, yt}};
-        x_agent = x_agent.transpose();
+        // Create state vector of the neighbor agent
+        p_n = {{px_n, py_n}};
+        p_n = p_n.transpose();
+        v_n = {{vx_n, vy_n}};
+        v_n = v_n.transpose();
 
         // Define system dynamics (f + g*u)
         // f = A*x (drift term)
@@ -144,7 +146,7 @@ namespace cbf
     std::pair<GiNaC::matrix, GiNaC::ex> ConnectivityCBF::initSafetyCBF()
     {
         // Calculate relative position to other agent
-        GiNaC::matrix d = x_agent.sub(GiNaC::matrix{{px}, {py}});
+        GiNaC::matrix d = p_n.sub(GiNaC::matrix{{px}, {py}});
 
         // Calculate squared distance to other agent
         GiNaC::ex norm2 = GiNaC::pow(d(0, 0), 2) + GiNaC::pow(d(1, 0), 2);
@@ -273,10 +275,10 @@ namespace cbf
     // Parameters:
     //   a: Symbolic matrix
     //   state: Current state vector
-    //   agent_state: Other agent state vector
+    //   neighbor_state: Other agent state vector
     // Returns:
     //   Matrix with numerical values substituted
-    GiNaC::ex ConnectivityCBF::matrixSubs(GiNaC::matrix a, Eigen::VectorXd state, Eigen::VectorXd agent_state)
+    GiNaC::ex ConnectivityCBF::matrixSubs(GiNaC::matrix a, Eigen::VectorXd state, Eigen::VectorXd neighbor_state)
     {
         // Substitute each state variable with its numerical value
         GiNaC::ex tmp = GiNaC::subs(a, px == state(0));
@@ -285,8 +287,8 @@ namespace cbf
         tmp = GiNaC::subs(tmp, vx == state(3));
         tmp = GiNaC::subs(tmp, vy == state(4));
         tmp = GiNaC::subs(tmp, w == state(5));
-        tmp = GiNaC::subs(tmp, xt == agent_state(0));
-        tmp = GiNaC::subs(tmp, yt == agent_state(1));
+        tmp = GiNaC::subs(tmp, px_n == neighbor_state(0));
+        tmp = GiNaC::subs(tmp, py_n == neighbor_state(1));
         return tmp;
     }
 
@@ -294,10 +296,10 @@ namespace cbf
     // Parameters:
     //   a: Symbolic expression
     //   state: Current state vector
-    //   agent_state: Other agent state vector
+    //   neighbor_state: Other agent state vector
     // Returns:
     //   Expression with numerical values substituted
-    GiNaC::ex ConnectivityCBF::valueSubs(GiNaC::ex a, Eigen::VectorXd state, Eigen::VectorXd agent_state)
+    GiNaC::ex ConnectivityCBF::valueSubs(GiNaC::ex a, Eigen::VectorXd state, Eigen::VectorXd neighbor_state)
     {
         // Substitute each state variable with its numerical value
         GiNaC::ex tmp = GiNaC::subs(a, px == state(0));
@@ -306,21 +308,21 @@ namespace cbf
         tmp = GiNaC::subs(tmp, vx == state(3));
         tmp = GiNaC::subs(tmp, vy == state(4));
         tmp = GiNaC::subs(tmp, w == state(5));
-        tmp = GiNaC::subs(tmp, xt == agent_state(0));
-        tmp = GiNaC::subs(tmp, yt == agent_state(1));
+        tmp = GiNaC::subs(tmp, px_n == neighbor_state(0));
+        tmp = GiNaC::subs(tmp, py_n == neighbor_state(1));
         return tmp;
     }
 
     // Get the minimum distance constraint vector for the current state and agent
     // Parameters:
     //   state: Current state vector
-    //   agent_state: Other agent state vector
+    //   neighbor_state: Other agent state vector
     // Returns:
     //   Constraint vector for the QP solver
-    Eigen::VectorXd ConnectivityCBF::getSafetyConstraints(Eigen::VectorXd state, Eigen::VectorXd agent_state)
+    Eigen::VectorXd ConnectivityCBF::getSafetyConstraints(Eigen::VectorXd state, Eigen::VectorXd neighbor_state)
     {
         // Substitute numerical values into symbolic matrix and convert to Eigen vector
-        GiNaC::ex matrix_expr = matrixSubs(Ac_safe, state, agent_state);
+        GiNaC::ex matrix_expr = matrixSubs(Ac_safe, state, neighbor_state);
         Eigen::VectorXd Ac;
         Ac.resize(CONTROL_VARS);
         Ac.setZero();
@@ -690,13 +692,13 @@ namespace cbf
     // Get the minimum distance constraint bound for the current state and agent
     // Parameters:
     //   state: Current state vector
-    //   agent_state: Other agent state vector
+    //   neighbor_state: Other agent state vector
     // Returns:
     //   Bound value for the minimum distance constraint
-    double ConnectivityCBF::getSafetyBound(Eigen::VectorXd state, Eigen::VectorXd agent_state)
+    double ConnectivityCBF::getSafetyBound(Eigen::VectorXd state, Eigen::VectorXd neighbor_state)
     {
         // Substitute numerical values and evaluate
-        GiNaC::ex expr = valueSubs(Bc_safe, state, agent_state);
+        GiNaC::ex expr = valueSubs(Bc_safe, state, neighbor_state);
         double Bc = GiNaC::ex_to<GiNaC::numeric>(expr).to_double();
 
         return Bc;
@@ -705,13 +707,13 @@ namespace cbf
     // Get the maximum distance constraint bound for the current state and agent
     // Parameters:
     //   state: Current state vector
-    //   agent_state: Other agent state vector
+    //   neighbor_state: Other agent state vector
     // Returns:
     //   Bound value for the maximum distance constraint
-    double ConnectivityCBF::getMaxDistBound(Eigen::VectorXd state, Eigen::VectorXd agent_state)
+    double ConnectivityCBF::getMaxDistBound(Eigen::VectorXd state, Eigen::VectorXd neighbor_state)
     {
         // Substitute numerical values and evaluate
-        GiNaC::ex expr = valueSubs(Bc_connectivity, state, agent_state);
+        GiNaC::ex expr = valueSubs(Bc_connectivity, state, neighbor_state);
         double Bc = GiNaC::ex_to<GiNaC::numeric>(expr).to_double();
 
         return Bc;

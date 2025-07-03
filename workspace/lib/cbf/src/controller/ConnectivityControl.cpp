@@ -14,17 +14,29 @@ namespace cbf {
     template <typename T, unsigned int DIM>
     bool ConnectivityControl<T, DIM>::optimize(VectorDIM &cbf_u,
                                                const VectorDIM &desired_u,
-                                               const State &current_state,
-                                               const std::vector<VectorDIM> &other_robot_positions,
+                                               std::vector<State> current_states,
+                                               size_t ego_robot_idx,
                                                const VectorDIM &u_min,
                                                const VectorDIM &u_max)
     {
 
-        VectorDIM current_pos = current_state.pos_;
-        VectorDIM current_vel = current_state.vel_;
-        
+        State current_state = current_states.at(ego_robot_idx);
+
+        // For backward compatibility
+        std::vector<VectorDIM> other_robot_positions;
+        for (size_t i = 0; i < current_states.size(); ++i)
+        {
+            if (i != ego_robot_idx)
+            {
+
+                VectorDIM &pos = current_states.at(i).pos_;
+                pos(2) = 0; // Set z-coordinate to zero for 2D control
+                other_robot_positions.push_back(pos);
+            }
+        }
+
         // if slack_mode, compute the slack weights
-        int num_neighbors = other_robot_positions.size();
+        int num_neighbors = current_states.size() - 1; // Exclude the ego robot itself
         std::vector<double> slack_weights(num_neighbors);
         if (slack_mode_) {
             // Define slack weights with decay
@@ -44,18 +56,19 @@ namespace cbf {
         // add constraints
         Vector state(2*DIM);
         state << current_state.pos_, current_state.vel_;
-        
-        for (size_t i = 0; i < other_robot_positions.size(); ++i) {
+
+        for (size_t i = 0; i < num_neighbors; ++i)
+        {
             Vector other_xy(2);
             other_xy << other_robot_positions.at(i)(0), other_robot_positions.at(i)(1);
-            
+
             if (!slack_mode_) {
                 qp_generator_.addSafetyConstraint(state, other_xy);
             } else {
                 qp_generator_.addSafetyConstraint(state, other_xy, true, i);
             }
         }
-        
+
         // Add velocity constraints
         qp_generator_.addMinVelConstraints(state);
         qp_generator_.addMaxVelConstraints(state);
@@ -67,7 +80,7 @@ namespace cbf {
         } else {
             qp_generator_.addConnConstraint(state, other_robot_positions);
         }
-        
+
         // solve QP
         Problem &problem = qp_generator_.problem();
         CPLEXSolver cplex_solver;

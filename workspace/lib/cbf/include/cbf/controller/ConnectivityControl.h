@@ -38,22 +38,22 @@ namespace cbf {
 
         /**
          * @brief Solve the optimization problem to get connectivity-preserving control input
-         * 
+         *
          * @param cbf_u Output parameter for the optimized control input
          * @param desired_u Desired control input without CBF constraints
-         * @param current_state Current state of the robot
-         * @param other_robot_positions Positions of other robots in the network
+         * @param current_states Current states of all robots in the network
+         * @param ego_robot_idx Index of the ego robot for which we are computing control input
          * @param u_min Minimum allowable control inputs
          * @param u_max Maximum allowable control inputs
          * @return true if optimization was successful
          * @return false if optimization failed
          */
-        bool optimize(VectorDIM &cbf_u, 
+        bool optimize(VectorDIM &cbf_u,
                       const VectorDIM &desired_u,
-                      const State &current_state,
-                      const std::vector<VectorDIM> &other_robot_positions,
-                      const VectorDIM& u_min, 
-                      const VectorDIM& u_max);
+                      std::vector<State> current_states,
+                      size_t ego_robot_idx,
+                      const VectorDIM &u_min,
+                      const VectorDIM &u_max);
 
         const std::shared_ptr<cbf::ConnectivityCBF>& getCBF() const {
             return qp_generator_.getCBF();
