@@ -47,7 +47,7 @@ def instance_success(traj, goals, radius, collision_shape):
         pos = traj[i, -1, :2]
         goal = goals[i][:2]
         if not reach_goal_area(pos, goal, radius):
-            print("cannot reach goal area...")
+            print("Cannot reach goal area...")
             # return False, float('inf')
 
     for t in range(ts):

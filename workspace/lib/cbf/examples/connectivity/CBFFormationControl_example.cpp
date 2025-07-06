@@ -13,6 +13,7 @@
 #include <math/Controls.h>
 #include <math/Random.h>
 #include <spdlog/spdlog.h>
+#include <common/logging.hpp>
 
 int main(int argc, char *argv[])
 {
@@ -26,9 +27,10 @@ int main(int argc, char *argv[])
     using VectorDIM = math::VectorDIM<double, DIM>;
     using State = model::State<double, DIM>;
 
-    spdlog::set_pattern("[%H:%M:%S] [%^%l%$] [%s:%# %!] %v");
+    // Initialize logging with environment variable support
+    auto logger = common::initializeLogging();
 
-    const std::string DF_CFG = "/usr/src/mpc-cbf/workspace/experiments/config/formation/robots2_2.json";
+    const std::string DF_CFG = "/usr/src/mpc-cbf/workspace/experiments/config/formation/Circle2.json";
     const std::string DF_OUT = "/usr/src/mpc-cbf/workspace/experiments/results/formation/states.json";
 
     // Parse command-line arguments
@@ -45,7 +47,7 @@ int main(int argc, char *argv[])
 
     auto option_parse = options.parse(argc, argv);
     // Load experiment configuration
-    SPDLOG_INFO("Starting CBF Formation Control Example...");
+    logger->info("Starting CBF Formation Control Example...");
 
     // Configuration file path
     std::string experiment_config_filename = option_parse["config_file"].as<std::string>();
@@ -139,7 +141,7 @@ int main(int argc, char *argv[])
         // Print out current loop_idx if loop_idx is a multiple of 10
         if (loop_idx % 10 == 0)
         {
-            SPDLOG_INFO("Timestep: {}", loop_idx);
+            logger->info("Timestep: {}", loop_idx);
         }
         // Process each robot in the simulation
         for (int robot_idx = 0; robot_idx < num_robots; ++robot_idx)
@@ -186,7 +188,7 @@ int main(int argc, char *argv[])
     }
 
     // Save simulation results to JSON file
-    SPDLOG_INFO("Writing states to JSON file: {}", JSON_FILENAME);
+    logger->info("Writing states to JSON file: {}", JSON_FILENAME);
     std::ofstream o(JSON_FILENAME, std::ofstream::trunc);
     o << std::setw(4) << states << std::endl;
 

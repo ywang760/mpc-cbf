@@ -33,6 +33,8 @@ GiNaC::ex fifthAlpha(GiNaC::ex myh, double mygamma)
 
 namespace cbf
 {
+    auto logger = spdlog::default_logger();
+
     // Constructor for Connectivity Control Barrier Function
     // Initializes the CBF with minimum/maximum distance constraints and velocity limits
     // Parameters:
@@ -411,9 +413,9 @@ namespace cbf
         for (int i = 0; i < N; ++i)
             D_num(i, i) = A_num.row(i).sum();
         Eigen::MatrixXd L_num = D_num - A_num;
-        SPDLOG_INFO("Diagonal matrix D:\n{}", D_num);
-        SPDLOG_INFO("Adjacency matrix A:\n{}", A_num);
-        SPDLOG_INFO("Laplacian matrix L:\n{}", L_num);
+        logger->debug("Diagonal matrix D:\n{}", D_num);
+        logger->debug("Adjacency matrix A:\n{}", A_num);
+        logger->debug("Laplacian matrix L:\n{}", L_num);
 
         // Numerically solve for the second smallest eigenvalue and corresponding eigenvector
         Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> solver(L_num);
@@ -454,7 +456,6 @@ namespace cbf
             substitutions[px_list[i]] = robot_positions(i, 0);
             substitutions[py_list[i]] = robot_positions(i, 1);
             substitutions[eigenvec_list[i]] = eigenvec(i);
-            std::cout << "Substituting px" << i << ": " << robot_positions(i, 0) << ", py" << i << ": " << robot_positions(i, 1) << ", eigenvec" << i << ": " << eigenvec(i) << std::endl;
         }
         // 当前机器人的自身位置
         substitutions[px] = self_position(0);
@@ -492,7 +493,6 @@ namespace cbf
                 GiNaC::ex dAij_dy = -4 * (Aij + 1) * diff / sigma * dy;
 
                 // Calculate each component in the gradient (formula (12) in the paper)
-                // print eigenvec_list[i], eigenvec_list[j];
                 GiNaC::ex vdiff2 = GiNaC::pow(eigenvec_list[i] - eigenvec_list[j], 2);
                 dLdx += dAij_dx * vdiff2;
                 dLdy += dAij_dy * vdiff2;
@@ -531,15 +531,14 @@ namespace cbf
         GiNaC::matrix hess_sym = compute_d2h_dx2(dh_dx_sym, self_idx);
         // 输出符号 Hessian 表达式（调试用）
         GiNaC::matrix hess_eval = matrixSubsMatrix(hess_sym, robot_positions, eigenvec, x_self.head<2>());
-        SPDLOG_INFO("Step 1: ∇²h evaluated:\n{}", hess_eval);
+        logger->debug("Step 1: ∇²h evaluated:\n{}", hess_eval);
         // === Step 2: 计算 Hessian 项：∇²h · f(x) ===
         double fx = x_self(3);
         double fy = x_self(4);
         Eigen::Vector2d hess_term;
         hess_term(0) = GiNaC::ex_to<GiNaC::numeric>(hess_eval(0, 0) * fx + hess_eval(0, 1) * fy).to_double();
         hess_term(1) = GiNaC::ex_to<GiNaC::numeric>(hess_eval(1, 0) * fx + hess_eval(1, 1) * fy).to_double();
-        SPDLOG_INFO("Step 2: Hessian contribution ∇²h·f");
-        // logVector("hess_term", hess_term);
+        logger->debug("Step 2: Hessian contribution ∇²h·f");
 
         // === Step 3: ∇h 数值化，替换变量获得数值梯度 ===
         GiNaC::matrix dh_eval = matrixSubsMatrix(dh_dx_sym, robot_positions, eigenvec, x_self.head<2>());
@@ -547,7 +546,7 @@ namespace cbf
         // 这里只对 px 和 py 非零，其他导数为零
         dh_dx(0) = GiNaC::ex_to<GiNaC::numeric>(dh_eval(self_idx, 0)).to_double();
         dh_dx(1) = GiNaC::ex_to<GiNaC::numeric>(dh_eval(self_idx, 1)).to_double();
-        SPDLOG_INFO("Step 3: ∇h(px, py)\n{}", dh_dx);
+        logger->debug("Step 3: ∇h(px, py)\n{}", dh_dx);
 
         // === Step 4: 构造 Jf^T ∇h 项 ===
         // 由于 f(x) = [vx, vy, w]，其雅可比矩阵 Jf 关于状态向量 x 的非零偏导为：
@@ -555,7 +554,7 @@ namespace cbf
         Eigen::VectorXd jac_term = Eigen::VectorXd::Zero(6);
         jac_term(3) = dh_dx(0); // vx 对应 px
         jac_term(4) = dh_dx(1); // vy 对应 py
-        SPDLOG_INFO("Step 4: Jf^T ∇h\n{}", jac_term);
+        logger->debug("Step 4: Jf^T ∇h\n{}", jac_term);
 
         // === Step 5: 拼接最终结果 ∇(L_f h) = ∇²h·f + Jfᵀ∇h ===
         Eigen::VectorXd total = jac_term;
@@ -572,32 +571,33 @@ namespace cbf
         int self_idx)                        // 当前机器人在 robot_states 中的索引
     {
         const int N = robot_states.rows(); // Number of robots
-        SPDLOG_INFO("Initializing Connectivity CBF with {} robots", N);
+        logger->debug("Initializing Connectivity CBF with {} robots", N);
 
         // Step 1: h = λ₂ - λ₂_min (numerically)
         const double sigma_val = dmax * dmax * dmax * dmax / std::log(2.0); // σ = R_s^4 / ln(2)
         auto [lambda2_val, eigenvec] = getLambda2FromL(robot_states.leftCols(2), dmax, sigma_val);
         eigenvec = eigenvec / eigenvec.norm();
         double h = lambda2_val - epsilon;
-        SPDLOG_INFO("Step 1: λ₂ = {}, λ₂_min = {}, h = {}", lambda2_val, epsilon, h);
+        logger->debug("Step 1: λ₂ = {}, λ₂_min = {}, h = {}", lambda2_val, epsilon, h);
 
         // Step 2: 符号构造 ∇h (gradient of h), shape = N×2
         initSymbolLists(N);
         GiNaC::matrix dh_dx_sym = compute_dh_dx(N, dmax, sigma_val);                                 // shape Nx2
         GiNaC::matrix dh_dx_ginac = matrixSubsMatrix(dh_dx_sym, robot_states.leftCols(2), eigenvec); // N×2 数值表达式, robot_states.leftCols(2) 只取 px, py
-        SPDLOG_INFO("Step 2: ∇h evaluated\n{}", dh_dx_ginac);
+        logger->debug("Step 2: ∇h evaluated\n{}", dh_dx_ginac);
         Eigen::VectorXd dh_dx = Eigen::VectorXd::Zero(STATE_VARS);
         dh_dx(0) = GiNaC::ex_to<GiNaC::numeric>(dh_dx_ginac(self_idx, 0)).to_double();
         dh_dx(1) = GiNaC::ex_to<GiNaC::numeric>(dh_dx_ginac(self_idx, 1)).to_double();
 
         // Step 3: L_f h = ∇h · f(x_self)
         // 由于 f = A*x = [vx, vy, w, 0, 0, 0]，直接从 x_self 构造 f 的数值向量 // TODO: this could potentially be replaced by f in fields (if using symbolic)
+        // FIXME: QUESTION: this only computes the ego robot's L_fh, should it sum over all robots????
         Eigen::VectorXd f_x = Eigen::VectorXd::Zero(STATE_VARS);
         f_x(0) = x_self(3); // vx
         f_x(1) = x_self(4); // vy
         f_x(2) = x_self(5); // w
         double lfh = dh_dx.dot(f_x);
-        SPDLOG_INFO("Step 3: L_f h = ∇h · f = {}", lfh);
+        logger->debug("Step 3: L_f h = ∇h · f = {}", lfh);
 
         // Step 4: 用符号 Hessian 构造 ∇(L_f h)
         Eigen::VectorXd dlfh_dx = compute_dLf_h_dx(
@@ -606,11 +606,11 @@ namespace cbf
             robot_states.leftCols(2),
             eigenvec,
             x_self);
-        SPDLOG_INFO("Step 4: ∇(L_f h)\n{}", dlfh_dx);
+        logger->debug("Step 4: ∇(L_f h)\n{}", dlfh_dx);
 
         //  Step 5: L_f² h = ∇(L_f h) · f
         double lf2h = dlfh_dx.dot(f_x);
-        SPDLOG_INFO("Step 5: L_f² h = ∇(L_f h) · f = {}", lf2h);
+        logger->debug("Step 5: L_f² h = ∇(L_f h) · f = {}", lf2h);
 
         //  Step 6: L_g L_f h = ∇(L_f h) · g
         Eigen::MatrixXd g = Eigen::MatrixXd::Zero(STATE_VARS, CONTROL_VARS); // shape 6x3 // TODO: this could potentially be replaced by g in fields (if using symbolic)
@@ -618,14 +618,17 @@ namespace cbf
         g(4, 1) = 1.0;
         Eigen::VectorXd Ac = (dlfh_dx.transpose() * g).transpose(); // size = 3
         Ac(2) = 0.0;                                                // 防止角速度影响控制约束 // TODO: why is this necessary
-        SPDLOG_INFO("Step 6: Ac = L_g L_f h = ∇(L_f h) · g\n{}", Ac);
+        logger->debug("Step 6: Ac = L_g L_f h = ∇(L_f h) · g\n{}", Ac);
+
+        // Alternative method for Ac:
+        
 
         // Step 7: Bc = L_f² h + L_f(α(h)) + α(L_f h + α(h)), where α is a class of K functions
         double psi1 = lfh + gamma * h; // psi1 = L_f h + alpha1(h), assuming linear alpha1
         double Bc = lf2h               // L_f^2 h
                     + gamma * lfh      // Assuming linear alpha11: L_f(α(h)) = γ L_f h
                     + gamma * psi1;    // Assuming linear alpha2:
-        SPDLOG_INFO("Step 7: Bc = L_f² h + L_f(α(h)) + α(L_f h + α(h)) = {} + {} + {} = {}", lf2h, gamma * lfh, gamma * psi1, Bc);
+        logger->debug("Step 7: Bc = L_f² h + L_f(α(h)) + α(L_f h + α(h)) = {} + {} + {} = {}", lf2h, gamma * lfh, gamma * psi1, Bc);
         return std::make_pair(Ac, Bc);
 
         //         // ✅ Step 7: 使用一致方式计算 Bc
