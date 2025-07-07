@@ -44,7 +44,7 @@ namespace cbf {
                                        const Eigen::VectorXd& eigenvec,
                                        const Eigen::Vector2d& self_position = Eigen::Vector2d::Zero());
         // Lambda2-based constraint
-std::tuple<Eigen::RowVectorXd, double, double> initConnCBF(const Eigen::MatrixXd& robot_states,
+        std::tuple<Eigen::RowVectorXd, double, double> initConnCBF(const Eigen::MatrixXd& robot_states,
                                                             const Eigen::VectorXd& x_self,
                                                             int self_idx,
                                                             double Rs_val,
@@ -52,12 +52,24 @@ std::tuple<Eigen::RowVectorXd, double, double> initConnCBF(const Eigen::MatrixXd
                                                             double lambda2_min,
                                                             double gamma);
         GiNaC::matrix compute_dh_dx(int N, const GiNaC::ex& Rs, const GiNaC::ex& sigma);
-        GiNaC::matrix compute_d2h_dx2(const GiNaC::matrix& dh_dx_sym, int self_idx);
-        Eigen::VectorXd compute_dLf_h_dx(const GiNaC::matrix& dh_dx_sym,
-                                         int self_idx,
-                                         const Eigen::MatrixXd& robot_positions,
-                                         const Eigen::VectorXd& eigenvec,
-                                         const Eigen::VectorXd& x_self);
+        //GiNaC::matrix compute_d2h_dx2(const GiNaC::matrix& dh_dx_sym, int self_idx);
+        Eigen::VectorXd compute_dLf_h_dx(
+            const GiNaC::matrix& dh_dx_sym,
+            int self_idx,
+            const Eigen::MatrixXd& robot_positions,
+            const Eigen::VectorXd& eigenvec,
+            const Eigen::VectorXd& x_self,
+            double Rs_val,
+            double sigma_val);
+        Eigen::Matrix2d compute_d2h_dx2_fd(
+            const GiNaC::matrix& dh_dx_sym, 
+            const Eigen::MatrixXd& robot_positions,
+            const Eigen::VectorXd& eigenvec,
+            const Eigen::Vector2d& x_self,
+            int self_idx,
+            double Rs_val,
+            double sigma_val);
+
     public:
         using Vector3d = math::VectorDIM<double, 3>;
         ConnectivityCBF(double min_dist, double max_dist, Eigen::VectorXd vmin, Eigen::VectorXd vmax);

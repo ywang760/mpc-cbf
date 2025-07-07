@@ -425,48 +425,97 @@ namespace cbf
 
         const double Rs = 3.0;
         const double sigma = 120;
-        const double lambda2_min = 0.1;
+        const double lambda2_min = 1e-3;
         const double gamma = 1.0;
         auto [Ac, Bc, h] = this->initConnCBF(robot_states, x_self, 0, Rs, sigma, lambda2_min, gamma);
         h_out = h;
+        // std::cout << "[DEBUG][getConnConstraints] Ac.rows() = " << Ac.rows()
+        //   << ", Ac.cols() = " << Ac.cols() << ", Ac.size() = " << Ac.size() << "\n";
         return Ac;
     }
 
 
-    std::pair<double, Eigen::VectorXd> getLambda2FromL(
-    const Eigen::MatrixXd& robot_positions, 
-    double Rs_value, 
-    double sigma_value)
-    {
-        const int N = robot_positions.rows();
-        Eigen::MatrixXd A_num = Eigen::MatrixXd::Zero(N, N);
-        for (int i = 0; i < N; ++i)
-        {
-            for (int j = 0; j < N; ++j)
-            {
-                if (i != j)
-                {
-                    double dx = robot_positions(i, 0) - robot_positions(j, 0);
-                    double dy = robot_positions(i, 1) - robot_positions(j, 1);
-                    double dij2 = dx * dx + dy * dy;
+    // std::pair<double, Eigen::VectorXd> getLambda2FromL(
+    // const Eigen::MatrixXd& robot_positions, 
+    // double Rs_value, 
+    // double sigma_value)
+    // {
+    //     const int N = robot_positions.rows();
+    //     Eigen::MatrixXd A_num = Eigen::MatrixXd::Zero(N, N);
+    //     for (int i = 0; i < N; ++i)
+    //     {
+    //         for (int j = 0; j < N; ++j)
+    //         {
+    //             if (i != j)
+    //             {
+    //                 double dx = robot_positions(i, 0) - robot_positions(j, 0);
+    //                 double dy = robot_positions(i, 1) - robot_positions(j, 1);
+    //                 double dij2 = dx * dx + dy * dy;
+    //                 //Try two conditions and weight with squared distance.
+    //                 if (dij2 <= Rs_value * Rs_value)
+    //                 {
+    //                     double weight = std::exp(std::pow(Rs_value * Rs_value - dij2, 2) / sigma_value) - 1;
+    //                     A_num(i, j) = weight;
+    //                 }
+    //                 // double diff = Rs_value * Rs_value - dij2;
+    //                 // // double weight = std::exp(std::pow(diff, 2) / sigma_value);
+    //                 // // A_num(i, j) = weight;   
+    //                 // //Try cubic condition & minus 1.
+    //                 // // double weight = std::exp(std::pow(diff, 3) / sigma_value)-1;
+    //                 // // A_num(i, j) = weight;          
+    //                 // //Try cubic condition.  
+    //                 // // double weight = std::exp(std::pow(diff, 3) / sigma_value);
+    //                 // // A_num(i, j) = weight;    
+    //                 // //Try linear condition.
+    //                 // double weight = std::exp(diff / sigma_value) - 1;
+    //                 // A_num(i, j) = weight;   
+    //             }
+    //         }
+    //     }
+    //     Eigen::MatrixXd D_num = Eigen::MatrixXd::Zero(N, N);
+    //     for (int i = 0; i < N; ++i)
+    //         D_num(i, i) = A_num.row(i).sum();
+    //     Eigen::MatrixXd L_num = D_num - A_num;
+    //     Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> solver(L_num);
+    //     Eigen::VectorXd eigenvals = solver.eigenvalues();
+    //     Eigen::MatrixXd eigenvecs = solver.eigenvectors();
+    //     return {eigenvals(1), eigenvecs.col(1)};
+    // }
 
-                    if (dij2 <= Rs_value * Rs_value)
+    std::pair<double, Eigen::VectorXd> getLambda2FromL(
+        const Eigen::MatrixXd& robot_positions, 
+        double Rs_value, 
+        double sigma_value)
+        {
+            const int N = robot_positions.rows();
+            Eigen::MatrixXd A_num = Eigen::MatrixXd::Zero(N, N);
+            for (int i = 0; i < N; ++i)
+            {
+                for (int j = 0; j < N; ++j)
+                {
+                    if (i != j)
                     {
-                        double weight = std::exp(std::pow(Rs_value * Rs_value - dij2, 2) / sigma_value) - 1;
-                        A_num(i, j) = weight;
+                        double dx = robot_positions(i, 0) - robot_positions(j, 0);
+                        double dy = robot_positions(i, 1) - robot_positions(j, 1);
+                        double dij2 = dx * dx + dy * dy;
+    
+                        if (dij2 <= Rs_value * Rs_value)
+                        {
+                            double weight = std::exp(std::pow(Rs_value * Rs_value - dij2, 2) / sigma_value) - 1;
+                            A_num(i, j) = weight;
+                        }
                     }
                 }
             }
+            Eigen::MatrixXd D_num = Eigen::MatrixXd::Zero(N, N);
+            for (int i = 0; i < N; ++i)
+                D_num(i, i) = A_num.row(i).sum();
+            Eigen::MatrixXd L_num = D_num - A_num;
+            Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> solver(L_num);
+            Eigen::VectorXd eigenvals = solver.eigenvalues();
+            Eigen::MatrixXd eigenvecs = solver.eigenvectors();
+            return {eigenvals(1), eigenvecs.col(1)};
         }
-        Eigen::MatrixXd D_num = Eigen::MatrixXd::Zero(N, N);
-        for (int i = 0; i < N; ++i)
-            D_num(i, i) = A_num.row(i).sum();
-        Eigen::MatrixXd L_num = D_num - A_num;
-        Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> solver(L_num);
-        Eigen::VectorXd eigenvals = solver.eigenvalues();
-        Eigen::MatrixXd eigenvecs = solver.eigenvectors();
-        return {eigenvals(1), eigenvecs.col(1)};
-    }
 
     void ConnectivityCBF::initSymbolLists(int N) {
         px_list.clear(); py_list.clear(); v_list.clear();
@@ -511,7 +560,7 @@ namespace cbf
                 GiNaC::ex dy = py_list[i] - py_list[j];
                 GiNaC::ex dij2 = dx*dx + dy*dy;
                 GiNaC::ex diff = GiNaC::pow(Rs, 2) - dij2;
-                GiNaC::ex Aij = GiNaC::exp(GiNaC::pow(diff, 2) / sigma);
+                GiNaC::ex Aij = GiNaC::exp(GiNaC::pow(diff, 2) / sigma) - 1;
                 GiNaC::ex dAij_dx = -4 * Aij * diff / sigma * dx;
                 GiNaC::ex dAij_dy = -4 * Aij * diff / sigma * dy;
                 GiNaC::ex vdiff2 = GiNaC::pow(v_list[i] - v_list[j], 2);
@@ -524,29 +573,99 @@ namespace cbf
         return grad;
     }
 
+    //Use the symbolic gradient to compute the Hessian matrix.
+    // GiNaC::matrix ConnectivityCBF::compute_d2h_dx2(const GiNaC::matrix& dh_dx_sym, int self_idx)
+    // {
+    //     GiNaC::matrix hess(2, 2);
+    //     hess(0, 0) = GiNaC::diff(dh_dx_sym(self_idx, 0), px_list[self_idx]);
+    //     hess(0, 1) = GiNaC::diff(dh_dx_sym(self_idx, 0), py_list[self_idx]);
+    //     hess(1, 0) = GiNaC::diff(dh_dx_sym(self_idx, 1), px_list[self_idx]);
+    //     hess(1, 1) = GiNaC::diff(dh_dx_sym(self_idx, 1), py_list[self_idx]);
+    //     return hess;
+    // }
 
+    Eigen::MatrixXd ginacToEigen(const GiNaC::matrix& m) {
+        Eigen::MatrixXd result(m.rows(), m.cols());
+        for (int i = 0; i < m.rows(); ++i) {
+            for (int j = 0; j < m.cols(); ++j) {
+                result(i, j) = GiNaC::ex_to<GiNaC::numeric>(m(i, j)).to_double();
+            }
+        }
+        return result;
+    }
 
-    GiNaC::matrix ConnectivityCBF::compute_d2h_dx2(const GiNaC::matrix& dh_dx_sym, int self_idx)
+    Eigen::Matrix2d ConnectivityCBF::compute_d2h_dx2_fd(
+    const GiNaC::matrix& dh_dx_sym, 
+    const Eigen::MatrixXd& robot_positions,
+    const Eigen::VectorXd& eigenvec,
+    const Eigen::Vector2d& x_self,
+    int self_idx,
+    double Rs_val,
+    double sigma_val)
     {
-        GiNaC::matrix hess(2, 2);
-        hess(0, 0) = GiNaC::diff(dh_dx_sym(self_idx, 0), px_list[self_idx]);
-        hess(0, 1) = GiNaC::diff(dh_dx_sym(self_idx, 0), py_list[self_idx]);
-        hess(1, 0) = GiNaC::diff(dh_dx_sym(self_idx, 1), px_list[self_idx]);
-        hess(1, 1) = GiNaC::diff(dh_dx_sym(self_idx, 1), py_list[self_idx]);
+        const double eps = 1e-5;
+        Eigen::Matrix2d hess;
+        Eigen::Vector2d grad_plus_x, grad_minus_x;
+        Eigen::Vector2d grad_plus_y, grad_minus_y;
+
+        // x + eps
+        {
+            Eigen::MatrixXd pos = robot_positions;
+            pos(self_idx, 0) = x_self(0) + eps;
+            Eigen::MatrixXd dh_dx_plus = ginacToEigen(
+                matrixSubsMatrix(dh_dx_sym, pos, eigenvec, x_self + Eigen::Vector2d(eps, 0)));
+            grad_plus_x = dh_dx_plus.row(self_idx);
+        }
+
+        // x - eps
+        {
+            Eigen::MatrixXd pos = robot_positions;
+            pos(self_idx, 0) = x_self(0) - eps;
+            Eigen::MatrixXd dh_dx_minus = ginacToEigen(
+                matrixSubsMatrix(dh_dx_sym, pos, eigenvec, x_self - Eigen::Vector2d(eps, 0)));
+            grad_minus_x = dh_dx_minus.row(self_idx);
+        }
+
+        // y + eps
+        {
+            Eigen::MatrixXd pos = robot_positions;
+            pos(self_idx, 1) = x_self(1) + eps;
+            Eigen::MatrixXd dh_dx_plus = ginacToEigen(
+                matrixSubsMatrix(dh_dx_sym, pos, eigenvec, x_self + Eigen::Vector2d(0, eps)));
+            grad_plus_y = dh_dx_plus.row(self_idx);
+        }
+
+        // y - eps
+        {
+            Eigen::MatrixXd pos = robot_positions;
+            pos(self_idx, 1) = x_self(1) - eps;
+            Eigen::MatrixXd dh_dx_minus = ginacToEigen(
+                matrixSubsMatrix(dh_dx_sym, pos, eigenvec, x_self - Eigen::Vector2d(0, eps)));
+            grad_minus_y = dh_dx_minus.row(self_idx);
+        }
+
+        hess.col(0) = (grad_plus_x - grad_minus_x) / (2 * eps);  // d²h/dx², d²h/dxdy
+        hess.col(1) = (grad_plus_y - grad_minus_y) / (2 * eps);  // d²h/dydx, d²h/dy²
+
         return hess;
     }
+
+
+
 
     Eigen::VectorXd ConnectivityCBF::compute_dLf_h_dx(
         const GiNaC::matrix& dh_dx_sym,
         int self_idx,
         const Eigen::MatrixXd& robot_positions,
         const Eigen::VectorXd& eigenvec,
-        const Eigen::VectorXd& x_self)
+        const Eigen::VectorXd& x_self,
+        double Rs_val,        
+        double sigma_val)
     {
         // === Step 1: 构造符号 Hessian 矩阵 ===
-        GiNaC::matrix hess_sym = compute_d2h_dx2(dh_dx_sym, self_idx);
-        // 输出符号 Hessian 表达式（调试用）
-        GiNaC::matrix hess_eval = matrixSubsMatrix(hess_sym, robot_positions, eigenvec, x_self.head<2>());
+        // GiNaC::matrix hess_sym = compute_d2h_dx2(dh_dx_sym, self_idx);
+        // // 输出符号 Hessian 表达式（调试用）
+        // GiNaC::matrix hess_eval = matrixSubsMatrix(hess_sym, robot_positions, eigenvec, x_self.head<2>());
         // 输出数值化后的 Hessian 矩阵
         //std::cout << "[CBF] Evaluated Hessian matrix (∇²h evaluated):" << std::endl;
         // for (int i = 0; i < 2; ++i) {
@@ -555,6 +674,8 @@ namespace cbf
         //                 << GiNaC::ex_to<GiNaC::numeric>(hess_eval(i, j)).to_double() << std::endl;
         //     }
         // }
+
+        Eigen::Matrix2d hess_eval = compute_d2h_dx2_fd(dh_dx_sym, robot_positions, eigenvec, x_self.head<2>(), self_idx, Rs_val, sigma_val);
         // === Step 2: 计算 Hessian 项：∇²h · f(x) ===
         double fx = x_self(3);
         double fy = x_self(4);
@@ -590,6 +711,12 @@ namespace cbf
         total(0) = hess_term(0);
         total(1) = hess_term(1);
         total.segment<6>(0) += jac_term;
+        
+        if (total.size() != 6 || !total.allFinite()) {
+            std::cerr << "[CBF][ERROR] compute_dLf_h_dx() returned invalid gradient! Size = "
+                      << total.size() << ", allFinite = " << total.allFinite() << std::endl;
+        }
+
         return total;
     }
 
@@ -611,7 +738,7 @@ namespace cbf
         //std::cout << "[CBF] λ₂ = " << lambda2_val << std::endl;
         eigenvec = eigenvec / eigenvec.norm();
         double h = lambda2_val - lambda2_min;
-        std::cout << "1[CBF] h = λ₂ - λ₂_min = " << h << std::endl;
+        //std::cout << "1[CBF] h = λ₂ - λ₂_min = " << h << std::endl;
         // Step 2: 符号构造 ∇h
         initSymbolLists(N);
         GiNaC::matrix dh_dx_sym = compute_dh_dx(N, Rs_val, sigma_val);
@@ -644,7 +771,9 @@ namespace cbf
             self_idx,
             robot_states.leftCols(2),
             eigenvec,
-            x_self
+            x_self,
+            Rs_val,        
+            sigma_val
         );
         //std::cout << "[CBF] ∇(L_f h): dlfh_dx = ";
        //std::cout << dlfh_dx.transpose() << std::endl;
@@ -655,8 +784,9 @@ namespace cbf
         Eigen::MatrixXd g = Eigen::MatrixXd::Zero(STATE_VARS, CONTROL_VARS);
         g(3, 0) = 1.0;
         g(4, 1) = 1.0;
-        Eigen::RowVectorXd Ac = dlfh_dx.transpose() * g; // size = 2
-        Ac(2) = 0.0; // 防止角速度影响控制约束
+        Eigen::RowVectorXd Ac(3); // 显式分配 3 个元素
+        Ac.head<2>() = dlfh_dx.transpose() * g.leftCols(2);  // 只乘 vx, vy 部分
+        Ac(2) = 0.0;  // 忽略角速度项
         // Step 7: Bc = L_f² h + γ L_f h + γ² h
         double gamma1 = 1.0;
         double gamma2 = 1.0;
@@ -708,7 +838,7 @@ namespace cbf
         // === 参数设置 ===
         const double Rs = 3.0;
         const double sigma = 120;
-        const double lambda2_min = 0.1;
+        const double lambda2_min = 1e-3;
         const double gamma = 1.0;
         // === 计算约束 ===
         auto [Ac, Bc, h] = initConnCBF(robot_states, x_self, 0, Rs, sigma, lambda2_min, gamma);
