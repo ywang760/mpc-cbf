@@ -5,6 +5,7 @@
 #include <iostream>
 #include <spdlog/spdlog.h>
 #include <cbf/detail/ConnectivityCBF.h>
+#include <common/logging.hpp>
 
 // Convenience: check vector size then its entries
 #define EXPECT_SIZE(vec, n) EXPECT_EQ((vec).size(), (n))
@@ -46,7 +47,7 @@ class InitConnCBFTest : public ::testing::Test
 protected:
     // CBF parameters
     double min_dist = 0.8;                                      // minimum distance for safety (not used)
-    double max_dist = 2.0;                                      // maximum distance for connectivity
+    double max_dist = 3.0;                                      // maximum distance for connectivity
     Eigen::VectorXd v_min = Eigen::VectorXd::Constant(3, -1.0); // min velocity limits (-1.0 for all 3 dims)
     Eigen::VectorXd v_max = Eigen::VectorXd::Constant(3, 1.0);  // max velocity limits (1.0 for all 3 dims)
 
@@ -75,22 +76,54 @@ protected:
 
 // ---------- TEST CASES ------------------------------------------------------
 
-TEST_F(InitConnCBFTest, TwoRobotRail)
+// TEST_F(InitConnCBFTest, TwoRobotRail)
+// {
+//     /* Robots on x-axis, 1 m apart (within R_s) */
+//     Eigen::MatrixXd states(2, 6);
+//     states << 0.0, 0.0, 0, 0, 0, 0,
+//         1.0, 0.0, 0, 0, 0, 0;
+
+//     int self_idx = 0;
+//     Eigen::VectorXd x_self = states.row(self_idx).transpose();
+//     auto res = connectivity_cbf->initConnCBF(states,
+//                                              x_self,
+//                                              self_idx);
+
+//     // Expected results
+//     Eigen::VectorXd expected_Ac(3);
+//     expected_Ac << 0.0, 0.0, 0.0;
+//     double expected_Bc = 0.0;
+//     // checkResult(res, expected_Ac, expected_Bc);
+// }
+
+TEST_F(InitConnCBFTest, Misc)
 {
+    auto logger = common::initializeLogging();
     /* Robots on x-axis, 1 m apart (within R_s) */
-    Eigen::MatrixXd states(2, 6);
-    states << 0.0, 0.0, 0, 0, 0, 0,
-        1.0, 0.0, 0, 0, 0, 0;
+    Eigen::MatrixXd states(3, 6);
+    states << 1.0, 2.0, 0, 0, 0, 0,
+        1.0, 4.0, 0, 0, 0, 0,
+        1.0, 6.0, 0, 0, 0, 0;
 
     int self_idx = 0;
     Eigen::VectorXd x_self = states.row(self_idx).transpose();
     auto res = connectivity_cbf->initConnCBF(states,
                                              x_self,
                                              self_idx);
+}
 
-    // Expected results
-    Eigen::VectorXd expected_Ac(3);
-    expected_Ac << 0.0, 0.0, 0.0;
-    double expected_Bc = 0.0;
-    // checkResult(res, expected_Ac, expected_Bc);
+TEST_F(InitConnCBFTest, Misc2)
+{
+    auto logger = common::initializeLogging();
+    /* Robots on x-axis, 1 m apart (within R_s) */
+    Eigen::MatrixXd states(3, 6);
+    states << 0.212, 1.592, 0, -0.293, -0.21, 0.0,
+        1.01, 4.20, 0, -1.2, 0.12, 0,
+        -1.0, -0.02, 0, -0.2, 0.16, 0;
+
+    int self_idx = 0;
+    Eigen::VectorXd x_self = states.row(self_idx).transpose();
+    auto res = connectivity_cbf->initConnCBF(states,
+                                             x_self,
+                                             self_idx);
 }
