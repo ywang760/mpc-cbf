@@ -18,7 +18,7 @@ namespace cbf
                                                             bool use_slack,
                                                             std::size_t slack_idx)
     {
-        auto [Ac, Bc] = cbf_->initConnCBF(robot_states, state, 0);
+        auto [Ac, Bc] = cbf_->initConnCBF(state, robot_states, 0);
 
         Vector coefficients = -1.0 * Ac;
         T bound = Bc;

@@ -84,9 +84,9 @@ protected:
 //         1.0, 0.0, 0, 0, 0, 0;
 
 //     int self_idx = 0;
-//     Eigen::VectorXd x_self = states.row(self_idx).transpose();
+//     Eigen::VectorXd state = states.row(self_idx).transpose();
 //     auto res = connectivity_cbf->initConnCBF(states,
-//                                              x_self,
+//                                              state,
 //                                              self_idx);
 
 //     // Expected results
@@ -106,9 +106,9 @@ TEST_F(InitConnCBFTest, Misc)
         1.0, 6.0, 0, 0, 0, 0;
 
     int self_idx = 0;
-    Eigen::VectorXd x_self = states.row(self_idx).transpose();
-    auto res = connectivity_cbf->initConnCBF(states,
-                                             x_self,
+    Eigen::VectorXd state = states.row(self_idx).transpose();
+    auto res = connectivity_cbf->initConnCBF(state,
+                                             states,
                                              self_idx);
 }
 
@@ -122,8 +122,8 @@ TEST_F(InitConnCBFTest, Misc2)
         -1.0, -0.02, 0, -0.2, 0.16, 0;
 
     int self_idx = 0;
-    Eigen::VectorXd x_self = states.row(self_idx).transpose();
-    auto res = connectivity_cbf->initConnCBF(states,
-                                             x_self,
+    Eigen::VectorXd state = states.row(self_idx).transpose();
+    auto res = connectivity_cbf->initConnCBF(state,
+                                             states,
                                              self_idx);
 }

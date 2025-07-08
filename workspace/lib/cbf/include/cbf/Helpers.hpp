@@ -70,7 +70,7 @@ namespace cbf {
         const GiNaC::ex &expr,
         const Eigen::MatrixXd &robot_positions,
         const Eigen::VectorXd &eigenvec,
-        const Eigen::VectorXd &x_self,
+        const Eigen::VectorXd &state,
         const ConnectivityCBF &cbf)
     {
         GiNaC::exmap substitutions;
@@ -82,12 +82,12 @@ namespace cbf {
             substitutions[cbf.eigenvec_list[i]] = eigenvec(i);
         }
         // Substitute self position
-        substitutions[cbf.px] = x_self(0);
-        substitutions[cbf.py] = x_self(1);
-        substitutions[cbf.th] = x_self(2); // Assuming x_self contains [px, py, th, vx, vy, w
-        substitutions[cbf.vx] = x_self(3); // Substitute for vx
-        substitutions[cbf.vy] = x_self(4); // Substitute for vy
-        substitutions[cbf.w] = x_self(5); // Substitute for angular velocity
+        substitutions[cbf.px] = state(0);
+        substitutions[cbf.py] = state(1);
+        substitutions[cbf.th] = state(2); // Assuming state contains [px, py, th, vx, vy, w
+        substitutions[cbf.vx] = state(3); // Substitute for vx
+        substitutions[cbf.vy] = state(4); // Substitute for vy
+        substitutions[cbf.w] = state(5);  // Substitute for angular velocity
         GiNaC::ex result = expr.subs(substitutions);
         return result;
     }

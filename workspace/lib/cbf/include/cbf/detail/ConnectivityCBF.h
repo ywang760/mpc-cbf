@@ -27,7 +27,7 @@ namespace cbf
             const GiNaC::ex &expr,
             const Eigen::MatrixXd &robot_positions,
             const Eigen::VectorXd &eigenvec,
-            const Eigen::VectorXd &x_self,
+            const Eigen::VectorXd &state,
             const ConnectivityCBF &cbf);
 
     private:
@@ -60,7 +60,7 @@ namespace cbf
         std::pair<GiNaC::matrix, GiNaC::ex> initVelCBF(GiNaC::ex bv);
         void initSymbolLists(int N);
         // Helpers for connectivity CBF
-        GiNaC::matrix compute_dh_dx(int N, const GiNaC::ex &Rs, const GiNaC::ex &sigma);
+        GiNaC::matrix compute_full_grad_h(int N, const GiNaC::ex &Rs, const GiNaC::ex &sigma);
 
     public:
         using Vector3d = math::VectorDIM<double, 3>;
@@ -75,8 +75,8 @@ namespace cbf
         Eigen::MatrixXd getMinVelContraints(Eigen::VectorXd state);
         Eigen::VectorXd getMaxVelBounds(Eigen::VectorXd state);
         Eigen::VectorXd getMinVelBounds(Eigen::VectorXd state);
-        std::pair<Eigen::VectorXd, double> initConnCBF(const Eigen::MatrixXd &robot_states,
-                                                       const Eigen::VectorXd &x_self,
+        std::pair<Eigen::VectorXd, double> initConnCBF(const Eigen::VectorXd &state,
+                                                       const Eigen::MatrixXd &robot_states,
                                                        int self_idx);
         // Alpha setter
         void setAlpha(std::function<GiNaC::ex(GiNaC::ex, double)> newAlpha);

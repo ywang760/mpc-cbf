@@ -373,7 +373,10 @@ namespace cbf
         Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> solver(L_num);
         Eigen::VectorXd eigenvals = solver.eigenvalues();
         Eigen::MatrixXd eigenvecs = solver.eigenvectors();
-        return {eigenvals(1), eigenvecs.col(1)};
+
+        Eigen::VectorXd eigenvec = eigenvecs.col(1); // Second smallest eigenvector
+        eigenvec.normalize(); // Normalize the eigenvector
+        return {eigenvals(1), eigenvec};
     }
 
     void ConnectivityCBF::initSymbolLists(int N)
@@ -389,13 +392,13 @@ namespace cbf
         }
     }
 
-    // Symbolically compute the gradient of the barrier function with respect to state variables
+    // Symbolically compute the full gradient of the barrier function with respect to state variables
     // Parameters:
     //   N: Number of agents
     //   Rs: Symbolic representation of the maximum distance for connectivity
     //   sigma: Symbolic representation of the weight function parameter
     // TODO: this could be optimized: the A matrices are already calulated earlier
-    GiNaC::matrix ConnectivityCBF::compute_dh_dx(int N, const GiNaC::ex &Rs, const GiNaC::ex &sigma)
+    GiNaC::matrix ConnectivityCBF::compute_full_grad_h(int N, const GiNaC::ex &Rs, const GiNaC::ex &sigma)
     {
         initSymbolLists(N);
         GiNaC::matrix grad(N, 2); // TODO: for 3d: this needs to be N x 3 (figure out a way to generalize this)
@@ -431,39 +434,37 @@ namespace cbf
     // return std::pair<GiNaC::matrix, GiNaC::ex>
     // Ac should be a vector of shape 1 x CONTROL_VARS, Bc should be a scalar
     std::pair<Eigen::VectorXd, double> ConnectivityCBF::initConnCBF(
+        const Eigen::VectorXd &state,       // 当前机器人的状态 6x1
         const Eigen::MatrixXd &robot_states, // N x 6 matrix
-        const Eigen::VectorXd &x_self,       // 当前机器人的状态 6x1
         int self_idx)                        // 当前机器人在 robot_states 中的索引
     {
         const int N = robot_states.rows(); // Number of robots
         logger->debug("Initializing Connectivity CBF with {} robots", N);
 
-        // Step 0: definiing some constants:
+        // Step 0: defining some constants:
         const double sigma_val = dmax * dmax * dmax * dmax / std::log(2.0); // σ = R_s^4 / ln(2)
         const auto robot_positions = robot_states.leftCols(2);
 
         // Step 1: h = λ₂ - λ₂_min (numerically)
-        // Pre-extract robot positions to avoid repeated leftCols calls
         auto [lambda2_val, eigenvec] = getLambda2(robot_positions, dmax, sigma_val);
-        eigenvec.normalize();
-        double h = lambda2_val - epsilon;
-        logger->debug("Step 1: λ₂ = {}, λ₂_min = {}, h = {}", lambda2_val, epsilon, h);
+        double h = lambda2_val - epsilon; // barrier function: h = λ₂ - λ₂_min
+        logger->debug("Step 1: λ₂ = {}, λ₂_min (epsilon) = {}, h = {}", lambda2_val, epsilon, h);
 
         // Step 2: 符号构造 ∇h (gradient of h), shape = N×2
-        GiNaC::matrix dh_dx_sym = compute_dh_dx(N, dmax, sigma_val);                                 // shape Nx2
-        GiNaC::matrix grad_row_sym(1, 2);
-        grad_row_sym(0, 0) = dh_dx_sym(self_idx, 0); // ∂h/∂p_x  (symbolic)
-        grad_row_sym(0, 1) = dh_dx_sym(self_idx, 1); // ∂h/∂p_y  (symbolic)
+        GiNaC::matrix full_grad_sym = compute_full_grad_h(N, dmax, sigma_val); // Full gradient, shape Nx2
+        GiNaC::matrix grad_h(1, 2); // Gradient for the current robot, shape 1x2
+        grad_h(0, 0) = full_grad_sym(self_idx, 0); // ∂h/∂p_x  (symbolic)
+        grad_h(0, 1) = full_grad_sym(self_idx, 1); // ∂h/∂p_y  (symbolic)
 
         // Step 3: Calculate L_f h = ∇h · f
-        GiNaC::ex lfh_sym = GiNaC::ex(grad_row_sym(0, 0)) * vx + GiNaC::ex(grad_row_sym(0, 1)) * vy; // ∇h·f (symbolic)
-        GiNaC::ex lfh_eval = valueSubsValue(lfh_sym, robot_positions, eigenvec, x_self, *this);      // 1×1 numeric
+        GiNaC::ex lfh_sym = GiNaC::ex(grad_h(0, 0)) * vx + GiNaC::ex(grad_h(0, 1)) * vy; // ∇h·f (symbolic)
+        GiNaC::ex lfh_eval = valueSubsValue(lfh_sym, robot_positions, eigenvec, state, *this);      // 1×1 numeric
         double lfh = GiNaC::ex_to<GiNaC::numeric>(lfh_eval).to_double();
         logger->debug("Step 3: L_f h = ∇h · f = {}", lfh);
 
-        // Step 4: Ac = L_g L_f h = ∇(L_f h) · g
-        GiNaC::matrix Ac_eval = matrixSubsMatrix(grad_row_sym, robot_positions, eigenvec,
-                                                 x_self.head<2>(), *this); // 1×2 numeric
+        // Step 4: Ac = L_g L_f h = ∇(L_f h) · g (which is ∇h)
+        GiNaC::matrix Ac_eval = matrixSubsMatrix(grad_h, robot_positions, eigenvec,
+                                                 state.head<2>(), *this); // 1×2 numeric
         Eigen::VectorXd Ac(CONTROL_VARS);
         Ac.setZero();
         Ac << GiNaC::ex_to<GiNaC::numeric>(Ac_eval(0, 0)).to_double(),
@@ -473,12 +474,12 @@ namespace cbf
 
         // Step 5: Lf² h = ∇(L_f h) · f
         // Create the symbolic quadratic form: v^T * Hess * v = vx*(h00*vx + h01*vy) + vy*(h10*vx + h11*vy)
-        GiNaC::ex h00_sym = GiNaC::diff(dh_dx_sym(self_idx, 0), px_list[self_idx]);
-        GiNaC::ex h01_sym = GiNaC::diff(dh_dx_sym(self_idx, 0), py_list[self_idx]);
-        GiNaC::ex h10_sym = GiNaC::diff(dh_dx_sym(self_idx, 1), px_list[self_idx]);
-        GiNaC::ex h11_sym = GiNaC::diff(dh_dx_sym(self_idx, 1), py_list[self_idx]);
+        GiNaC::ex h00_sym = GiNaC::diff(grad_h(0, 0), px_list[self_idx]);
+        GiNaC::ex h01_sym = GiNaC::diff(grad_h(0, 0), py_list[self_idx]);
+        GiNaC::ex h10_sym = GiNaC::diff(grad_h(0, 1), px_list[self_idx]);
+        GiNaC::ex h11_sym = GiNaC::diff(grad_h(0, 1), py_list[self_idx]);
         GiNaC::ex lf2h_sym = vx * (h00_sym * vx + h01_sym * vy) + vy * (h10_sym * vx + h11_sym * vy);
-        GiNaC::ex lf2h_eval = valueSubsValue(lf2h_sym, robot_positions, eigenvec, x_self, *this);
+        GiNaC::ex lf2h_eval = valueSubsValue(lf2h_sym, robot_positions, eigenvec, state, *this);
 
         double lf2h = GiNaC::ex_to<GiNaC::numeric>(lf2h_eval).to_double();
         logger->debug("Step 5: L_f² h = ∇(L_f h) · f = {}", lf2h);
