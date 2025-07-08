@@ -5,6 +5,8 @@ INPUT=(
     "/usr/src/mpc-cbf/workspace/experiments/config/baseline/3r/circle.json"
     "/usr/src/mpc-cbf/workspace/experiments/config/baseline/3r/cross_split.json"
     "/usr/src/mpc-cbf/workspace/experiments/config/baseline/3r/line.json"
+    "/usr/src/mpc-cbf/workspace/experiments/config/baseline/3r/line2.json"
+    "/usr/src/mpc-cbf/workspace/experiments/config/baseline/3r/line3.json"
     "/usr/src/mpc-cbf/workspace/experiments/config/baseline/3r/triangle.json"
     "/usr/src/mpc-cbf/workspace/experiments/config/baseline/5r/circle.json"
     "/usr/src/mpc-cbf/workspace/experiments/config/baseline/5r/expand.json"

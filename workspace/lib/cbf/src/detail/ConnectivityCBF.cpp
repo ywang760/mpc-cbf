@@ -1,5 +1,6 @@
 #include <vector>
 #include <cbf/detail/ConnectivityCBF.h>
+#include <cbf/Helpers.hpp>
 
 // Default alpha function for Control Barrier Functions (CBF)
 // Implements a linear scaling of the barrier function
@@ -237,55 +238,6 @@ namespace cbf
         return std::make_pair(Ac_v1, Bc_v1);
     }
 
-    // Substitute state and agent values into a symbolic matrix
-    // Parameters:
-    //   a: Symbolic matrix
-    //   state: Current state vector
-    //   neighbor_state: Other agent state vector
-    // Returns:
-    //   Matrix with numerical values substituted
-    GiNaC::ex ConnectivityCBF::matrixSubs(GiNaC::matrix a, Eigen::VectorXd state, Eigen::VectorXd neighbor_state)
-    {
-        // Substitute each state variable with its numerical value
-        GiNaC::ex tmp = GiNaC::subs(a, px == state(0));
-        tmp = GiNaC::subs(tmp, py == state(1));
-        tmp = GiNaC::subs(tmp, th == state(2));
-        tmp = GiNaC::subs(tmp, vx == state(3));
-        tmp = GiNaC::subs(tmp, vy == state(4));
-        tmp = GiNaC::subs(tmp, w == state(5));
-        tmp = GiNaC::subs(tmp, px_n == neighbor_state(0));
-        tmp = GiNaC::subs(tmp, py_n == neighbor_state(1));
-        // pz_n (th_n) is omitted for now
-        tmp = GiNaC::subs(tmp, vx_n == neighbor_state(3));
-        tmp = GiNaC::subs(tmp, vy_n == neighbor_state(4));
-        // w_n (angular velocity of neighbor) is omitted for now
-        return tmp;
-    }
-
-    // Substitute state and agent values into a symbolic expression
-    // Parameters:
-    //   a: Symbolic expression
-    //   state: Current state vector
-    //   neighbor_state: Other agent state vector
-    // Returns:
-    //   Expression with numerical values substituted
-    GiNaC::ex ConnectivityCBF::valueSubs(GiNaC::ex a, Eigen::VectorXd state, Eigen::VectorXd neighbor_state)
-    {
-        // Substitute each state variable with its numerical value
-        GiNaC::ex tmp = GiNaC::subs(a, px == state(0));
-        tmp = GiNaC::subs(tmp, py == state(1));
-        tmp = GiNaC::subs(tmp, th == state(2));
-        tmp = GiNaC::subs(tmp, vx == state(3));
-        tmp = GiNaC::subs(tmp, vy == state(4));
-        tmp = GiNaC::subs(tmp, w == state(5));
-        tmp = GiNaC::subs(tmp, px_n == neighbor_state(0));
-        tmp = GiNaC::subs(tmp, py_n == neighbor_state(1));
-        // pz_n (th_n) is omitted for now
-        tmp = GiNaC::subs(tmp, vx_n == neighbor_state(3));
-        tmp = GiNaC::subs(tmp, vy_n == neighbor_state(4));
-        // w_n (angular velocity of neighbor) is omitted for now
-        return tmp;
-    }
 
     // Get the minimum distance constraint vector for the current state and agent
     // Parameters:
@@ -296,7 +248,7 @@ namespace cbf
     Eigen::VectorXd ConnectivityCBF::getSafetyConstraints(Eigen::VectorXd state, Eigen::VectorXd neighbor_state)
     {
         // Substitute numerical values into symbolic matrix and convert to Eigen vector
-        GiNaC::ex matrix_expr = matrixSubs(Ac_safe, state, neighbor_state);
+        GiNaC::ex matrix_expr = matrixSubs(Ac_safe, state, neighbor_state, *this);
         Eigen::VectorXd Ac;
         Ac.resize(CONTROL_VARS);
         Ac.setZero();
@@ -322,9 +274,9 @@ namespace cbf
 
         // Get constraint matrices for each velocity component
         std::vector<GiNaC::ex> expressions(CONTROL_VARS);
-        expressions[0] = matrixSubs(Ac_v1_max, state, dummy_agent);
-        expressions[1] = matrixSubs(Ac_v2_max, state, dummy_agent);
-        expressions[2] = matrixSubs(Ac_v3_max, state, dummy_agent);
+        expressions[0] = matrixSubs(Ac_v1_max, state, dummy_agent, *this);
+        expressions[1] = matrixSubs(Ac_v2_max, state, dummy_agent, *this);
+        expressions[2] = matrixSubs(Ac_v3_max, state, dummy_agent, *this);
 
         // Convert to Eigen matrix
         Eigen::MatrixXd Acs;
@@ -355,9 +307,9 @@ namespace cbf
 
         // Get constraint matrices for each velocity component
         std::vector<GiNaC::ex> expressions(CONTROL_VARS);
-        expressions[0] = matrixSubs(Ac_v1_min, state, dummy_agent);
-        expressions[1] = matrixSubs(Ac_v2_min, state, dummy_agent);
-        expressions[2] = matrixSubs(Ac_v3_min, state, dummy_agent);
+        expressions[0] = matrixSubs(Ac_v1_min, state, dummy_agent, *this);
+        expressions[1] = matrixSubs(Ac_v2_min, state, dummy_agent, *this);
+        expressions[2] = matrixSubs(Ac_v3_min, state, dummy_agent, *this);
 
         // Convert to Eigen matrix
         Eigen::MatrixXd Acs;
@@ -435,34 +387,6 @@ namespace cbf
             py_list.emplace_back(GiNaC::symbol("py" + std::to_string(i)));
             eigenvec_list.emplace_back(GiNaC::symbol("eigenvec" + std::to_string(i)));
         }
-    }
-
-    // Substitute symbolic matrix with numerical values for robot positions and eigenvector
-    // Parameters:
-    //   expr_matrix: Symbolic matrix to substitute
-    //   robot_positions: Matrix of robot positions (N x 2)
-    //   eigenvec: Eigenvector containing velocity values for each robot
-    //   self_position: Position of the current robot (optional, defaults to zero vector)
-    GiNaC::matrix ConnectivityCBF::matrixSubsMatrix(
-        const GiNaC::matrix &expr_matrix,
-        const Eigen::MatrixXd &robot_positions,
-        const Eigen::VectorXd &eigenvec,
-        const Eigen::Vector2d &self_position)
-    {
-        GiNaC::exmap substitutions;
-        // 机器人位置和特征值向量替换
-        for (int i = 0; i < robot_positions.rows(); ++i)
-        {
-            substitutions[px_list[i]] = robot_positions(i, 0);
-            substitutions[py_list[i]] = robot_positions(i, 1);
-            substitutions[eigenvec_list[i]] = eigenvec(i);
-        }
-        // 当前机器人的自身位置
-        substitutions[px] = self_position(0);
-        substitutions[py] = self_position(1);
-        // 对整个矩阵统一替换
-        GiNaC::matrix result = GiNaC::ex_to<GiNaC::matrix>(expr_matrix.subs(substitutions));
-        return result;
     }
 
     // Symbolically compute the gradient of the barrier function with respect to state variables
@@ -550,7 +474,7 @@ namespace cbf
     //         Eigen::MatrixXd pos = robot_positions;
     //         pos(self_idx, 0) = x_self(0) + eps;
     //         Eigen::MatrixXd dh_dx_plus = ginacToEigen(
-    //             matrixSubsMatrix(dh_dx_sym, pos, eigenvec, x_self + Eigen::Vector2d(eps, 0)));
+    //             matrixSubsMatrix(dh_dx_sym, pos, eigenvec, x_self + Eigen::Vector2d(eps, 0)), *this);
     //         grad_plus_x = dh_dx_plus.row(self_idx);
     //     }
 
@@ -559,7 +483,7 @@ namespace cbf
     //         Eigen::MatrixXd pos = robot_positions;
     //         pos(self_idx, 0) = x_self(0) - eps;
     //         Eigen::MatrixXd dh_dx_minus = ginacToEigen(
-    //             matrixSubsMatrix(dh_dx_sym, pos, eigenvec, x_self - Eigen::Vector2d(eps, 0)));
+    //             matrixSubsMatrix(dh_dx_sym, pos, eigenvec, x_self - Eigen::Vector2d(eps, 0)), *this);
     //         grad_minus_x = dh_dx_minus.row(self_idx);
     //     }
 
@@ -568,7 +492,7 @@ namespace cbf
     //         Eigen::MatrixXd pos = robot_positions;
     //         pos(self_idx, 1) = x_self(1) + eps;
     //         Eigen::MatrixXd dh_dx_plus = ginacToEigen(
-    //             matrixSubsMatrix(dh_dx_sym, pos, eigenvec, x_self + Eigen::Vector2d(0, eps)));
+    //             matrixSubsMatrix(dh_dx_sym, pos, eigenvec, x_self + Eigen::Vector2d(0, eps)), *this);
     //         grad_plus_y = dh_dx_plus.row(self_idx);
     //     }
 
@@ -577,7 +501,7 @@ namespace cbf
     //         Eigen::MatrixXd pos = robot_positions;
     //         pos(self_idx, 1) = x_self(1) - eps;
     //         Eigen::MatrixXd dh_dx_minus = ginacToEigen(
-    //             matrixSubsMatrix(dh_dx_sym, pos, eigenvec, x_self - Eigen::Vector2d(0, eps)));
+    //             matrixSubsMatrix(dh_dx_sym, pos, eigenvec, x_self - Eigen::Vector2d(0, eps)), *this);
     //         grad_minus_y = dh_dx_minus.row(self_idx);
     //     }
 
@@ -598,7 +522,7 @@ namespace cbf
         // === Step 1: 构造符号 Hessian 矩阵 ===
         GiNaC::matrix hess_sym = compute_d2h_dx2(dh_dx_sym, self_idx);
         // 输出符号 Hessian 表达式（调试用）
-        GiNaC::matrix hess_eval = matrixSubsMatrix(hess_sym, robot_positions, eigenvec, x_self.head<2>());
+        GiNaC::matrix hess_eval = matrixSubsMatrix(hess_sym, robot_positions, eigenvec, x_self.head<2>(), *this);
         logger->debug("Step 1: ∇²h evaluated:\n{}", hess_eval);
         // === Step 2: 计算 Hessian 项：∇²h · f(x) ===
         double fx = x_self(3);
@@ -609,7 +533,7 @@ namespace cbf
         logger->debug("Step 2: Hessian contribution ∇²h·f");
 
         // === Step 3: ∇h 数值化，替换变量获得数值梯度 ===
-        GiNaC::matrix dh_eval = matrixSubsMatrix(dh_dx_sym, robot_positions, eigenvec, x_self.head<2>());
+        GiNaC::matrix dh_eval = matrixSubsMatrix(dh_dx_sym, robot_positions, eigenvec, x_self.head<2>(), *this);
         Eigen::VectorXd dh_dx = Eigen::VectorXd::Zero(6);
         // 这里只对 px 和 py 非零，其他导数为零
         dh_dx(0) = GiNaC::ex_to<GiNaC::numeric>(dh_eval(self_idx, 0)).to_double();
@@ -651,7 +575,7 @@ namespace cbf
         // Step 2: 符号构造 ∇h (gradient of h), shape = N×2
         initSymbolLists(N);
         GiNaC::matrix dh_dx_sym = compute_dh_dx(N, dmax, sigma_val);                                 // shape Nx2
-        GiNaC::matrix dh_dx_ginac = matrixSubsMatrix(dh_dx_sym, robot_states.leftCols(2), eigenvec); // N×2 数值表达式, robot_states.leftCols(2) 只取 px, py
+        GiNaC::matrix dh_dx_ginac = matrixSubsMatrix(dh_dx_sym, robot_states.leftCols(2), eigenvec, Eigen::Vector2d::Zero(), *this); // N×2 数值表达式, robot_states.leftCols(2) 只取 px, py
         logger->debug("Step 2: ∇h evaluated\n{}", dh_dx_ginac);
         Eigen::VectorXd dh_dx = Eigen::VectorXd::Zero(STATE_VARS);
         dh_dx(0) = GiNaC::ex_to<GiNaC::numeric>(dh_dx_ginac(self_idx, 0)).to_double();
@@ -738,7 +662,7 @@ namespace cbf
     double ConnectivityCBF::getSafetyBound(Eigen::VectorXd state, Eigen::VectorXd neighbor_state)
     {
         // Substitute numerical values and evaluate
-        GiNaC::ex expr = valueSubs(Bc_safe, state, neighbor_state);
+        GiNaC::ex expr = valueSubs(Bc_safe, state, neighbor_state, *this);
         double Bc = GiNaC::ex_to<GiNaC::numeric>(expr).to_double();
 
         return Bc;
@@ -753,7 +677,7 @@ namespace cbf
     double ConnectivityCBF::getMaxDistBound(Eigen::VectorXd state, Eigen::VectorXd neighbor_state)
     {
         // Substitute numerical values and evaluate
-        GiNaC::ex expr = valueSubs(Bc_connectivity, state, neighbor_state);
+        GiNaC::ex expr = valueSubs(Bc_connectivity, state, neighbor_state, *this);
         double Bc = GiNaC::ex_to<GiNaC::numeric>(expr).to_double();
 
         return Bc;
@@ -772,9 +696,9 @@ namespace cbf
 
         // Get bounds for each velocity component
         std::vector<GiNaC::ex> expressions(CONTROL_VARS);
-        expressions[0] = valueSubs(Bc_v1_max, state, dummy_agent);
-        expressions[1] = valueSubs(Bc_v2_max, state, dummy_agent);
-        expressions[2] = valueSubs(Bc_v3_max, state, dummy_agent);
+        expressions[0] = valueSubs(Bc_v1_max, state, dummy_agent, *this);
+        expressions[1] = valueSubs(Bc_v2_max, state, dummy_agent, *this);
+        expressions[2] = valueSubs(Bc_v3_max, state, dummy_agent, *this);
 
         // Convert to Eigen vector
         Eigen::VectorXd Bs;
@@ -801,9 +725,9 @@ namespace cbf
 
         // Get bounds for each velocity component
         std::vector<GiNaC::ex> expressions(CONTROL_VARS);
-        expressions[0] = valueSubs(Bc_v1_min, state, dummy_agent);
-        expressions[1] = valueSubs(Bc_v2_min, state, dummy_agent);
-        expressions[2] = valueSubs(Bc_v3_min, state, dummy_agent);
+        expressions[0] = valueSubs(Bc_v1_min, state, dummy_agent, *this);
+        expressions[1] = valueSubs(Bc_v2_min, state, dummy_agent, *this);
+        expressions[2] = valueSubs(Bc_v3_min, state, dummy_agent, *this);
 
         // Convert to Eigen vector
         Eigen::VectorXd Bs;
