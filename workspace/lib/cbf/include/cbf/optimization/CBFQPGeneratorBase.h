@@ -66,11 +66,11 @@ namespace cbf {
          * based on their specific barrier function formulations.
          *
          * @param state Current state of the robot
-         * @param target_state State of the target/neighboring robot
+         * @param neighbor_state State of the target/neighboring robot
          * @param use_slack Whether to use slack variables for this constraint
          * @param slack_idx Index of slack variable to use (if use_slack is true)
          */
-        virtual void addSafetyConstraint(const Vector& state, const Vector& target_state, 
+        virtual void addSafetyConstraint(const Vector& state, const Vector& neighbor_state, 
                                 bool use_slack = false, std::size_t slack_idx = 0) = 0;
                                 
         /**
