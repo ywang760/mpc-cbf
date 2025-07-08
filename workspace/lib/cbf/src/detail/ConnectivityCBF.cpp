@@ -440,75 +440,50 @@ namespace cbf
 
         // Step 0: definiing some constants:
         const double sigma_val = dmax * dmax * dmax * dmax / std::log(2.0); // σ = R_s^4 / ln(2)
-
         const auto robot_positions = robot_states.leftCols(2);
-        const auto self_position = x_self.head<2>();
-        const double vx = x_self(3); // vx
-        const double vy = x_self(4); // vy
 
         // Step 1: h = λ₂ - λ₂_min (numerically)
         // Pre-extract robot positions to avoid repeated leftCols calls
         auto [lambda2_val, eigenvec] = getLambda2(robot_positions, dmax, sigma_val);
-        eigenvec.normalize(); // More efficient than division
+        eigenvec.normalize();
         double h = lambda2_val - epsilon;
         logger->debug("Step 1: λ₂ = {}, λ₂_min = {}, h = {}", lambda2_val, epsilon, h);
 
         // Step 2: 符号构造 ∇h (gradient of h), shape = N×2
-        initSymbolLists(N);
         GiNaC::matrix dh_dx_sym = compute_dh_dx(N, dmax, sigma_val);                                 // shape Nx2
-        GiNaC::matrix dh_eval = matrixSubsMatrix(dh_dx_sym, robot_positions, eigenvec, Eigen::Vector2d::Zero(), *this); // N×2 数值表达式, robot_states.leftCols(2) 只取 px, py
-        logger->debug("Step 2: ∇h evaluated\n{}", dh_eval);
+        GiNaC::matrix grad_row_sym(1, 2);
+        grad_row_sym(0, 0) = dh_dx_sym(self_idx, 0); // ∂h/∂p_x  (symbolic)
+        grad_row_sym(0, 1) = dh_dx_sym(self_idx, 1); // ∂h/∂p_y  (symbolic)
 
-        // Extract gradient for self robot - batch conversion to avoid repeated GiNaC conversions
-        const double dh_dx_0 = GiNaC::ex_to<GiNaC::numeric>(dh_eval(self_idx, 0)).to_double();
-        const double dh_dx_1 = GiNaC::ex_to<GiNaC::numeric>(dh_eval(self_idx, 1)).to_double();
-
-        // Construct gradient vector efficiently using block operations
-        Eigen::VectorXd dh_dx = Eigen::VectorXd::Zero(STATE_VARS);
-        dh_dx.head<2>() << dh_dx_0, dh_dx_1;
-
-        logger->debug("Step 2: ∇h = [dh_dx_0, dh_dx_1, 0, 0, 0, 0] = [{}]", dh_dx.head<2>().transpose());
-
-        // Step 3: L_f h = ∇h · f(x_self) - optimized dot product calculation
-        // FIXME: QUESTION: this only computes the ego robot's L_fh, should it sum over all robots????
-        double lfh = dh_dx_0 * vx + dh_dx_1 * vy; // Direct calculation instead of full dot product
+        // Step 3: Calculate L_f h = ∇h · f
+        GiNaC::ex lfh_sym = GiNaC::ex(grad_row_sym(0, 0)) * vx + GiNaC::ex(grad_row_sym(0, 1)) * vy; // ∇h·f (symbolic)
+        GiNaC::ex lfh_eval = valueSubsValue(lfh_sym, robot_positions, eigenvec, x_self, *this);      // 1×1 numeric
+        double lfh = GiNaC::ex_to<GiNaC::numeric>(lfh_eval).to_double();
         logger->debug("Step 3: L_f h = ∇h · f = {}", lfh);
-        logger->debug("f (shape 3): vx = {}, vy = {}, w = {}", vx, vy, x_self(5));
 
-        // Step 4: Lf² h = ∇(L_f h) · f
-        GiNaC::matrix hess_sym(2, 2);
-        hess_sym(0, 0) = GiNaC::diff(dh_dx_sym(self_idx, 0), px_list[self_idx]);
-        hess_sym(0, 1) = GiNaC::diff(dh_dx_sym(self_idx, 0), py_list[self_idx]);
-        hess_sym(1, 0) = GiNaC::diff(dh_dx_sym(self_idx, 1), px_list[self_idx]);
-        hess_sym(1, 1) = GiNaC::diff(dh_dx_sym(self_idx, 1), py_list[self_idx]);
-
-        // 输出符号 Hessian 表达式（调试用）
-        GiNaC::matrix hess_eval = matrixSubsMatrix(hess_sym, robot_positions, eigenvec, self_position, *this);
-        logger->debug("Step 4.1: ∇²h evaluated:\n{}", hess_eval);
-
-        // === Step 4.2: 计算 Hessian 项：∇²h · f(x) ===
-        // Batch convert and compute Hessian terms in one go
-        const double h00 = GiNaC::ex_to<GiNaC::numeric>(hess_eval(0, 0)).to_double();
-        const double h01 = GiNaC::ex_to<GiNaC::numeric>(hess_eval(0, 1)).to_double();
-        const double h10 = GiNaC::ex_to<GiNaC::numeric>(hess_eval(1, 0)).to_double();
-        const double h11 = GiNaC::ex_to<GiNaC::numeric>(hess_eval(1, 1)).to_double();
-
-        Eigen::Vector2d hess_term;
-        hess_term(0) = h00 * vx + h01 * vy;
-        hess_term(1) = h10 * vx + h11 * vy;
-        logger->debug("Step 4.2: Hessian contribution ∇²h·f:\n{}", hess_term);
-
-        // alternative method: dlfh_dx(0) is basically hess_term(0) and dlfh_dx(1) is hess_term(1)
-        double lf2h = (h00 * vx + h01 * vy) * vx + (h10 * vx + h11 * vy) * vy;
-        logger->debug("Step 5 (alt): L_f² h = ∇(L_f h) · f = {}", lf2h);
-
-        //  Step 6: L_g L_f h = ∇(L_f h) · g = ∇h ^ T
-        // Use block operation for efficient assignment
+        // Step 4: Ac = L_g L_f h = ∇(L_f h) · g
+        GiNaC::matrix Ac_eval = matrixSubsMatrix(grad_row_sym, robot_positions, eigenvec,
+                                                 x_self.head<2>(), *this); // 1×2 numeric
         Eigen::VectorXd Ac(CONTROL_VARS);
-        Ac << dh_dx.head<2>(), 0;
-        logger->debug("Step 6 (alt): Ac = L_g L_f h = ∇(L_f h) · g = ∇h ^ T\n{}", Ac);
+        Ac.setZero();
+        Ac << GiNaC::ex_to<GiNaC::numeric>(Ac_eval(0, 0)).to_double(),
+            GiNaC::ex_to<GiNaC::numeric>(Ac_eval(0, 1)).to_double(),
+            0.0;
+        logger->debug("Step 4: Ac = L_g L_f h = ∇(L_f h) · g = ∇h ^ T\n{}", Ac);
 
-        // Step 7: Bc = L_f² h + L_f(α(h)) + α(L_f h + α(h)), where α is a class of K functions
+        // Step 5: Lf² h = ∇(L_f h) · f
+        // Create the symbolic quadratic form: v^T * Hess * v = vx*(h00*vx + h01*vy) + vy*(h10*vx + h11*vy)
+        GiNaC::ex h00_sym = GiNaC::diff(dh_dx_sym(self_idx, 0), px_list[self_idx]);
+        GiNaC::ex h01_sym = GiNaC::diff(dh_dx_sym(self_idx, 0), py_list[self_idx]);
+        GiNaC::ex h10_sym = GiNaC::diff(dh_dx_sym(self_idx, 1), px_list[self_idx]);
+        GiNaC::ex h11_sym = GiNaC::diff(dh_dx_sym(self_idx, 1), py_list[self_idx]);
+        GiNaC::ex lf2h_sym = vx * (h00_sym * vx + h01_sym * vy) + vy * (h10_sym * vx + h11_sym * vy);
+        GiNaC::ex lf2h_eval = valueSubsValue(lf2h_sym, robot_positions, eigenvec, x_self, *this);
+
+        double lf2h = GiNaC::ex_to<GiNaC::numeric>(lf2h_eval).to_double();
+        logger->debug("Step 5: L_f² h = ∇(L_f h) · f = {}", lf2h);
+
+        // Step 6: Bc = L_f² h + L_f(α(h)) + α(L_f h + α(h)), where α is a class of K functions
         // TODO: replace gamma *  with the alpha function
         // Currently the alpha function only works for symbolic expressions,
         // Need a version that works for numerical values
@@ -516,7 +491,7 @@ namespace cbf
         double Bc = lf2h               // L_f^2 h
                     + gamma * lfh      // Assuming linear alpha11: L_f(α(h)) = γ L_f h
                     + gamma * psi1;    // Assuming linear alpha2:
-        logger->debug("Step 7: Bc = L_f² h + L_f(α(h)) + α(L_f h + α(h)) = {} + {} + {} = {}", lf2h, gamma * lfh, gamma * psi1, Bc);
+        logger->debug("Step 6: Bc = L_f² h + L_f(α(h)) + α(L_f h + α(h)) = {} + {} + {} = {}", lf2h, gamma * lfh, gamma * psi1, Bc);
         return std::make_pair(Ac, Bc);
     }
 

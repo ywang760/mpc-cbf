@@ -27,7 +27,7 @@ namespace cbf
             const GiNaC::ex &expr,
             const Eigen::MatrixXd &robot_positions,
             const Eigen::VectorXd &eigenvec,
-            const Eigen::Vector2d &self_position,
+            const Eigen::VectorXd &x_self,
             const ConnectivityCBF &cbf);
 
     private:
