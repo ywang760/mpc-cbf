@@ -62,16 +62,6 @@ namespace cbf
             const Eigen::MatrixXd &robot_positions,
             const Eigen::VectorXd &eigenvec,
             const Eigen::VectorXd &x_self);
-        // @quyichun check if the following functions are needed
-        // Eigen::MatrixXd ginacToEigen(const GiNaC::matrix& m);
-        // Eigen::Matrix2d compute_d2h_dx2_fd(
-        //     const GiNaC::matrix& dh_dx_sym,
-        //     const Eigen::MatrixXd& robot_positions,
-        //     const Eigen::VectorXd& eigenvec,
-        //     const Eigen::Vector2d& x_self,
-        //     int self_idx,
-        //     double Rs_val,
-        //     double sigma_val);
 
     public:
         using Vector3d = math::VectorDIM<double, 3>;
@@ -89,11 +79,6 @@ namespace cbf
         std::pair<Eigen::VectorXd, double> initConnCBF(const Eigen::MatrixXd &robot_states,
                                                        const Eigen::VectorXd &x_self,
                                                        int self_idx);
-        // Connectivity constraint //TODO: deprecated
-        // Eigen::VectorXd getConnConstraints(const Eigen::VectorXd &x_self,
-        //                                               const std::vector<Eigen::VectorXd> &other_positions);
-        // double getConnBound(const Eigen::VectorXd &x_self,
-        //                             const std::vector<Eigen::VectorXd> &other_positions);
         // Alpha setter
         void setAlpha(std::function<GiNaC::ex(GiNaC::ex, double)> newAlpha);
     };

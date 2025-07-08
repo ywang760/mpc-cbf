@@ -365,9 +365,9 @@ namespace cbf
         for (int i = 0; i < N; ++i)
             D_num(i, i) = A_num.row(i).sum();
         Eigen::MatrixXd L_num = D_num - A_num;
-        logger->debug("Diagonal matrix D:\n{}", D_num);
-        logger->debug("Adjacency matrix A:\n{}", A_num);
-        logger->debug("Laplacian matrix L:\n{}", L_num);
+        // logger->debug("Diagonal matrix D:\n{}", D_num);
+        // logger->debug("Adjacency matrix A:\n{}", A_num);
+        // logger->debug("Laplacian matrix L:\n{}", L_num);
 
         // Numerically solve for the second smallest eigenvalue and corresponding eigenvector
         Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> solver(L_num);
@@ -443,75 +443,6 @@ namespace cbf
         return hess;
     }
 
-    // // @quyichun check if this function can be deprecated
-    // Eigen::MatrixXd ginacToEigen(const GiNaC::matrix& m) {
-    //     Eigen::MatrixXd result(m.rows(), m.cols());
-    //     for (int i = 0; i < m.rows(); ++i) {
-    //         for (int j = 0; j < m.cols(); ++j) {
-    //             result(i, j) = GiNaC::ex_to<GiNaC::numeric>(m(i, j)).to_double();
-    //         }
-    //     }
-    //     return result;
-    // }
-
-    // // @quyichun check if this can be deprecated
-    // Eigen::Matrix2d ConnectivityCBF::compute_d2h_dx2_fd(
-    // const GiNaC::matrix& dh_dx_sym, 
-    // const Eigen::MatrixXd& robot_positions,
-    // const Eigen::VectorXd& eigenvec,
-    // const Eigen::Vector2d& x_self,
-    // int self_idx,
-    // double Rs_val,
-    // double sigma_val)
-    // {
-    //     const double eps = 1e-5;
-    //     Eigen::Matrix2d hess;
-    //     Eigen::Vector2d grad_plus_x, grad_minus_x;
-    //     Eigen::Vector2d grad_plus_y, grad_minus_y;
-
-    //     // x + eps
-    //     {
-    //         Eigen::MatrixXd pos = robot_positions;
-    //         pos(self_idx, 0) = x_self(0) + eps;
-    //         Eigen::MatrixXd dh_dx_plus = ginacToEigen(
-    //             matrixSubsMatrix(dh_dx_sym, pos, eigenvec, x_self + Eigen::Vector2d(eps, 0)), *this);
-    //         grad_plus_x = dh_dx_plus.row(self_idx);
-    //     }
-
-    //     // x - eps
-    //     {
-    //         Eigen::MatrixXd pos = robot_positions;
-    //         pos(self_idx, 0) = x_self(0) - eps;
-    //         Eigen::MatrixXd dh_dx_minus = ginacToEigen(
-    //             matrixSubsMatrix(dh_dx_sym, pos, eigenvec, x_self - Eigen::Vector2d(eps, 0)), *this);
-    //         grad_minus_x = dh_dx_minus.row(self_idx);
-    //     }
-
-    //     // y + eps
-    //     {
-    //         Eigen::MatrixXd pos = robot_positions;
-    //         pos(self_idx, 1) = x_self(1) + eps;
-    //         Eigen::MatrixXd dh_dx_plus = ginacToEigen(
-    //             matrixSubsMatrix(dh_dx_sym, pos, eigenvec, x_self + Eigen::Vector2d(0, eps)), *this);
-    //         grad_plus_y = dh_dx_plus.row(self_idx);
-    //     }
-
-    //     // y - eps
-    //     {
-    //         Eigen::MatrixXd pos = robot_positions;
-    //         pos(self_idx, 1) = x_self(1) - eps;
-    //         Eigen::MatrixXd dh_dx_minus = ginacToEigen(
-    //             matrixSubsMatrix(dh_dx_sym, pos, eigenvec, x_self - Eigen::Vector2d(0, eps)), *this);
-    //         grad_minus_y = dh_dx_minus.row(self_idx);
-    //     }
-
-    //     hess.col(0) = (grad_plus_x - grad_minus_x) / (2 * eps);  // d²h/dx², d²h/dxdy
-    //     hess.col(1) = (grad_plus_y - grad_minus_y) / (2 * eps);  // d²h/dydx, d²h/dy²
-
-    //     return hess;
-    // }
-
-
     Eigen::VectorXd ConnectivityCBF::compute_dLf_h_dx(
         const GiNaC::matrix &dh_dx_sym,
         int self_idx,
@@ -523,14 +454,15 @@ namespace cbf
         GiNaC::matrix hess_sym = compute_d2h_dx2(dh_dx_sym, self_idx);
         // 输出符号 Hessian 表达式（调试用）
         GiNaC::matrix hess_eval = matrixSubsMatrix(hess_sym, robot_positions, eigenvec, x_self.head<2>(), *this);
-        logger->debug("Step 1: ∇²h evaluated:\n{}", hess_eval);
+        logger->debug("Step 4.1: ∇²h evaluated:\n{}", hess_eval);
+
         // === Step 2: 计算 Hessian 项：∇²h · f(x) ===
         double fx = x_self(3);
         double fy = x_self(4);
         Eigen::Vector2d hess_term;
         hess_term(0) = GiNaC::ex_to<GiNaC::numeric>(hess_eval(0, 0) * fx + hess_eval(0, 1) * fy).to_double();
         hess_term(1) = GiNaC::ex_to<GiNaC::numeric>(hess_eval(1, 0) * fx + hess_eval(1, 1) * fy).to_double();
-        logger->debug("Step 2: Hessian contribution ∇²h·f");
+        logger->debug("Step 4.2: Hessian contribution ∇²h·f:\n{}", hess_term);
 
         // === Step 3: ∇h 数值化，替换变量获得数值梯度 ===
         GiNaC::matrix dh_eval = matrixSubsMatrix(dh_dx_sym, robot_positions, eigenvec, x_self.head<2>(), *this);
@@ -538,7 +470,7 @@ namespace cbf
         // 这里只对 px 和 py 非零，其他导数为零
         dh_dx(0) = GiNaC::ex_to<GiNaC::numeric>(dh_eval(self_idx, 0)).to_double();
         dh_dx(1) = GiNaC::ex_to<GiNaC::numeric>(dh_eval(self_idx, 1)).to_double();
-        logger->debug("Step 3: ∇h(px, py)\n{}", dh_dx);
+        logger->debug("Step 4.3: ∇h(px, py)\n{}", dh_dx);
 
         // === Step 4: 构造 Jf^T ∇h 项 ===
         // 由于 f(x) = [vx, vy, w]，其雅可比矩阵 Jf 关于状态向量 x 的非零偏导为：
@@ -546,7 +478,7 @@ namespace cbf
         Eigen::VectorXd jac_term = Eigen::VectorXd::Zero(6);
         jac_term(3) = dh_dx(0); // vx 对应 px
         jac_term(4) = dh_dx(1); // vy 对应 py
-        logger->debug("Step 4: Jf^T ∇h\n{}", jac_term);
+        logger->debug("Step 4.4: Jf^T ∇h\n{}", jac_term);
 
         // === Step 5: 拼接最终结果 ∇(L_f h) = ∇²h·f + Jfᵀ∇h ===
         Eigen::VectorXd total = jac_term;
@@ -575,14 +507,16 @@ namespace cbf
         // Step 2: 符号构造 ∇h (gradient of h), shape = N×2
         initSymbolLists(N);
         GiNaC::matrix dh_dx_sym = compute_dh_dx(N, dmax, sigma_val);                                 // shape Nx2
-        GiNaC::matrix dh_dx_ginac = matrixSubsMatrix(dh_dx_sym, robot_states.leftCols(2), eigenvec, Eigen::Vector2d::Zero(), *this); // N×2 数值表达式, robot_states.leftCols(2) 只取 px, py
-        logger->debug("Step 2: ∇h evaluated\n{}", dh_dx_ginac);
+        logger->debug("Step 2: ∇h (symbolic) = \n{}", dh_dx_sym);
+        GiNaC::matrix dh_eval = matrixSubsMatrix(dh_dx_sym, robot_states.leftCols(2), eigenvec, Eigen::Vector2d::Zero(), *this); // N×2 数值表达式, robot_states.leftCols(2) 只取 px, py
+        logger->debug("Step 2: ∇h evaluated\n{}", dh_eval);
         Eigen::VectorXd dh_dx = Eigen::VectorXd::Zero(STATE_VARS);
-        dh_dx(0) = GiNaC::ex_to<GiNaC::numeric>(dh_dx_ginac(self_idx, 0)).to_double();
-        dh_dx(1) = GiNaC::ex_to<GiNaC::numeric>(dh_dx_ginac(self_idx, 1)).to_double();
+        dh_dx(0) = GiNaC::ex_to<GiNaC::numeric>(dh_eval(self_idx, 0)).to_double();
+        dh_dx(1) = GiNaC::ex_to<GiNaC::numeric>(dh_eval(self_idx, 1)).to_double();
 
         // Step 3: L_f h = ∇h · f(x_self)
-        // 由于 f = A*x = [vx, vy, w, 0, 0, 0]，直接从 x_self 构造 f 的数值向量 // TODO: this could potentially be replaced by f in fields (if using symbolic)
+        // 由于 f = A*x = [vx, vy, w, 0, 0, 0]，直接从 x_self 构造 f 的数值向量 
+        // TODO: this could potentially be replaced by f in fields (if using symbolic)
         // FIXME: QUESTION: this only computes the ego robot's L_fh, should it sum over all robots????
         Eigen::VectorXd f_x = Eigen::VectorXd::Zero(STATE_VARS);
         f_x(0) = x_self(3); // vx
@@ -604,54 +538,24 @@ namespace cbf
         double lf2h = dlfh_dx.dot(f_x);
         logger->debug("Step 5: L_f² h = ∇(L_f h) · f = {}", lf2h);
 
-        //  Step 6: L_g L_f h = ∇(L_f h) · g
-        Eigen::MatrixXd g = Eigen::MatrixXd::Zero(STATE_VARS, CONTROL_VARS); // shape 6x3 // TODO: this could potentially be replaced by g in fields (if using symbolic)
-        g(3, 0) = 1.0;
-        g(4, 1) = 1.0;
-        Eigen::VectorXd Ac = (dlfh_dx.transpose() * g).transpose(); // size = 3
-        Ac(2) = 0.0;                                                // 防止角速度影响控制约束 // TODO: why is this necessary
-        logger->debug("Step 6: Ac = L_g L_f h = ∇(L_f h) · g\n{}", Ac);
+        //  Step 6: L_g L_f h = ∇(L_f h) · g = ∇h ^ T
+        Eigen::VectorXd Ac = Eigen::VectorXd::Zero(CONTROL_VARS);
+        Ac(0) = dh_dx(0);
+        Ac(1) = dh_dx(1);
+        logger->debug("Step 6 (alt): Ac = L_g L_f h = ∇(L_f h) · g = ∇h ^ T\n{}", Ac);
 
         // Step 7: Bc = L_f² h + L_f(α(h)) + α(L_f h + α(h)), where α is a class of K functions
+        // TODO: replace gamma *  with the alpha function
+        // Currently the alpha function only works for symbolic expressions,
+        // Need a version that works for numerical values
         double psi1 = lfh + gamma * h; // psi1 = L_f h + alpha1(h), assuming linear alpha1
         double Bc = lf2h               // L_f^2 h
                     + gamma * lfh      // Assuming linear alpha11: L_f(α(h)) = γ L_f h
                     + gamma * psi1;    // Assuming linear alpha2:
         logger->debug("Step 7: Bc = L_f² h + L_f(α(h)) + α(L_f h + α(h)) = {} + {} + {} = {}", lf2h, gamma * lfh, gamma * psi1, Bc);
         return std::make_pair(Ac, Bc);
-
-        //         // ✅ Step 7: 使用一致方式计算 Bc
-        // // alpha(h)
-        // GiNaC::ex h_sym = h;  // 直接用 double 值代入
-        // GiNaC::ex alpha_h_expr = alpha(h_sym, gamma);
-        // double alpha_h = GiNaC::ex_to<GiNaC::numeric>(alpha_h_expr).to_double();
-
-        // // L_f α(h) = α'(h) * L_f h, 以 fifthAlpha = γ h^5 为例，其导数为 5γ h^4
-        // double d_alpha_h = 5.0 * gamma * std::pow(h, 4);
-        // double lf_alpha_h = d_alpha_h * lfh;
-
-        // // α(L_f h + α(h))
-        // GiNaC::ex nested_expr = alpha(lfh + alpha_h, gamma);
-        // double nested_alpha = GiNaC::ex_to<GiNaC::numeric>(nested_expr).to_double();
-
-        // // Final Bc
-        // double Bc = lf2h + lf_alpha_h + nested_alpha;
-        // std::cout << "[CBF] Bc = L_f² h + L_f(α(h)) + α(L_f h + α(h)) = " << Bc << std::endl;
-
-        // return std::make_pair(Ac, Bc);
     }
 
-    // TODO: Deprecated: check initConnCBF
-    // Eigen::VectorXd ConnectivityCBF::getConnConstraints(
-    //     const Eigen::VectorXd &x_self,
-    //     const std::vector<Eigen::VectorXd> &other_positions)
-    // {
-    // }
-    // double ConnectivityCBF::getConnBound(
-    //     const Eigen::VectorXd &x_self,
-    //     const std::vector<Eigen::VectorXd> &other_positions)
-    // {
-    // }
 
     // Get the minimum distance constraint bound for the current state and agent
     // Parameters:

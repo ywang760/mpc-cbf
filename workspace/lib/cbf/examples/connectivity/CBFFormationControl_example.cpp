@@ -170,8 +170,6 @@ int main(int argc, char *argv[])
             {
                 logger->warn("Optimization failed for robot {} at timestep {}", robot_idx, loop_idx);
                 cbf_u = VectorDIM::Zero(); // Fallback to zero control if optimization fails
-                // @quyichun recommended way is to simply use logger->warn to log failures
-                // and if you need to save the log, you can use the ./<executable> > log.txt syntax to log them
             }
 
             // Apply control to robot model to get next state and add noise

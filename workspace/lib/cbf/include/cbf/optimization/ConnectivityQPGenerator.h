@@ -37,11 +37,11 @@ namespace cbf {
          * @brief Adds connectivity constraint between agents to maintain network connectivity
          *
          * @param state Current state of the robot
-         * @param other_positions Positions of other agents in the network
+         * @param robot_states Matrix of states for all robots in the network
          * @param use_slack Whether to use slack variables for this constraint
          * @param slack_idx Index of slack variable to use (if use_slack is true)
          */
-        void addConnConstraint(const Vector &state, const std::vector<VectorDIM> &other_positions,
+        void addConnConstraint(const Vector &state, const Eigen::MatrixXd &robot_states,
                                bool use_slack = false, std::size_t slack_idx = 0);
 
         /**
