@@ -50,23 +50,23 @@ namespace cbf {
                                        const Eigen::Vector2d &self_position = Eigen::Vector2d::Zero());
         // Helpers for connectivity CBF
         GiNaC::matrix compute_dh_dx(int N, const GiNaC::ex& Rs, const GiNaC::ex& sigma);
-        //GiNaC::matrix compute_d2h_dx2(const GiNaC::matrix& dh_dx_sym, int self_idx);
+        GiNaC::matrix compute_d2h_dx2(const GiNaC::matrix& dh_dx_sym, int self_idx);
         Eigen::VectorXd compute_dLf_h_dx(
             const GiNaC::matrix& dh_dx_sym,
             int self_idx,
             const Eigen::MatrixXd& robot_positions,
             const Eigen::VectorXd& eigenvec,
-            const Eigen::VectorXd& x_self,
-            double Rs_val,
-            double sigma_val);
-        Eigen::Matrix2d compute_d2h_dx2_fd(
-            const GiNaC::matrix& dh_dx_sym, 
-            const Eigen::MatrixXd& robot_positions,
-            const Eigen::VectorXd& eigenvec,
-            const Eigen::Vector2d& x_self,
-            int self_idx,
-            double Rs_val,
-            double sigma_val);
+            const Eigen::VectorXd& x_self);
+        // @quyichun check if the following functions are needed
+        // Eigen::MatrixXd ginacToEigen(const GiNaC::matrix& m);
+        // Eigen::Matrix2d compute_d2h_dx2_fd(
+        //     const GiNaC::matrix& dh_dx_sym, 
+        //     const Eigen::MatrixXd& robot_positions,
+        //     const Eigen::VectorXd& eigenvec,
+        //     const Eigen::Vector2d& x_self,
+        //     int self_idx,
+        //     double Rs_val,
+        //     double sigma_val);
 
     public:
         using Vector3d = math::VectorDIM<double, 3>;

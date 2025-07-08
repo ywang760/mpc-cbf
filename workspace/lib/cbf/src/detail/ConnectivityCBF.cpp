@@ -237,19 +237,6 @@ namespace cbf
         return std::make_pair(Ac_v1, Bc_v1);
     }
 
-        void ConnectivityCBF::initSymbolLists(int N)
-    {
-        px_list.clear();
-        py_list.clear();
-        eigenvec_list.clear();
-        for (int i = 0; i < N; ++i)
-        {
-            px_list.emplace_back(GiNaC::symbol("px" + std::to_string(i)));
-            py_list.emplace_back(GiNaC::symbol("py" + std::to_string(i)));
-            eigenvec_list.emplace_back(GiNaC::symbol("eigenvec" + std::to_string(i)));
-        }
-    }
-
     // Substitute state and agent values into a symbolic matrix
     // Parameters:
     //   a: Symbolic matrix
@@ -298,34 +285,6 @@ namespace cbf
         tmp = GiNaC::subs(tmp, vy_n == neighbor_state(4));
         // w_n (angular velocity of neighbor) is omitted for now
         return tmp;
-    }
-
-    // Substitute symbolic matrix with numerical values for robot positions and eigenvector
-    // Parameters:
-    //   expr_matrix: Symbolic matrix to substitute
-    //   robot_positions: Matrix of robot positions (N x 2)
-    //   eigenvec: Eigenvector containing velocity values for each robot
-    //   self_position: Position of the current robot (optional, defaults to zero vector)
-    GiNaC::matrix ConnectivityCBF::matrixSubsMatrix(
-        const GiNaC::matrix &expr_matrix,
-        const Eigen::MatrixXd &robot_positions,
-        const Eigen::VectorXd &eigenvec,
-        const Eigen::Vector2d &self_position)
-    {
-        GiNaC::exmap substitutions;
-        // 机器人位置和特征值向量替换
-        for (int i = 0; i < robot_positions.rows(); ++i)
-        {
-            substitutions[px_list[i]] = robot_positions(i, 0);
-            substitutions[py_list[i]] = robot_positions(i, 1);
-            substitutions[eigenvec_list[i]] = eigenvec(i);
-        }
-        // 当前机器人的自身位置
-        substitutions[px] = self_position(0);
-        substitutions[py] = self_position(1);
-        // 对整个矩阵统一替换
-        GiNaC::matrix result = GiNaC::ex_to<GiNaC::matrix>(expr_matrix.subs(substitutions));
-        return result;
     }
 
     // Get the minimum distance constraint vector for the current state and agent
@@ -416,8 +375,6 @@ namespace cbf
         return Acs;
     }
 
-    // ==================== Starting Connectivity CBF Functions ====================
-
     // Given the numerical robot positions, compute the second smallest eigenvalue (lambda2) for the Laplacian matrix
     // Parameters:
     //   robot_positions: Matrix of robot positions
@@ -449,14 +406,6 @@ namespace cbf
                     A_num(i, j) = weight;
                 }
             }
-            Eigen::MatrixXd D_num = Eigen::MatrixXd::Zero(N, N);
-            for (int i = 0; i < N; ++i)
-                D_num(i, i) = A_num.row(i).sum();
-            Eigen::MatrixXd L_num = D_num - A_num;
-            Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> solver(L_num);
-            Eigen::VectorXd eigenvals = solver.eigenvalues();
-            Eigen::MatrixXd eigenvecs = solver.eigenvectors();
-            return {eigenvals(1), eigenvecs.col(1)};
         }
 
         // Construct the Diagonal matrix D and Laplacian matrix L in numerical form
@@ -475,7 +424,46 @@ namespace cbf
         return {eigenvals(1), eigenvecs.col(1)};
     }
 
+    void ConnectivityCBF::initSymbolLists(int N)
+    {
+        px_list.clear();
+        py_list.clear();
+        eigenvec_list.clear();
+        for (int i = 0; i < N; ++i)
+        {
+            px_list.emplace_back(GiNaC::symbol("px" + std::to_string(i)));
+            py_list.emplace_back(GiNaC::symbol("py" + std::to_string(i)));
+            eigenvec_list.emplace_back(GiNaC::symbol("eigenvec" + std::to_string(i)));
+        }
+    }
 
+    // Substitute symbolic matrix with numerical values for robot positions and eigenvector
+    // Parameters:
+    //   expr_matrix: Symbolic matrix to substitute
+    //   robot_positions: Matrix of robot positions (N x 2)
+    //   eigenvec: Eigenvector containing velocity values for each robot
+    //   self_position: Position of the current robot (optional, defaults to zero vector)
+    GiNaC::matrix ConnectivityCBF::matrixSubsMatrix(
+        const GiNaC::matrix &expr_matrix,
+        const Eigen::MatrixXd &robot_positions,
+        const Eigen::VectorXd &eigenvec,
+        const Eigen::Vector2d &self_position)
+    {
+        GiNaC::exmap substitutions;
+        // 机器人位置和特征值向量替换
+        for (int i = 0; i < robot_positions.rows(); ++i)
+        {
+            substitutions[px_list[i]] = robot_positions(i, 0);
+            substitutions[py_list[i]] = robot_positions(i, 1);
+            substitutions[eigenvec_list[i]] = eigenvec(i);
+        }
+        // 当前机器人的自身位置
+        substitutions[px] = self_position(0);
+        substitutions[py] = self_position(1);
+        // 对整个矩阵统一替换
+        GiNaC::matrix result = GiNaC::ex_to<GiNaC::matrix>(expr_matrix.subs(substitutions));
+        return result;
+    }
 
     // Symbolically compute the gradient of the barrier function with respect to state variables
     // Parameters:
@@ -531,73 +519,73 @@ namespace cbf
         return hess;
     }
 
-    // @quyichun check if this function can be deprecated
-    Eigen::MatrixXd ginacToEigen(const GiNaC::matrix& m) {
-        Eigen::MatrixXd result(m.rows(), m.cols());
-        for (int i = 0; i < m.rows(); ++i) {
-            for (int j = 0; j < m.cols(); ++j) {
-                result(i, j) = GiNaC::ex_to<GiNaC::numeric>(m(i, j)).to_double();
-            }
-        }
-        return result;
-    }
+    // // @quyichun check if this function can be deprecated
+    // Eigen::MatrixXd ginacToEigen(const GiNaC::matrix& m) {
+    //     Eigen::MatrixXd result(m.rows(), m.cols());
+    //     for (int i = 0; i < m.rows(); ++i) {
+    //         for (int j = 0; j < m.cols(); ++j) {
+    //             result(i, j) = GiNaC::ex_to<GiNaC::numeric>(m(i, j)).to_double();
+    //         }
+    //     }
+    //     return result;
+    // }
 
-    // @quyichun check if this can be deprecated
-    Eigen::Matrix2d ConnectivityCBF::compute_d2h_dx2_fd(
-    const GiNaC::matrix& dh_dx_sym, 
-    const Eigen::MatrixXd& robot_positions,
-    const Eigen::VectorXd& eigenvec,
-    const Eigen::Vector2d& x_self,
-    int self_idx,
-    double Rs_val,
-    double sigma_val)
-    {
-        const double eps = 1e-5;
-        Eigen::Matrix2d hess;
-        Eigen::Vector2d grad_plus_x, grad_minus_x;
-        Eigen::Vector2d grad_plus_y, grad_minus_y;
+    // // @quyichun check if this can be deprecated
+    // Eigen::Matrix2d ConnectivityCBF::compute_d2h_dx2_fd(
+    // const GiNaC::matrix& dh_dx_sym, 
+    // const Eigen::MatrixXd& robot_positions,
+    // const Eigen::VectorXd& eigenvec,
+    // const Eigen::Vector2d& x_self,
+    // int self_idx,
+    // double Rs_val,
+    // double sigma_val)
+    // {
+    //     const double eps = 1e-5;
+    //     Eigen::Matrix2d hess;
+    //     Eigen::Vector2d grad_plus_x, grad_minus_x;
+    //     Eigen::Vector2d grad_plus_y, grad_minus_y;
 
-        // x + eps
-        {
-            Eigen::MatrixXd pos = robot_positions;
-            pos(self_idx, 0) = x_self(0) + eps;
-            Eigen::MatrixXd dh_dx_plus = ginacToEigen(
-                matrixSubsMatrix(dh_dx_sym, pos, eigenvec, x_self + Eigen::Vector2d(eps, 0)));
-            grad_plus_x = dh_dx_plus.row(self_idx);
-        }
+    //     // x + eps
+    //     {
+    //         Eigen::MatrixXd pos = robot_positions;
+    //         pos(self_idx, 0) = x_self(0) + eps;
+    //         Eigen::MatrixXd dh_dx_plus = ginacToEigen(
+    //             matrixSubsMatrix(dh_dx_sym, pos, eigenvec, x_self + Eigen::Vector2d(eps, 0)));
+    //         grad_plus_x = dh_dx_plus.row(self_idx);
+    //     }
 
-        // x - eps
-        {
-            Eigen::MatrixXd pos = robot_positions;
-            pos(self_idx, 0) = x_self(0) - eps;
-            Eigen::MatrixXd dh_dx_minus = ginacToEigen(
-                matrixSubsMatrix(dh_dx_sym, pos, eigenvec, x_self - Eigen::Vector2d(eps, 0)));
-            grad_minus_x = dh_dx_minus.row(self_idx);
-        }
+    //     // x - eps
+    //     {
+    //         Eigen::MatrixXd pos = robot_positions;
+    //         pos(self_idx, 0) = x_self(0) - eps;
+    //         Eigen::MatrixXd dh_dx_minus = ginacToEigen(
+    //             matrixSubsMatrix(dh_dx_sym, pos, eigenvec, x_self - Eigen::Vector2d(eps, 0)));
+    //         grad_minus_x = dh_dx_minus.row(self_idx);
+    //     }
 
-        // y + eps
-        {
-            Eigen::MatrixXd pos = robot_positions;
-            pos(self_idx, 1) = x_self(1) + eps;
-            Eigen::MatrixXd dh_dx_plus = ginacToEigen(
-                matrixSubsMatrix(dh_dx_sym, pos, eigenvec, x_self + Eigen::Vector2d(0, eps)));
-            grad_plus_y = dh_dx_plus.row(self_idx);
-        }
+    //     // y + eps
+    //     {
+    //         Eigen::MatrixXd pos = robot_positions;
+    //         pos(self_idx, 1) = x_self(1) + eps;
+    //         Eigen::MatrixXd dh_dx_plus = ginacToEigen(
+    //             matrixSubsMatrix(dh_dx_sym, pos, eigenvec, x_self + Eigen::Vector2d(0, eps)));
+    //         grad_plus_y = dh_dx_plus.row(self_idx);
+    //     }
 
-        // y - eps
-        {
-            Eigen::MatrixXd pos = robot_positions;
-            pos(self_idx, 1) = x_self(1) - eps;
-            Eigen::MatrixXd dh_dx_minus = ginacToEigen(
-                matrixSubsMatrix(dh_dx_sym, pos, eigenvec, x_self - Eigen::Vector2d(0, eps)));
-            grad_minus_y = dh_dx_minus.row(self_idx);
-        }
+    //     // y - eps
+    //     {
+    //         Eigen::MatrixXd pos = robot_positions;
+    //         pos(self_idx, 1) = x_self(1) - eps;
+    //         Eigen::MatrixXd dh_dx_minus = ginacToEigen(
+    //             matrixSubsMatrix(dh_dx_sym, pos, eigenvec, x_self - Eigen::Vector2d(0, eps)));
+    //         grad_minus_y = dh_dx_minus.row(self_idx);
+    //     }
 
-        hess.col(0) = (grad_plus_x - grad_minus_x) / (2 * eps);  // d²h/dx², d²h/dxdy
-        hess.col(1) = (grad_plus_y - grad_minus_y) / (2 * eps);  // d²h/dydx, d²h/dy²
+    //     hess.col(0) = (grad_plus_x - grad_minus_x) / (2 * eps);  // d²h/dx², d²h/dxdy
+    //     hess.col(1) = (grad_plus_y - grad_minus_y) / (2 * eps);  // d²h/dydx, d²h/dy²
 
-        return hess;
-    }
+    //     return hess;
+    // }
 
 
     Eigen::VectorXd ConnectivityCBF::compute_dLf_h_dx(

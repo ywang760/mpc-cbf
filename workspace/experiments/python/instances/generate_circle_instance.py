@@ -46,5 +46,5 @@ if __name__ == "__main__":
     )
     
     args = parser.parse_args()
-    out = args.out or f'/usr/src/mpc-cbf/workspace/experiments/config/examples/Circle{args.num_robots}.json'
+    out = args.out or f'/usr/src/mpc-cbf/workspace/experiments/config/examples/{args.num_robots}r/circle.json'
     main(out, args.num_robots, args.radius)

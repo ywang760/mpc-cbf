@@ -64,8 +64,16 @@ def main():
 
     output_dir = args.output_dir
     os.makedirs(output_dir, exist_ok=True)
-    output_static = os.path.join(output_dir, os.path.basename(config_file).replace('.json', '.png'))
-    output_anim = os.path.join(output_dir, os.path.basename(config_file).replace('.json', '.mp4'))
+
+    output_dir_expanded = os.path.join(
+        output_dir, os.path.dirname(config_file).split("/")[-1]
+    )
+    output_static = os.path.join(
+        output_dir_expanded, os.path.basename(config_file).replace(".json", ".png")
+    )
+    output_anim = os.path.join(
+        output_dir_expanded, os.path.basename(config_file).replace(".json", ".mp4")
+    )
 
     # === 2. 读取配置和状态数据 ===
     cfg = load_json(config_file)
@@ -100,8 +108,6 @@ def main():
     else:
         fig, axes = plt.subplots(1, 2, figsize=(10, 5))
 
-
-
     # --- 3.1 初始连通性（Static） ---
     axes[0].set_title('Initial Connectivity')
     plot_connectivity(axes[0], so, max_dist, colors)
@@ -132,54 +138,54 @@ def main():
     fig.savefig(output_static)
     print(f"Static plot saved to {output_static}")
 
-    # === 4. 准备动画：在第三个子图 axes[2] 上，动态绘制每帧的连通性 ===
-    ax_anim = axes[2]
-    artists = []
-
-    def init_frame():
-        nonlocal artists
-        for art in artists:
-            try:
-                art.remove()
-            except Exception:
-                pass
-        artists = []
-        return []
-
-    def update_frame(frame_idx):
-        nonlocal artists
-        for art in artists:
-            try:
-                art.remove()
-            except Exception:
-                pass
-        artists = []
-
-        # 取出当前帧每辆车的 (x, y)
-        curr_positions = traj[:, frame_idx, :2]  # 形状 (N, 2)
-        # 先用 scatter 画机器人当前位置
-        scat = ax_anim.scatter(
-            curr_positions[:, 0],
-            curr_positions[:, 1],
-            c=colors,
-            s=50,
-            edgecolors='k',
-            zorder=3
-        )
-        artists.append(scat)
-
-        # 再两两判断距离，画连通性线段
-        for i in range(N):
-            x_i, y_i = curr_positions[i]
-            for j in range(i + 1, N):
-                x_j, y_j = curr_positions[j]
-                if np.hypot(x_j - x_i, y_j - y_i) <= max_dist:
-                    ln, = ax_anim.plot([x_i, x_j], [y_i, y_j], '-', color='gray', lw=1, zorder=2)
-                    artists.append(ln)
-
-        return artists
-
     if args.create_anim and HAS_RESULT:
+        
+        ax_anim = axes[2]
+        artists = []
+        
+        def init_frame():
+            nonlocal artists
+            for art in artists:
+                try:
+                    art.remove()
+                except Exception:
+                    pass
+            artists = []
+            return []
+
+        def update_frame(frame_idx):
+            nonlocal artists
+            for art in artists:
+                try:
+                    art.remove()
+                except Exception:
+                    pass
+            artists = []
+
+            # 取出当前帧每辆车的 (x, y)
+            curr_positions = traj[:, frame_idx, :2]  # 形状 (N, 2)
+            # 先用 scatter 画机器人当前位置
+            scat = ax_anim.scatter(
+                curr_positions[:, 0],
+                curr_positions[:, 1],
+                c=colors,
+                s=50,
+                edgecolors='k',
+                zorder=3
+            )
+            artists.append(scat)
+
+            # 再两两判断距离，画连通性线段
+            for i in range(N):
+                x_i, y_i = curr_positions[i]
+                for j in range(i + 1, N):
+                    x_j, y_j = curr_positions[j]
+                    if np.hypot(x_j - x_i, y_j - y_i) <= max_dist:
+                        ln, = ax_anim.plot([x_i, x_j], [y_i, y_j], '-', color='gray', lw=1, zorder=2)
+                        artists.append(ln)
+
+            return artists
+    
         # TODO: downsample the frames if T is too large
         anim = animation.FuncAnimation(
             fig,

@@ -1,15 +1,23 @@
 INPUT=(
-    # "/usr/src/mpc-cbf/workspace/experiments/config/formation/Separate2.json"
-    # "/usr/src/mpc-cbf/workspace/experiments/config/formation/Cross3.json"
-    # "/usr/src/mpc-cbf/workspace/experiments/config/formation/DiagonalSwitch3.json"
-    # "/usr/src/mpc-cbf/workspace/experiments/config/formation/Horizontal3.json"
-    # "/usr/src/mpc-cbf/workspace/experiments/config/formation/Circle5.json"
-    "/usr/src/mpc-cbf/workspace/experiments/config/formation/Circle6.json"
+    "/usr/src/mpc-cbf/workspace/experiments/config/baseline/2r/circle.json"
+    "/usr/src/mpc-cbf/workspace/experiments/config/baseline/2r/line.json"
+    "/usr/src/mpc-cbf/workspace/experiments/config/baseline/3r/bend.json"
+    "/usr/src/mpc-cbf/workspace/experiments/config/baseline/3r/circle.json"
+    "/usr/src/mpc-cbf/workspace/experiments/config/baseline/3r/cross_split.json"
+    "/usr/src/mpc-cbf/workspace/experiments/config/baseline/3r/line.json"
+    "/usr/src/mpc-cbf/workspace/experiments/config/baseline/3r/triangle.json"
+    "/usr/src/mpc-cbf/workspace/experiments/config/baseline/5r/circle.json"
+    "/usr/src/mpc-cbf/workspace/experiments/config/baseline/5r/expand.json"
+    "/usr/src/mpc-cbf/workspace/experiments/config/baseline/6r/circle.json"
+    "/usr/src/mpc-cbf/workspace/experiments/config/baseline/6r/upward.json"
+    "/usr/src/mpc-cbf/workspace/experiments/config/baseline/8r/circle.json"
+    "/usr/src/mpc-cbf/workspace/experiments/config/baseline/8r/diverge.json"
 )
 
-DEFAULT_STATES_PATH="/usr/src/mpc-cbf/workspace/experiments/results/formation/states.json"
-MAX_STEPS=1500
-BASE_CONFIG_FILE="/usr/src/mpc-cbf/workspace/experiments/config/formation/base_config.json"
+DEFAULT_STATES_PATH="/usr/src/mpc-cbf/workspace/experiments/results/states.json"
+BASE_CONFIG_FILE="/usr/src/mpc-cbf/workspace/experiments/config/base_config.json"
+VIZ_OUTPUT_DIR="/usr/src/mpc-cbf/workspace/experiments/results/viz"
+MAX_STEPS=1000
 
 # Build the CBF examples once before running experiments
 echo "Building CBF Formation Control example"
@@ -31,9 +39,9 @@ for config_file in "${INPUT[@]}"; do
     echo "Processing configuration: $(basename ${config_file})"
     echo "=========================================="
     
-    # Step 0: Visualize the config
-    echo "Step 0: Processing and visualizing the configuration file"
-    python3 /usr/src/mpc-cbf/workspace/experiments/python/visualization/preprocess.py \
+    # Step 0: Preprocesss
+    echo "Step 0: Processing the configuration file"
+    python3 /usr/src/mpc-cbf/workspace/experiments/python/preprocess.py \
         --base_config_file ${BASE_CONFIG_FILE} \
         --task_config_file ${config_file}
 
@@ -41,6 +49,7 @@ for config_file in "${INPUT[@]}"; do
     echo "Step 1: Running the CBF Formation Control example with configuration"
     ./cbf_examples_CBFFormationControl_example \
         --config_file ${config_file} \
+        --write_filename ${DEFAULT_STATES_PATH} \
         --max_steps ${MAX_STEPS}
 
     # Step 2: Visualize the results
@@ -48,7 +57,8 @@ for config_file in "${INPUT[@]}"; do
     python3 /usr/src/mpc-cbf/workspace/experiments/python/visualization/plot_results.py \
         --config ${config_file} \
         --states ${DEFAULT_STATES_PATH} \
-        --output_dir /usr/src/mpc-cbf/workspace/experiments/results/formation/viz
+        --output_dir ${VIZ_OUTPUT_DIR}
+        # can add the --create_anim flag if needed
 
     # Step 3: Check for collisions and success
     echo "Step 3: Checking for collisions and success of the robot trajectories"

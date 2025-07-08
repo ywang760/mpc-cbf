@@ -76,11 +76,11 @@ namespace cbf {
         qp_generator_.addControlBoundConstraint(u_min, u_max);
 
         // Add connectivity constraint
-        // if (slack_mode_) {
-        //     qp_generator_.addConnConstraint(state, other_robot_positions, true, num_neighbors);
-        // } else {
-        //     qp_generator_.addConnConstraint(state, other_robot_positions);
-        // }
+        if (slack_mode_) {
+            qp_generator_.addConnConstraint(state, other_robot_positions, true, num_neighbors);
+        } else {
+            qp_generator_.addConnConstraint(state, other_robot_positions);
+        }
 
         // solve QP
         Problem &problem = qp_generator_.problem();
@@ -91,7 +91,6 @@ namespace cbf {
             success = true;
         } else {
             success = false;
-            SPDLOG_WARN("QP solver failed with status: {}", qpcpp::SolveStatusToStr(solve_status));
         }
 
         cbf_u = qp_generator_.generatorCBFControlInput();

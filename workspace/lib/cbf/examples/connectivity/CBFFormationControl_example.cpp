@@ -30,8 +30,8 @@ int main(int argc, char *argv[])
     // Initialize logging with environment variable support
     auto logger = common::initializeLogging();
 
-    const std::string DF_CFG = "/usr/src/mpc-cbf/workspace/experiments/config/formation/Circle2.json";
-    const std::string DF_OUT = "/usr/src/mpc-cbf/workspace/experiments/results/formation/states.json";
+    const std::string DF_CFG = "/usr/src/mpc-cbf/workspace/experiments/config/baseline/2r/line.json";
+    const std::string DF_OUT = "/usr/src/mpc-cbf/workspace/experiments/results/states.json";
 
     // Parse command-line arguments
     cxxopts::Options options(
@@ -136,9 +136,6 @@ int main(int argc, char *argv[])
 
     // Main simulation loop
     int loop_idx = 0;
-    double h_this_timestep = 0.0;
-    int qp_success_count = 0;
-
     while (loop_idx < option_parse["max_steps"].as<int>())
     {
         // Print out current loop_idx if loop_idx is a multiple of 10
@@ -196,7 +193,5 @@ int main(int argc, char *argv[])
     logger->info("Writing states to JSON file: {}", JSON_FILENAME);
     std::ofstream o(JSON_FILENAME, std::ofstream::trunc);
     o << std::setw(4) << states << std::endl;
-    std::cout << "Total successful QP optimizations: " << qp_success_count << " out of " << num_robots * loop_idx << std::endl;
-
     return 0;
 }
