@@ -128,7 +128,7 @@ int main(int argc, char *argv[])
         experiment_config_json["pid_params"]["ki"],
         experiment_config_json["pid_params"]["kd"],
         Ts};
-
+        
     for (size_t i = 0; i < num_robots; ++i)
     {
         pid_controllers.emplace_back(pid_params);
@@ -136,6 +136,9 @@ int main(int argc, char *argv[])
 
     // Main simulation loop
     int loop_idx = 0;
+    double h_this_timestep = 0.0;
+    int qp_success_count = 0;
+
     while (loop_idx < option_parse["max_steps"].as<int>())
     {
         // Print out current loop_idx if loop_idx is a multiple of 10
@@ -168,8 +171,10 @@ int main(int argc, char *argv[])
             bool success = connectivity_control.optimize(cbf_u, desired_u, current_states, robot_idx, a_min, a_max);
             if (!success)
             {
-                SPDLOG_WARN("Optimization failed for robot {} at timestep {}", robot_idx, loop_idx);
+                logger->warn("Optimization failed for robot {} at timestep {}", robot_idx, loop_idx);
                 cbf_u = VectorDIM::Zero(); // Fallback to zero control if optimization fails
+                // @quyichun recommended way is to simply use logger->warn to log failures
+                // and if you need to save the log, you can use the ./<executable> > log.txt syntax to log them
             }
 
             // Apply control to robot model to get next state and add noise
@@ -186,11 +191,12 @@ int main(int argc, char *argv[])
 
         loop_idx += 1;
     }
-
+    
     // Save simulation results to JSON file
     logger->info("Writing states to JSON file: {}", JSON_FILENAME);
     std::ofstream o(JSON_FILENAME, std::ofstream::trunc);
     o << std::setw(4) << states << std::endl;
+    std::cout << "Total successful QP optimizations: " << qp_success_count << " out of " << num_robots * loop_idx << std::endl;
 
     return 0;
 }
