@@ -23,6 +23,12 @@ namespace cbf
             const Eigen::VectorXd &eigenvec,
             const Eigen::Vector2d &self_position,
             const ConnectivityCBF &cbf);
+        friend GiNaC::ex valueSubsValue(
+            const GiNaC::ex &expr,
+            const Eigen::MatrixXd &robot_positions,
+            const Eigen::VectorXd &eigenvec,
+            const Eigen::Vector2d &self_position,
+            const ConnectivityCBF &cbf);
 
     private:
         // Parameters
@@ -55,13 +61,6 @@ namespace cbf
         void initSymbolLists(int N);
         // Helpers for connectivity CBF
         GiNaC::matrix compute_dh_dx(int N, const GiNaC::ex &Rs, const GiNaC::ex &sigma);
-        GiNaC::matrix compute_d2h_dx2(const GiNaC::matrix &dh_dx_sym, int self_idx);
-        Eigen::VectorXd compute_dLf_h_dx(
-            const GiNaC::matrix &dh_dx_sym,
-            int self_idx,
-            const Eigen::MatrixXd &robot_positions,
-            const Eigen::VectorXd &eigenvec,
-            const Eigen::VectorXd &x_self);
 
     public:
         using Vector3d = math::VectorDIM<double, 3>;
@@ -83,8 +82,8 @@ namespace cbf
         void setAlpha(std::function<GiNaC::ex(GiNaC::ex, double)> newAlpha);
     };
     // Free function
-    std::pair<double, Eigen::VectorXd> getLambda2FromL(const Eigen::MatrixXd &robot_positions,
-                                                       double Rs_value,
-                                                       double sigma_value);
+    std::pair<double, Eigen::VectorXd> getLambda2(const Eigen::MatrixXd &robot_positions,
+                                                  double Rs_value,
+                                                  double sigma_value);
 } // namespace cbf
 #endif // CONNECTIVITY_CBF_H

@@ -65,6 +65,29 @@ namespace cbf {
         GiNaC::matrix result = GiNaC::ex_to<GiNaC::matrix>(expr_matrix.subs(substitutions));
         return result;
     }
+
+    inline GiNaC::ex valueSubsValue(
+        const GiNaC::ex &expr,
+        const Eigen::MatrixXd &robot_positions,
+        const Eigen::VectorXd &eigenvec,
+        const Eigen::Vector2d &self_position,
+        const ConnectivityCBF &cbf)
+    {
+        GiNaC::exmap substitutions;
+        // Substitute robot positions and eigenvector values
+        for (int i = 0; i < robot_positions.rows(); ++i)
+        {
+            substitutions[cbf.px_list[i]] = robot_positions(i, 0);
+            substitutions[cbf.py_list[i]] = robot_positions(i, 1);
+            substitutions[cbf.eigenvec_list[i]] = eigenvec(i);
+        }
+        // Substitute self position
+        substitutions[cbf.px] = self_position(0);
+        substitutions[cbf.py] = self_position(1);
+        // Apply substitutions to the expression
+        GiNaC::ex result = expr.subs(substitutions);
+        return result;
+    }
 } // namespace cbf
 
 

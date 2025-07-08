@@ -334,7 +334,7 @@ namespace cbf
     //   sigma_value: Parameter for the weight function
     // Returns:
     //   A pair containing the second smallest eigenvalue (lambda2) and the corresponding eigenvector
-    std::pair<double, Eigen::VectorXd> getLambda2FromL(
+    std::pair<double, Eigen::VectorXd> getLambda2(
         const Eigen::MatrixXd &robot_positions,
         double Rs_value,
         double sigma_value)
@@ -427,65 +427,6 @@ namespace cbf
         return grad;
     }
 
-    // Compute the second derivative (Hessian) of the barrier function with respect to state variables
-    // Parameters:
-    //   dh_dx_sym: Symbolic gradient of the barrier function
-    //   self_idx: Index of the current robot in the gradient matrix
-    // Returns:
-    //   Hessian matrix (2x2) of the barrier function with respect to px and py in symbolic form
-    GiNaC::matrix ConnectivityCBF::compute_d2h_dx2(const GiNaC::matrix &dh_dx_sym, int self_idx)
-    {
-        GiNaC::matrix hess(2, 2);
-        hess(0, 0) = GiNaC::diff(dh_dx_sym(self_idx, 0), px_list[self_idx]);
-        hess(0, 1) = GiNaC::diff(dh_dx_sym(self_idx, 0), py_list[self_idx]);
-        hess(1, 0) = GiNaC::diff(dh_dx_sym(self_idx, 1), px_list[self_idx]);
-        hess(1, 1) = GiNaC::diff(dh_dx_sym(self_idx, 1), py_list[self_idx]);
-        return hess;
-    }
-
-    Eigen::VectorXd ConnectivityCBF::compute_dLf_h_dx(
-        const GiNaC::matrix &dh_dx_sym,
-        int self_idx,
-        const Eigen::MatrixXd &robot_positions,
-        const Eigen::VectorXd &eigenvec,
-        const Eigen::VectorXd &x_self)
-    {
-        // === Step 1: 构造符号 Hessian 矩阵 ===
-        GiNaC::matrix hess_sym = compute_d2h_dx2(dh_dx_sym, self_idx);
-        // 输出符号 Hessian 表达式（调试用）
-        GiNaC::matrix hess_eval = matrixSubsMatrix(hess_sym, robot_positions, eigenvec, x_self.head<2>(), *this);
-        logger->debug("Step 4.1: ∇²h evaluated:\n{}", hess_eval);
-
-        // === Step 2: 计算 Hessian 项：∇²h · f(x) ===
-        double fx = x_self(3);
-        double fy = x_self(4);
-        Eigen::Vector2d hess_term;
-        hess_term(0) = GiNaC::ex_to<GiNaC::numeric>(hess_eval(0, 0) * fx + hess_eval(0, 1) * fy).to_double();
-        hess_term(1) = GiNaC::ex_to<GiNaC::numeric>(hess_eval(1, 0) * fx + hess_eval(1, 1) * fy).to_double();
-        logger->debug("Step 4.2: Hessian contribution ∇²h·f:\n{}", hess_term);
-
-        // === Step 3: ∇h 数值化，替换变量获得数值梯度 ===
-        GiNaC::matrix dh_eval = matrixSubsMatrix(dh_dx_sym, robot_positions, eigenvec, x_self.head<2>(), *this);
-        Eigen::VectorXd dh_dx = Eigen::VectorXd::Zero(6);
-        // 这里只对 px 和 py 非零，其他导数为零
-        dh_dx(0) = GiNaC::ex_to<GiNaC::numeric>(dh_eval(self_idx, 0)).to_double();
-        dh_dx(1) = GiNaC::ex_to<GiNaC::numeric>(dh_eval(self_idx, 1)).to_double();
-        logger->debug("Step 4.3: ∇h(px, py)\n{}", dh_dx);
-
-        // === Step 4: 构造 Jf^T ∇h 项 ===
-        // 由于 f(x) = [vx, vy, w]，其雅可比矩阵 Jf 关于状态向量 x 的非零偏导为：
-        // ∂vx/∂x4=1, ∂vy/∂x5=1, ∂w/∂x6=1，对应 transpose 后影响的就是 dh_dx 中 vx, vy 项
-        Eigen::VectorXd jac_term = Eigen::VectorXd::Zero(6);
-        jac_term(3) = dh_dx(0); // vx 对应 px
-        jac_term(4) = dh_dx(1); // vy 对应 py
-        logger->debug("Step 4.4: Jf^T ∇h\n{}", jac_term);
-
-        // === Step 5: 拼接最终结果 ∇(L_f h) = ∇²h·f + Jfᵀ∇h ===
-        Eigen::VectorXd total = jac_term;
-        total.head<2>() += hess_term;
-        return total;
-    }
-
     // TODO: ideally this should return a symbolic expression
     // return std::pair<GiNaC::matrix, GiNaC::ex>
     // Ac should be a vector of shape 1 x CONTROL_VARS, Bc should be a scalar
@@ -497,51 +438,74 @@ namespace cbf
         const int N = robot_states.rows(); // Number of robots
         logger->debug("Initializing Connectivity CBF with {} robots", N);
 
-        // Step 1: h = λ₂ - λ₂_min (numerically)
+        // Step 0: definiing some constants:
         const double sigma_val = dmax * dmax * dmax * dmax / std::log(2.0); // σ = R_s^4 / ln(2)
-        auto [lambda2_val, eigenvec] = getLambda2FromL(robot_states.leftCols(2), dmax, sigma_val);
-        eigenvec = eigenvec / eigenvec.norm();
+
+        const auto robot_positions = robot_states.leftCols(2);
+        const auto self_position = x_self.head<2>();
+        const double vx = x_self(3); // vx
+        const double vy = x_self(4); // vy
+
+        // Step 1: h = λ₂ - λ₂_min (numerically)
+        // Pre-extract robot positions to avoid repeated leftCols calls
+        auto [lambda2_val, eigenvec] = getLambda2(robot_positions, dmax, sigma_val);
+        eigenvec.normalize(); // More efficient than division
         double h = lambda2_val - epsilon;
         logger->debug("Step 1: λ₂ = {}, λ₂_min = {}, h = {}", lambda2_val, epsilon, h);
 
         // Step 2: 符号构造 ∇h (gradient of h), shape = N×2
         initSymbolLists(N);
         GiNaC::matrix dh_dx_sym = compute_dh_dx(N, dmax, sigma_val);                                 // shape Nx2
-        logger->debug("Step 2: ∇h (symbolic) = \n{}", dh_dx_sym);
-        GiNaC::matrix dh_eval = matrixSubsMatrix(dh_dx_sym, robot_states.leftCols(2), eigenvec, Eigen::Vector2d::Zero(), *this); // N×2 数值表达式, robot_states.leftCols(2) 只取 px, py
+        GiNaC::matrix dh_eval = matrixSubsMatrix(dh_dx_sym, robot_positions, eigenvec, Eigen::Vector2d::Zero(), *this); // N×2 数值表达式, robot_states.leftCols(2) 只取 px, py
         logger->debug("Step 2: ∇h evaluated\n{}", dh_eval);
+
+        // Extract gradient for self robot - batch conversion to avoid repeated GiNaC conversions
+        const double dh_dx_0 = GiNaC::ex_to<GiNaC::numeric>(dh_eval(self_idx, 0)).to_double();
+        const double dh_dx_1 = GiNaC::ex_to<GiNaC::numeric>(dh_eval(self_idx, 1)).to_double();
+
+        // Construct gradient vector efficiently using block operations
         Eigen::VectorXd dh_dx = Eigen::VectorXd::Zero(STATE_VARS);
-        dh_dx(0) = GiNaC::ex_to<GiNaC::numeric>(dh_eval(self_idx, 0)).to_double();
-        dh_dx(1) = GiNaC::ex_to<GiNaC::numeric>(dh_eval(self_idx, 1)).to_double();
+        dh_dx.head<2>() << dh_dx_0, dh_dx_1;
 
-        // Step 3: L_f h = ∇h · f(x_self)
-        // 由于 f = A*x = [vx, vy, w, 0, 0, 0]，直接从 x_self 构造 f 的数值向量 
-        // TODO: this could potentially be replaced by f in fields (if using symbolic)
+        logger->debug("Step 2: ∇h = [dh_dx_0, dh_dx_1, 0, 0, 0, 0] = [{}]", dh_dx.head<2>().transpose());
+
+        // Step 3: L_f h = ∇h · f(x_self) - optimized dot product calculation
         // FIXME: QUESTION: this only computes the ego robot's L_fh, should it sum over all robots????
-        Eigen::VectorXd f_x = Eigen::VectorXd::Zero(STATE_VARS);
-        f_x(0) = x_self(3); // vx
-        f_x(1) = x_self(4); // vy
-        f_x(2) = x_self(5); // w
-        double lfh = dh_dx.dot(f_x);
+        double lfh = dh_dx_0 * vx + dh_dx_1 * vy; // Direct calculation instead of full dot product
         logger->debug("Step 3: L_f h = ∇h · f = {}", lfh);
+        logger->debug("f (shape 3): vx = {}, vy = {}, w = {}", vx, vy, x_self(5));
 
-        // Step 4: 用符号 Hessian 构造 ∇(L_f h)
-        Eigen::VectorXd dlfh_dx = compute_dLf_h_dx(
-            dh_dx_sym,
-            self_idx,
-            robot_states.leftCols(2),
-            eigenvec,
-            x_self);
-        logger->debug("Step 4: ∇(L_f h)\n{}", dlfh_dx);
+        // Step 4: Lf² h = ∇(L_f h) · f
+        GiNaC::matrix hess_sym(2, 2);
+        hess_sym(0, 0) = GiNaC::diff(dh_dx_sym(self_idx, 0), px_list[self_idx]);
+        hess_sym(0, 1) = GiNaC::diff(dh_dx_sym(self_idx, 0), py_list[self_idx]);
+        hess_sym(1, 0) = GiNaC::diff(dh_dx_sym(self_idx, 1), px_list[self_idx]);
+        hess_sym(1, 1) = GiNaC::diff(dh_dx_sym(self_idx, 1), py_list[self_idx]);
 
-        //  Step 5: L_f² h = ∇(L_f h) · f
-        double lf2h = dlfh_dx.dot(f_x);
-        logger->debug("Step 5: L_f² h = ∇(L_f h) · f = {}", lf2h);
+        // 输出符号 Hessian 表达式（调试用）
+        GiNaC::matrix hess_eval = matrixSubsMatrix(hess_sym, robot_positions, eigenvec, self_position, *this);
+        logger->debug("Step 4.1: ∇²h evaluated:\n{}", hess_eval);
+
+        // === Step 4.2: 计算 Hessian 项：∇²h · f(x) ===
+        // Batch convert and compute Hessian terms in one go
+        const double h00 = GiNaC::ex_to<GiNaC::numeric>(hess_eval(0, 0)).to_double();
+        const double h01 = GiNaC::ex_to<GiNaC::numeric>(hess_eval(0, 1)).to_double();
+        const double h10 = GiNaC::ex_to<GiNaC::numeric>(hess_eval(1, 0)).to_double();
+        const double h11 = GiNaC::ex_to<GiNaC::numeric>(hess_eval(1, 1)).to_double();
+
+        Eigen::Vector2d hess_term;
+        hess_term(0) = h00 * vx + h01 * vy;
+        hess_term(1) = h10 * vx + h11 * vy;
+        logger->debug("Step 4.2: Hessian contribution ∇²h·f:\n{}", hess_term);
+
+        // alternative method: dlfh_dx(0) is basically hess_term(0) and dlfh_dx(1) is hess_term(1)
+        double lf2h = (h00 * vx + h01 * vy) * vx + (h10 * vx + h11 * vy) * vy;
+        logger->debug("Step 5 (alt): L_f² h = ∇(L_f h) · f = {}", lf2h);
 
         //  Step 6: L_g L_f h = ∇(L_f h) · g = ∇h ^ T
-        Eigen::VectorXd Ac = Eigen::VectorXd::Zero(CONTROL_VARS);
-        Ac(0) = dh_dx(0);
-        Ac(1) = dh_dx(1);
+        // Use block operation for efficient assignment
+        Eigen::VectorXd Ac(CONTROL_VARS);
+        Ac << dh_dx.head<2>(), 0;
         logger->debug("Step 6 (alt): Ac = L_g L_f h = ∇(L_f h) · g = ∇h ^ T\n{}", Ac);
 
         // Step 7: Bc = L_f² h + L_f(α(h)) + α(L_f h + α(h)), where α is a class of K functions
