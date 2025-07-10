@@ -206,11 +206,6 @@ int main(int argc, char* argv[]) {
     Vector p_max = Vector::Zero(2);
     p_max << experiment_config_json["mpc_params"]["physical_limits"]["p_max"][0],
             experiment_config_json["mpc_params"]["physical_limits"]["p_max"][1];
-    // fov cbf params
-    double fov_beta = double(fov_beta_parse) * M_PI / 180.0;
-    std::cout << "fov_beta: " << double(fov_beta_parse) << "\n";
-    double fov_Ds = experiment_config_json["robot_params"]["collision_shape"]["aligned_box"][0];
-    double fov_Rs = experiment_config_json["fov_cbf_params"]["Rs"];
 
     // robot physical params
     VectorDIM v_min;
@@ -266,7 +261,7 @@ int main(int argc, char* argv[]) {
     uint64_t bezier_continuity_upto_degree = 3;
     int num_neighbors = experiment_config_json["tasks"]["so"].size() - 1;
     std::cout << "neighbor size: " << num_neighbors << "\n";
-    BezierMPCCBFParams bezier_mpc_cbf_params = {piecewise_bezier_params, mpc_params, fov_cbf_params};
+    BezierMPCCBFParams bezier_mpc_cbf_params = {piecewise_bezier_params, mpc_params};
     int cbf_horizon = 2;
     int impc_iter = 2;
     double slack_cost = 1000;
@@ -275,7 +270,7 @@ int main(int argc, char* argv[]) {
     bool slack_mode = true;
     IMPCParams impc_params = {cbf_horizon, impc_iter, slack_cost, slack_decay_rate, slack_mode};
     IMPCCBFParams impc_cbf_params = {bezier_mpc_cbf_params, impc_params};
-    BezierIMPCCBF bezier_impc_cbf(impc_cbf_params, pred_model_ptr, fov_cbf, bezier_continuity_upto_degree, aligned_box_collision_shape_ptr, num_neighbors);
+    BezierIMPCCBF bezier_impc_cbf(impc_cbf_params, pred_model_ptr, bezier_continuity_upto_degree, aligned_box_collision_shape_ptr, num_neighbors);
 
     // main loop
     // load the tasks
@@ -317,7 +312,7 @@ int main(int argc, char* argv[]) {
             std::vector<VectorDIM> other_robot_positions;
             std::vector<Matrix> other_robot_covs;
             for (int j = 0; j < num_robots-1; ++j) {
-                size_t neighbor_id = neighbor_ids.at(robot_idx).at(j);
+                size_t neighbor_id = neighbor_id.at(robot_idx).at(j);
                 const VectorDIM& ego_pos = init_states.at(robot_idx).pos_;
                 const VectorDIM& neighbor_pos = init_states.at(neighbor_id).pos_;
 
