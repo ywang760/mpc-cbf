@@ -92,7 +92,7 @@ namespace cbf
 
         // Initialize all Control Barrier Functions (CBFs)
 
-        // Minimum distance CBF: Ensures minimum safe distance is maintained between agents
+        // Safety CBF: Ensures minimum safe distance is maintained between agents
         auto res = initSafetyCBF();
         Ac_safe = res.first;  // Constraint matrix
         Bc_safe = res.second; // Constraint bound
@@ -439,7 +439,6 @@ namespace cbf
         int self_idx)                        // 当前机器人在 robot_states 中的索引
     {
         const int N = robot_states.rows(); // Number of robots
-        logger->debug("Initializing Connectivity CBF with {} robots", N);
 
         // Step 0: defining some constants:
         const double sigma_val = dmax * dmax * dmax * dmax / std::log(2.0); // σ = R_s^4 / ln(2)
@@ -452,48 +451,99 @@ namespace cbf
 
         // Step 2: 符号构造 ∇h (gradient of h), shape = N×2
         GiNaC::matrix full_grad_sym = compute_full_grad_h(N, dmax, sigma_val); // Full gradient, shape Nx2
-        GiNaC::matrix grad_h(1, 2); // Gradient for the current robot, shape 1x2
+        GiNaC::matrix grad_h(1, CONTROL_VARS); // Gradient for the current robot, shape 1x2
         grad_h(0, 0) = full_grad_sym(self_idx, 0); // ∂h/∂p_x  (symbolic)
         grad_h(0, 1) = full_grad_sym(self_idx, 1); // ∂h/∂p_y  (symbolic)
+        grad_h(0, 2) = 0; // ∂h/∂θ (not used in connectivity CBF)
 
         // Step 3: Calculate L_f h = ∇h · f
         GiNaC::ex lfh_sym = GiNaC::ex(grad_h(0, 0)) * vx + GiNaC::ex(grad_h(0, 1)) * vy; // ∇h·f (symbolic)
-        GiNaC::ex lfh_eval = valueSubsValue(lfh_sym, robot_positions, eigenvec, state, *this);      // 1×1 numeric
-        double lfh = GiNaC::ex_to<GiNaC::numeric>(lfh_eval).to_double();
-        logger->debug("Step 3: L_f h = ∇h · f = {}", lfh);
 
-        // Step 4: Ac = L_g L_f h = ∇(L_f h) · g (which is ∇h)
-        GiNaC::matrix Ac_eval = matrixSubsMatrix(grad_h, robot_positions, eigenvec,
+        // Step 5: Lf² h = ∇(L_f h) · f
+        // Compute the Hessian matrix in batch for better efficiency
+        GiNaC::matrix hess_sym(2, 2);
+        hess_sym(0, 0) = GiNaC::diff(grad_h(0, 0), px_list[self_idx]);
+        hess_sym(0, 1) = GiNaC::diff(grad_h(0, 0), py_list[self_idx]);
+        hess_sym(1, 0) = GiNaC::diff(grad_h(0, 1), px_list[self_idx]);
+        hess_sym(1, 1) = GiNaC::diff(grad_h(0, 1), py_list[self_idx]);
+        // Create the symbolic quadratic form: v^T * Hess * v = vx*(h00*vx + h01*vy) + vy*(h10*vx + h11*vy)
+        // TODO: this could be optimized
+        GiNaC::ex lf2h_sym = vx * (hess_sym(0, 0) * vx + hess_sym(0, 1) * vy) +
+                             vy * (hess_sym(1, 0) * vx + hess_sym(1, 1) * vy);
+
+        // create variable h called h_sym
+        GiNaC::ex h_sym = GiNaC::symbol("h");
+        setAlpha(defaultAlpha);
+
+        // Bc = L_f² h + L_f(α(h)) + α(L_f h + α(h))
+        // Calculate the first Lie derivative of alpha(h)
+        GiNaC::matrix grad_alpha = GiNaC::matrix(STATE_VARS, 1);
+        GiNaC::ex alpha_h = alpha(h_sym, gamma);
+        grad_alpha(0, 0) = GiNaC::diff(alpha_h, px);
+        grad_alpha(1, 0) = GiNaC::diff(alpha_h, py);
+        grad_alpha(2, 0) = GiNaC::diff(alpha_h, th);
+        grad_alpha(3, 0) = GiNaC::diff(alpha_h, vx);
+        grad_alpha(4, 0) = GiNaC::diff(alpha_h, vy);
+        grad_alpha(5, 0) = GiNaC::diff(alpha_h, w);
+
+        // Calculate Lie derivative of alpha(h) along f
+        GiNaC::ex Lf_alpha = 0.0;
+        for (int i = 0; i < STATE_VARS; i++)
+        {
+            Lf_alpha = Lf_alpha + grad_alpha(i, 0) * f(i, 0);
+        }
+
+        // GiNaC::ex Bc_sym = lf2h_sym + Lf_alpha + alpha(lfh_sym + alpha(h_sym, gamma), gamma);
+
+        // Correct version:
+        GiNaC::ex Bc_sym = lf2h_sym + alpha(lfh_sym, gamma) + alpha(lfh_sym + alpha(h_sym, gamma), gamma);
+
+        Ac_conn = grad_h;
+        Bc_conn = Bc_sym;
+        // return std::make_pair(grad_h, Bc_sym);
+
+        // ========== All the code below should go in the get functions
+        GiNaC::matrix Ac_eval = matrixSubsMatrix(Ac_conn, robot_positions, eigenvec,
                                                  state.head<2>(), *this); // 1×2 numeric
         Eigen::VectorXd Ac(CONTROL_VARS);
         Ac.setZero();
-        Ac << GiNaC::ex_to<GiNaC::numeric>(Ac_eval(0, 0)).to_double(),
-            GiNaC::ex_to<GiNaC::numeric>(Ac_eval(0, 1)).to_double(),
-            0.0;
-        logger->debug("Step 4: Ac = L_g L_f h = ∇(L_f h) · g = ∇h ^ T\n{}", Ac);
+        for (int i = 0; i < CONTROL_VARS; i++)
+        {
+            GiNaC::ex val = Ac_eval(0, i).evalf();
+            Ac(i) = GiNaC::ex_to<GiNaC::numeric>(val).to_double();
+        }
+        logger->debug("Ac = L_g L_f h = ∇(L_f h) · g = ∇h ^ T\n{}", Ac);
 
-        // Step 5: Lf² h = ∇(L_f h) · f
-        // Create the symbolic quadratic form: v^T * Hess * v = vx*(h00*vx + h01*vy) + vy*(h10*vx + h11*vy)
-        GiNaC::ex h00_sym = GiNaC::diff(grad_h(0, 0), px_list[self_idx]);
-        GiNaC::ex h01_sym = GiNaC::diff(grad_h(0, 0), py_list[self_idx]);
-        GiNaC::ex h10_sym = GiNaC::diff(grad_h(0, 1), px_list[self_idx]);
-        GiNaC::ex h11_sym = GiNaC::diff(grad_h(0, 1), py_list[self_idx]);
-        GiNaC::ex lf2h_sym = vx * (h00_sym * vx + h01_sym * vy) + vy * (h10_sym * vx + h11_sym * vy);
-        GiNaC::ex lf2h_eval = valueSubsValue(lf2h_sym, robot_positions, eigenvec, state, *this);
+        // Substitute numerical values into the symbolic expression
+        GiNaC::ex Bc_eval = valueSubsValue(Bc_sym, robot_positions, eigenvec, state, *this);
+        Bc_eval = GiNaC::subs(Bc_eval, h_sym == h);
+        // Convert the evaluated expression to a double
+        double Bc = GiNaC::ex_to<GiNaC::numeric>(Bc_eval).to_double();
+        logger->debug("Bc = L_f² h + L_f(α(h)) + α(L_f h + α(h)) = {}", Bc);
 
-        double lf2h = GiNaC::ex_to<GiNaC::numeric>(lf2h_eval).to_double();
-        logger->debug("Step 5: L_f² h = ∇(L_f h) · f = {}", lf2h);
-
-        // Step 6: Bc = L_f² h + L_f(α(h)) + α(L_f h + α(h)), where α is a class of K functions
-        // TODO: replace gamma *  with the alpha function
-        // Currently the alpha function only works for symbolic expressions,
-        // Need a version that works for numerical values
-        double psi1 = lfh + gamma * h; // psi1 = L_f h + alpha1(h), assuming linear alpha1
-        double Bc = lf2h               // L_f^2 h
-                    + gamma * lfh      // Assuming linear alpha11: L_f(α(h)) = γ L_f h
-                    + gamma * psi1;    // Assuming linear alpha2:
-        logger->debug("Step 6: Bc = L_f² h + L_f(α(h)) + α(L_f h + α(h)) = {} + {} + {} = {}", lf2h, gamma * lfh, gamma * psi1, Bc);
         return std::make_pair(Ac, Bc);
+    }
+
+    Eigen::VectorXd ConnectivityCBF::getConnConstraints(Eigen::VectorXd state, Eigen::MatrixXd robot_states, int self_idx)
+    {
+        Eigen::VectorXd Ac(CONTROL_VARS);
+        Ac.setZero();
+        // TODO: eigenvec is not viable here
+        // const auto robot_positions = robot_states.leftCols(2);
+        // GiNaC::matrix Ac_eval = matrixSubsMatrix(Ac_conn, robot_positions, eigenvec, state.head<2>(), *this); // 1×2 numeric
+        // for (int i = 0; i < CONTROL_VARS; i++)
+        // {
+        //     GiNaC::ex val = Ac_eval(0, i).evalf();
+        //     Ac(i) = GiNaC::ex_to<GiNaC::numeric>(val).to_double();
+        // }
+
+        // logger->debug("Ac = L_g L_f h = ∇(L_f h) · g = ∇h ^ T\n{}", Ac);
+    
+        return Ac;
+    }
+    double ConnectivityCBF::getConnBound(Eigen::VectorXd state, Eigen::MatrixXd robot_states, int self_idx)
+    {
+        return 0.0;
     }
 
 
@@ -507,21 +557,6 @@ namespace cbf
     {
         // Substitute numerical values and evaluate
         GiNaC::ex expr = valueSubs(Bc_safe, state, neighbor_state, *this);
-        double Bc = GiNaC::ex_to<GiNaC::numeric>(expr).to_double();
-
-        return Bc;
-    }
-
-    // Get the maximum distance constraint bound for the current state and agent
-    // Parameters:
-    //   state: Current state vector
-    //   neighbor_state: Other agent state vector
-    // Returns:
-    //   Bound value for the maximum distance constraint
-    double ConnectivityCBF::getMaxDistBound(Eigen::VectorXd state, Eigen::VectorXd neighbor_state)
-    {
-        // Substitute numerical values and evaluate
-        GiNaC::ex expr = valueSubs(Bc_connectivity, state, neighbor_state, *this);
         double Bc = GiNaC::ex_to<GiNaC::numeric>(expr).to_double();
 
         return Bc;

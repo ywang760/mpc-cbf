@@ -47,10 +47,10 @@ namespace cbf
         // States for the ego and neighbor agent
         GiNaC::matrix state, p_n, v_n;
         // Symbolic constraints and bounds
-        GiNaC::matrix Ac_safe, Ac_connectivity;
+        GiNaC::matrix Ac_safe, Ac_conn;
         GiNaC::matrix Ac_v1_max, Ac_v2_max, Ac_v3_max;
         GiNaC::matrix Ac_v1_min, Ac_v2_min, Ac_v3_min;
-        GiNaC::ex Bc_safe, Bc_connectivity;
+        GiNaC::ex Bc_safe, Bc_conn;
         GiNaC::ex Bc_v1_max, Bc_v2_max, Bc_v3_max;
         GiNaC::ex Bc_v1_min, Bc_v2_min, Bc_v3_min;
         // Alpha function
@@ -66,15 +66,18 @@ namespace cbf
         using Vector3d = math::VectorDIM<double, 3>;
         ConnectivityCBF(double min_dist, double max_dist, Eigen::VectorXd vmin, Eigen::VectorXd vmax);
         ~ConnectivityCBF();
-        // Basic constraints
+        // Safety constraints
         Eigen::VectorXd getSafetyConstraints(Eigen::VectorXd state, Eigen::VectorXd neighbor_state);
         double getSafetyBound(Eigen::VectorXd state, Eigen::VectorXd neighbor_state);
-        double getMaxDistBound(Eigen::VectorXd state, Eigen::VectorXd neighbor_state);
+        // Connectivity Constraints
+        Eigen::VectorXd getConnConstraints(Eigen::VectorXd state, Eigen::MatrixXd robot_states, int self_idx);
+        double getConnBound(Eigen::VectorXd state, Eigen::MatrixXd robot_states, int self_idx);
         // Velocity constraints
         Eigen::MatrixXd getMaxVelContraints(Eigen::VectorXd state);
         Eigen::MatrixXd getMinVelContraints(Eigen::VectorXd state);
         Eigen::VectorXd getMaxVelBounds(Eigen::VectorXd state);
         Eigen::VectorXd getMinVelBounds(Eigen::VectorXd state);
+        // TODO: initConnCBF should be private
         std::pair<Eigen::VectorXd, double> initConnCBF(const Eigen::VectorXd &state,
                                                        const Eigen::MatrixXd &robot_states,
                                                        int self_idx);
