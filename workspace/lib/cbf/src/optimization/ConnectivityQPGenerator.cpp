@@ -22,7 +22,7 @@ namespace cbf
         const auto robot_positions = robot_states.leftCols(2); // Extract only the position columns (x, y)
         auto [lambda2_val, eigenvec] = cbf_->getLambda2(robot_positions);
         double h = lambda2_val - epsilon; // barrier function: h = λ₂ - λ₂_min
-        auto [Ac_sym, Bc_sym] = cbf_->initConnCBF(robot_states, 0);
+        cbf_->initConnCBF(robot_positions.rows(), 0); // second argument is self_idx
         Eigen::VectorXd Ac = cbf_->getConnConstraints(state, robot_states, eigenvec);
         T Bc = cbf_->getConnBound(state, robot_states, eigenvec, h);
 

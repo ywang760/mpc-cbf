@@ -148,15 +148,15 @@ namespace cbf
     std::pair<GiNaC::matrix, GiNaC::ex> ConnectivityCBF::initSafetyCBF()
     {
 
-        GiNaC::ex dx = px - px_n; // x-distance to other agent
-        GiNaC::ex dy = py - py_n; // y-distance to other agent
+        GiNaC::ex dx = px - px_n;  // x-distance to other agent
+        GiNaC::ex dy = py - py_n;  // y-distance to other agent
         GiNaC::ex dvx = vx - vx_n; // x-velocity difference to other agent
         GiNaC::ex dvy = vy - vy_n; // y-velocity difference
 
         // Calculate barrier function: h(p) = ||p - p_n||^2 - dmin^2
         GiNaC::ex h = dx * dx + dy * dy - GiNaC::pow(dmin, 2);
 
-        // First Lie derivative of the barrier function: L_f h = ∇h · f 
+        // First Lie derivative of the barrier function: L_f h = ∇h · f
         // This could be analytically derived
         GiNaC::ex Lf_h = 2 * (dx * dvx + dy * dvy);
 
@@ -237,7 +237,6 @@ namespace cbf
         GiNaC::ex Bc_v1 = lfbv + defaultAlpha(bv, 1);
         return std::make_pair(Ac_v1, Bc_v1);
     }
-
 
     // Get the minimum distance constraint vector for the current state and agent
     // Parameters:
@@ -369,9 +368,6 @@ namespace cbf
         for (int i = 0; i < N; ++i)
             D_num(i, i) = A_num.row(i).sum();
         Eigen::MatrixXd L_num = D_num - A_num;
-        // logger->debug("Diagonal matrix D:\n{}", D_num);
-        // logger->debug("Adjacency matrix A:\n{}", A_num);
-        // logger->debug("Laplacian matrix L:\n{}", L_num);
 
         // Numerically solve for the second smallest eigenvalue and corresponding eigenvector
         Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> solver(L_num);
@@ -379,7 +375,7 @@ namespace cbf
         Eigen::MatrixXd eigenvecs = solver.eigenvectors();
 
         Eigen::VectorXd eigenvec = eigenvecs.col(1); // Second smallest eigenvector
-        eigenvec.normalize(); // Normalize the eigenvector
+        eigenvec.normalize();                        // Normalize the eigenvector
         return {eigenvals(1), eigenvec};
     }
 
@@ -400,7 +396,6 @@ namespace cbf
     //   N: Number of agents
     //   Rs: Symbolic representation of the maximum distance for connectivity
     //   sigma: Symbolic representation of the weight function parameter
-    // TODO: this could be optimized: the A matrices are already calulated earlier
     GiNaC::matrix ConnectivityCBF::compute_full_grad_h(int N, const GiNaC::ex &Rs, const GiNaC::ex &sigma)
     {
         initSymbolLists(N);
@@ -434,11 +429,9 @@ namespace cbf
     }
 
     std::pair<GiNaC::matrix, GiNaC::ex> ConnectivityCBF::initConnCBF(
-        const Eigen::MatrixXd &robot_states, // N x 6 matrix
-        int self_idx)                        // 当前机器人在 robot_states 中的索引
+        int N, int self_idx)
     {
         // ∇h (gradient of h), shape = N×2
-        const int N = robot_states.rows(); // Number of robots
         const double sigma_val = getSigma();
         GiNaC::matrix full_grad_sym = compute_full_grad_h(N, dmax, sigma_val); // Full gradient, shape Nx2
 
@@ -446,7 +439,7 @@ namespace cbf
         GiNaC::matrix grad_h(1, CONTROL_VARS);
         grad_h(0, 0) = full_grad_sym(self_idx, 0); // ∂h/∂p_x  (symbolic)
         grad_h(0, 1) = full_grad_sym(self_idx, 1); // ∂h/∂p_y  (symbolic)
-        grad_h(0, 2) = 0; // ∂h/∂θ (not used in connectivity CBF)
+        grad_h(0, 2) = 0;                          // ∂h/∂θ (not used in connectivity CBF)
 
         // L_f h = ∇h · f
         // Only the terms related to vx and vy are non-zero
@@ -489,15 +482,15 @@ namespace cbf
 
         Ac_conn = grad_h;
         Bc_conn = Bc_sym;
-        return std::make_pair(grad_h, Bc_sym);
+
+        return std::make_pair(Ac_conn, Bc_conn);
     }
 
     Eigen::VectorXd ConnectivityCBF::getConnConstraints(Eigen::VectorXd state, Eigen::MatrixXd robot_states, Eigen::VectorXd eigenvec)
     {
         Eigen::VectorXd Ac(CONTROL_VARS);
         Ac.setZero();
-        const auto robot_positions = robot_states.leftCols(2);
-        GiNaC::matrix Ac_eval = matrixSubsMatrix(Ac_conn, robot_positions, eigenvec, state.head<2>(), *this); // 1×2 numeric
+        GiNaC::matrix Ac_eval = matrixSubsFull(Ac_conn, robot_states, eigenvec, state, *this); // 1×2 numeric
         for (int i = 0; i < CONTROL_VARS; i++)
         {
             GiNaC::ex val = Ac_eval(0, i).evalf();
@@ -511,8 +504,7 @@ namespace cbf
 
     double ConnectivityCBF::getConnBound(Eigen::VectorXd state, Eigen::MatrixXd robot_states, Eigen::VectorXd eigenvec, double h_val)
     {
-        const auto robot_positions = robot_states.leftCols(2);
-        GiNaC::ex Bc_eval = valueSubsValue(Bc_conn, robot_positions, eigenvec, state, *this);
+        GiNaC::ex Bc_eval = valueSubsFull(Bc_conn, robot_states, eigenvec, state, *this);
         Bc_eval = GiNaC::subs(Bc_eval, h == h_val);
         double Bc = GiNaC::ex_to<GiNaC::numeric>(Bc_eval).to_double();
         logger->debug("Bc = L_f² h + L_f(α(h)) + α(L_f h + α(h)) = {}", Bc);

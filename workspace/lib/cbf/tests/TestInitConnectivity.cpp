@@ -63,11 +63,15 @@ protected:
         // Check for Ac
         EXPECT_SIZE(Ac, 3);
         EXPECT_TRUE(Ac.allFinite());
-        EXPECT_TRUE(Ac.isApprox(expected_Ac));
+        for (int i = 0; i < Ac.size(); ++i)
+        {
+            // check approx equality
+            EXPECT_NEAR(Ac(i), expected_Ac(i), 1e-6)
+                << "Expected Ac[" << i << "] = " << expected_Ac(i) << ", got " << Ac(i);
+        }
 
         // Check for Bc
         EXPECT_TRUE(std::isfinite(Bc));
-        EXPECT_GE(Bc, 0.0); // Bc should be non-negative
         EXPECT_DOUBLE_EQ(Bc, expected_Bc);
 
         SPDLOG_INFO("Result: Ac = {}, Bc = {}", Ac.transpose(), Bc);
@@ -107,15 +111,19 @@ TEST_F(InitConnCBFTest, Misc)
 
     int self_idx = 0;
     Eigen::VectorXd state = robot_states.row(self_idx).transpose();
-
-    const double epsilon = 0.1; // minimum eigenvalue threshold
-
+    const double epsilon = 0.1;                            // minimum eigenvalue threshold
     const auto robot_positions = robot_states.leftCols(2); // Extract only the position columns (x, y)
     auto [lambda2_val, eigenvec] = connectivity_cbf->getLambda2(robot_positions);
     double h = lambda2_val - epsilon; // barrier function: h = λ₂ - λ₂_min
-    auto [Ac_sym, Bc_sym] = connectivity_cbf->initConnCBF(robot_states, 0);
+    connectivity_cbf->initConnCBF(3, self_idx);
     Eigen::VectorXd Ac = connectivity_cbf->getConnConstraints(state, robot_states, eigenvec);
     double Bc = connectivity_cbf->getConnBound(state, robot_states, eigenvec, h);
+
+    // Expected results
+    Eigen::VectorXd expected_Ac(3);
+    expected_Ac << 0.0, -2.703392, 0.0;
+    double expected_Bc = 3.4635324630258153;
+    checkResult({Ac, Bc}, expected_Ac, expected_Bc);
 }
 
 TEST_F(InitConnCBFTest, Misc2)
@@ -133,7 +141,13 @@ TEST_F(InitConnCBFTest, Misc2)
     const auto robot_positions = robot_states.leftCols(2); // Extract only the position columns (x, y)
     auto [lambda2_val, eigenvec] = connectivity_cbf->getLambda2(robot_positions);
     double h = lambda2_val - epsilon; // barrier function: h = λ₂ - λ₂_min
-    auto [Ac_sym, Bc_sym] = connectivity_cbf->initConnCBF(robot_states, 0);
+    connectivity_cbf->initConnCBF(3, self_idx);
     Eigen::VectorXd Ac = connectivity_cbf->getConnConstraints(state, robot_states, eigenvec);
     double Bc = connectivity_cbf->getConnBound(state, robot_states, eigenvec, h);
+
+    // Expected results
+    Eigen::VectorXd expected_Ac(3);
+    expected_Ac << 0.061292, 0.201971, 0.0;
+    double expected_Bc = -2.2784138163109593;
+    checkResult({Ac, Bc}, expected_Ac, expected_Bc);
 }

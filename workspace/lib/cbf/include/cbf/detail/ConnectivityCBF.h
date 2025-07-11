@@ -17,15 +17,15 @@ namespace cbf
         // Friend declarations for helper functions
         friend GiNaC::ex matrixSubs(GiNaC::matrix a, Eigen::VectorXd state, Eigen::VectorXd neighbor_state, const ConnectivityCBF &cbf);
         friend GiNaC::ex valueSubs(GiNaC::ex a, Eigen::VectorXd state, Eigen::VectorXd neighbor_state, const ConnectivityCBF &cbf);
-        friend GiNaC::matrix matrixSubsMatrix(
+        friend GiNaC::matrix matrixSubsFull(
             const GiNaC::matrix &expr_matrix,
-            const Eigen::MatrixXd &robot_positions,
+            const Eigen::MatrixXd &robot_states,
             const Eigen::VectorXd &eigenvec,
-            const Eigen::Vector2d &self_position,
+            const Eigen::VectorXd &state,
             const ConnectivityCBF &cbf);
-        friend GiNaC::ex valueSubsValue(
+        friend GiNaC::ex valueSubsFull(
             const GiNaC::ex &expr,
-            const Eigen::MatrixXd &robot_positions,
+            const Eigen::MatrixXd &robot_states,
             const Eigen::VectorXd &eigenvec,
             const Eigen::VectorXd &state,
             const ConnectivityCBF &cbf);
@@ -83,7 +83,7 @@ namespace cbf
         Eigen::VectorXd getMaxVelBounds(Eigen::VectorXd state);
         Eigen::VectorXd getMinVelBounds(Eigen::VectorXd state);
         // TODO: initConnCBF should be private
-        std::pair<GiNaC::matrix, GiNaC::ex> initConnCBF(const Eigen::MatrixXd &robot_states, int self_idx);
+        std::pair<GiNaC::matrix, GiNaC::ex> initConnCBF(int N, int self_idx);
         // Alpha setter
         void setAlpha(std::function<GiNaC::ex(GiNaC::ex, double)> newAlpha);
     };
