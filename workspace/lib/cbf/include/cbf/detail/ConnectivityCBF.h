@@ -53,6 +53,9 @@ namespace cbf
         GiNaC::ex Bc_safe, Bc_conn;
         GiNaC::ex Bc_v1_max, Bc_v2_max, Bc_v3_max;
         GiNaC::ex Bc_v1_min, Bc_v2_min, Bc_v3_min;
+
+        GiNaC::symbol h;
+
         // Alpha function
         std::function<GiNaC::ex(GiNaC::ex, double)> alpha;
         // Internal initialization
@@ -70,23 +73,20 @@ namespace cbf
         Eigen::VectorXd getSafetyConstraints(Eigen::VectorXd state, Eigen::VectorXd neighbor_state);
         double getSafetyBound(Eigen::VectorXd state, Eigen::VectorXd neighbor_state);
         // Connectivity Constraints
-        Eigen::VectorXd getConnConstraints(Eigen::VectorXd state, Eigen::MatrixXd robot_states, int self_idx);
-        double getConnBound(Eigen::VectorXd state, Eigen::MatrixXd robot_states, int self_idx);
+        double getSigma() const;
+        std::pair<double, Eigen::VectorXd> getLambda2(const Eigen::MatrixXd &robot_positions);
+        Eigen::VectorXd getConnConstraints(Eigen::VectorXd state, Eigen::MatrixXd robot_states, Eigen::VectorXd eigenvec);
+        double getConnBound(Eigen::VectorXd state, Eigen::MatrixXd robot_states, Eigen::VectorXd eigenvec, double h_val);
         // Velocity constraints
         Eigen::MatrixXd getMaxVelContraints(Eigen::VectorXd state);
         Eigen::MatrixXd getMinVelContraints(Eigen::VectorXd state);
         Eigen::VectorXd getMaxVelBounds(Eigen::VectorXd state);
         Eigen::VectorXd getMinVelBounds(Eigen::VectorXd state);
         // TODO: initConnCBF should be private
-        std::pair<Eigen::VectorXd, double> initConnCBF(const Eigen::VectorXd &state,
-                                                       const Eigen::MatrixXd &robot_states,
-                                                       int self_idx);
+        std::pair<GiNaC::matrix, GiNaC::ex> initConnCBF(const Eigen::MatrixXd &robot_states, int self_idx);
         // Alpha setter
         void setAlpha(std::function<GiNaC::ex(GiNaC::ex, double)> newAlpha);
     };
     // Free function
-    std::pair<double, Eigen::VectorXd> getLambda2(const Eigen::MatrixXd &robot_positions,
-                                                  double Rs_value,
-                                                  double sigma_value);
 } // namespace cbf
 #endif // CONNECTIVITY_CBF_H

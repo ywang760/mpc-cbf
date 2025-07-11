@@ -45,7 +45,7 @@ namespace cbf
     //   vmax: Maximum velocity limits for each control dimension
     ConnectivityCBF::ConnectivityCBF(double min_dist, double max_dist, Eigen::VectorXd vmin, Eigen::VectorXd vmax)
         : dmin(min_dist), dmax(max_dist), vmin(vmin), vmax(vmax),
-          px("px"), py("py"), th("th"), vx("vx"), vy("vy"), w("w"), px_n("px_n"), py_n("py_n"), vx_n("vx_n"), vy_n("vy_n")
+          px("px"), py("py"), th("th"), vx("vx"), vy("vy"), w("w"), px_n("px_n"), py_n("py_n"), vx_n("vx_n"), vy_n("vy_n"), h("h")
     {
         // Define dimensions of the state and control spaces
         STATE_VARS = 6;
@@ -138,7 +138,7 @@ namespace cbf
     // Destructor for the ConnectivityCBF class
     ConnectivityCBF::~ConnectivityCBF()
     {
-        std::cout << "Closing Connectivity CBF ..." << std::endl;
+        logger->info("Closing ConnectivityCBF instance");
     }
 
     // Initialize the minimum distance Control Barrier Function
@@ -327,22 +327,26 @@ namespace cbf
         return Acs;
     }
 
+    // Get sigma_value for the lambda2 function
+    // By default, sigma is set to the fourth power of dmax divided by log(2)
+    double ConnectivityCBF::getSigma() const
+    {
+        return dmax * dmax * dmax * dmax / std::log(2.0);
+    }
+
     // Given the numerical robot positions, compute the second smallest eigenvalue (lambda2) for the Laplacian matrix
     // Parameters:
     //   robot_positions: Matrix of robot positions
-    //   Rs_value: Maximum distance for connectivity
-    //   sigma_value: Parameter for the weight function
     // Returns:
     //   A pair containing the second smallest eigenvalue (lambda2) and the corresponding eigenvector
-    std::pair<double, Eigen::VectorXd> getLambda2(
-        const Eigen::MatrixXd &robot_positions,
-        double Rs_value,
-        double sigma_value)
+    std::pair<double, Eigen::VectorXd> ConnectivityCBF::getLambda2(
+        const Eigen::MatrixXd &robot_positions)
     {
         const int N = robot_positions.rows();
         // Construct the Adjacency matrix A in numerical form
         Eigen::MatrixXd A_num = Eigen::MatrixXd::Zero(N, N);
-        double Rs_value2 = Rs_value * Rs_value;
+        double Rs_value2 = std::pow(dmax, 2); // Rs^2
+        double sigma_value = getSigma();      // Get sigma value for the lambda2 function
         for (int i = 0; i < N; ++i)
         {
             const auto pi = robot_positions.row(i);
@@ -392,7 +396,6 @@ namespace cbf
         }
     }
 
-    // Symbolically compute the full gradient of the barrier function with respect to state variables
     // Parameters:
     //   N: Number of agents
     //   Rs: Symbolic representation of the maximum distance for connectivity
@@ -430,122 +433,91 @@ namespace cbf
         return grad;
     }
 
-    // TODO: ideally this should return a symbolic expression
-    // return std::pair<GiNaC::matrix, GiNaC::ex>
-    // Ac should be a vector of shape 1 x CONTROL_VARS, Bc should be a scalar
-    std::pair<Eigen::VectorXd, double> ConnectivityCBF::initConnCBF(
-        const Eigen::VectorXd &state,       // 当前机器人的状态 6x1
+    std::pair<GiNaC::matrix, GiNaC::ex> ConnectivityCBF::initConnCBF(
         const Eigen::MatrixXd &robot_states, // N x 6 matrix
         int self_idx)                        // 当前机器人在 robot_states 中的索引
     {
+        // ∇h (gradient of h), shape = N×2
         const int N = robot_states.rows(); // Number of robots
-
-        // Step 0: defining some constants:
-        const double sigma_val = dmax * dmax * dmax * dmax / std::log(2.0); // σ = R_s^4 / ln(2)
-        const auto robot_positions = robot_states.leftCols(2);
-
-        // Step 1: h = λ₂ - λ₂_min (numerically)
-        auto [lambda2_val, eigenvec] = getLambda2(robot_positions, dmax, sigma_val);
-        double h = lambda2_val - epsilon; // barrier function: h = λ₂ - λ₂_min
-        logger->debug("Step 1: λ₂ = {}, λ₂_min (epsilon) = {}, h = {}", lambda2_val, epsilon, h);
-
-        // Step 2: 符号构造 ∇h (gradient of h), shape = N×2
+        const double sigma_val = getSigma();
         GiNaC::matrix full_grad_sym = compute_full_grad_h(N, dmax, sigma_val); // Full gradient, shape Nx2
-        GiNaC::matrix grad_h(1, CONTROL_VARS); // Gradient for the current robot, shape 1x2
+
+        // Gradient for the current robot, shape 1x2
+        GiNaC::matrix grad_h(1, CONTROL_VARS);
         grad_h(0, 0) = full_grad_sym(self_idx, 0); // ∂h/∂p_x  (symbolic)
         grad_h(0, 1) = full_grad_sym(self_idx, 1); // ∂h/∂p_y  (symbolic)
         grad_h(0, 2) = 0; // ∂h/∂θ (not used in connectivity CBF)
 
-        // Step 3: Calculate L_f h = ∇h · f
-        GiNaC::ex lfh_sym = GiNaC::ex(grad_h(0, 0)) * vx + GiNaC::ex(grad_h(0, 1)) * vy; // ∇h·f (symbolic)
+        // L_f h = ∇h · f
+        // Only the terms related to vx and vy are non-zero
+        GiNaC::ex lfh_sym = GiNaC::ex(grad_h(0, 0)) * vx + GiNaC::ex(grad_h(0, 1)) * vy;
 
-        // Step 5: Lf² h = ∇(L_f h) · f
-        // Compute the Hessian matrix in batch for better efficiency
+        // Lf² h = ∇(L_f h) · f
+        // Compute the Hessian matrix
         GiNaC::matrix hess_sym(2, 2);
         hess_sym(0, 0) = GiNaC::diff(grad_h(0, 0), px_list[self_idx]);
         hess_sym(0, 1) = GiNaC::diff(grad_h(0, 0), py_list[self_idx]);
         hess_sym(1, 0) = GiNaC::diff(grad_h(0, 1), px_list[self_idx]);
         hess_sym(1, 1) = GiNaC::diff(grad_h(0, 1), py_list[self_idx]);
-        // Create the symbolic quadratic form: v^T * Hess * v = vx*(h00*vx + h01*vy) + vy*(h10*vx + h11*vy)
-        // TODO: this could be optimized
         GiNaC::ex lf2h_sym = vx * (hess_sym(0, 0) * vx + hess_sym(0, 1) * vy) +
                              vy * (hess_sym(1, 0) * vx + hess_sym(1, 1) * vy);
 
-        // create variable h called h_sym
-        GiNaC::ex h_sym = GiNaC::symbol("h");
         setAlpha(defaultAlpha);
 
         // Bc = L_f² h + L_f(α(h)) + α(L_f h + α(h))
         // Calculate the first Lie derivative of alpha(h)
-        GiNaC::matrix grad_alpha = GiNaC::matrix(STATE_VARS, 1);
-        GiNaC::ex alpha_h = alpha(h_sym, gamma);
-        grad_alpha(0, 0) = GiNaC::diff(alpha_h, px);
-        grad_alpha(1, 0) = GiNaC::diff(alpha_h, py);
-        grad_alpha(2, 0) = GiNaC::diff(alpha_h, th);
-        grad_alpha(3, 0) = GiNaC::diff(alpha_h, vx);
-        grad_alpha(4, 0) = GiNaC::diff(alpha_h, vy);
-        grad_alpha(5, 0) = GiNaC::diff(alpha_h, w);
+        // TODO: this version is not quite working
 
-        // Calculate Lie derivative of alpha(h) along f
-        GiNaC::ex Lf_alpha = 0.0;
-        for (int i = 0; i < STATE_VARS; i++)
-        {
-            Lf_alpha = Lf_alpha + grad_alpha(i, 0) * f(i, 0);
-        }
+        // GiNaC::matrix grad_alpha = GiNaC::matrix(STATE_VARS, 1);
+        // GiNaC::ex alpha_h = alpha(h, gamma);
+        // grad_alpha(0, 0) = GiNaC::diff(alpha_h, px);
+        // grad_alpha(1, 0) = GiNaC::diff(alpha_h, py);
+        // grad_alpha(2, 0) = GiNaC::diff(alpha_h, th);
+        // grad_alpha(3, 0) = GiNaC::diff(alpha_h, vx);
+        // grad_alpha(4, 0) = GiNaC::diff(alpha_h, vy);
+        // grad_alpha(5, 0) = GiNaC::diff(alpha_h, w);
 
-        // GiNaC::ex Bc_sym = lf2h_sym + Lf_alpha + alpha(lfh_sym + alpha(h_sym, gamma), gamma);
+        // // Calculate Lie derivative of alpha(h) along f
+        // GiNaC::ex Lf_alpha = 0.0;
+        // for (int i = 0; i < STATE_VARS; i++)
+        // {
+        //     Lf_alpha = Lf_alpha + grad_alpha(i, 0) * f(i, 0);
+        // }
 
         // Correct version:
-        GiNaC::ex Bc_sym = lf2h_sym + alpha(lfh_sym, gamma) + alpha(lfh_sym + alpha(h_sym, gamma), gamma);
+        GiNaC::ex Bc_sym = lf2h_sym + alpha(lfh_sym, gamma) + alpha(lfh_sym + alpha(h, gamma), gamma);
 
         Ac_conn = grad_h;
         Bc_conn = Bc_sym;
-        // return std::make_pair(grad_h, Bc_sym);
+        return std::make_pair(grad_h, Bc_sym);
+    }
 
-        // ========== All the code below should go in the get functions
-        GiNaC::matrix Ac_eval = matrixSubsMatrix(Ac_conn, robot_positions, eigenvec,
-                                                 state.head<2>(), *this); // 1×2 numeric
+    Eigen::VectorXd ConnectivityCBF::getConnConstraints(Eigen::VectorXd state, Eigen::MatrixXd robot_states, Eigen::VectorXd eigenvec)
+    {
         Eigen::VectorXd Ac(CONTROL_VARS);
         Ac.setZero();
+        const auto robot_positions = robot_states.leftCols(2);
+        GiNaC::matrix Ac_eval = matrixSubsMatrix(Ac_conn, robot_positions, eigenvec, state.head<2>(), *this); // 1×2 numeric
         for (int i = 0; i < CONTROL_VARS; i++)
         {
             GiNaC::ex val = Ac_eval(0, i).evalf();
             Ac(i) = GiNaC::ex_to<GiNaC::numeric>(val).to_double();
         }
+
         logger->debug("Ac = L_g L_f h = ∇(L_f h) · g = ∇h ^ T\n{}", Ac);
 
-        // Substitute numerical values into the symbolic expression
-        GiNaC::ex Bc_eval = valueSubsValue(Bc_sym, robot_positions, eigenvec, state, *this);
-        Bc_eval = GiNaC::subs(Bc_eval, h_sym == h);
-        // Convert the evaluated expression to a double
-        double Bc = GiNaC::ex_to<GiNaC::numeric>(Bc_eval).to_double();
-        logger->debug("Bc = L_f² h + L_f(α(h)) + α(L_f h + α(h)) = {}", Bc);
-
-        return std::make_pair(Ac, Bc);
-    }
-
-    Eigen::VectorXd ConnectivityCBF::getConnConstraints(Eigen::VectorXd state, Eigen::MatrixXd robot_states, int self_idx)
-    {
-        Eigen::VectorXd Ac(CONTROL_VARS);
-        Ac.setZero();
-        // TODO: eigenvec is not viable here
-        // const auto robot_positions = robot_states.leftCols(2);
-        // GiNaC::matrix Ac_eval = matrixSubsMatrix(Ac_conn, robot_positions, eigenvec, state.head<2>(), *this); // 1×2 numeric
-        // for (int i = 0; i < CONTROL_VARS; i++)
-        // {
-        //     GiNaC::ex val = Ac_eval(0, i).evalf();
-        //     Ac(i) = GiNaC::ex_to<GiNaC::numeric>(val).to_double();
-        // }
-
-        // logger->debug("Ac = L_g L_f h = ∇(L_f h) · g = ∇h ^ T\n{}", Ac);
-    
         return Ac;
     }
-    double ConnectivityCBF::getConnBound(Eigen::VectorXd state, Eigen::MatrixXd robot_states, int self_idx)
-    {
-        return 0.0;
-    }
 
+    double ConnectivityCBF::getConnBound(Eigen::VectorXd state, Eigen::MatrixXd robot_states, Eigen::VectorXd eigenvec, double h_val)
+    {
+        const auto robot_positions = robot_states.leftCols(2);
+        GiNaC::ex Bc_eval = valueSubsValue(Bc_conn, robot_positions, eigenvec, state, *this);
+        Bc_eval = GiNaC::subs(Bc_eval, h == h_val);
+        double Bc = GiNaC::ex_to<GiNaC::numeric>(Bc_eval).to_double();
+        logger->debug("Bc = L_f² h + L_f(α(h)) + α(L_f h + α(h)) = {}", Bc);
+        return Bc;
+    }
 
     // Get the minimum distance constraint bound for the current state and agent
     // Parameters:

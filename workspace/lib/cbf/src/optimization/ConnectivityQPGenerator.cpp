@@ -18,7 +18,13 @@ namespace cbf
                                                             bool use_slack,
                                                             std::size_t slack_idx)
     {
-        auto [Ac, Bc] = cbf_->initConnCBF(state, robot_states, 0);
+        double epsilon = 0.1;
+        const auto robot_positions = robot_states.leftCols(2); // Extract only the position columns (x, y)
+        auto [lambda2_val, eigenvec] = cbf_->getLambda2(robot_positions);
+        double h = lambda2_val - epsilon; // barrier function: h = λ₂ - λ₂_min
+        auto [Ac_sym, Bc_sym] = cbf_->initConnCBF(robot_states, 0);
+        Eigen::VectorXd Ac = cbf_->getConnConstraints(state, robot_states, eigenvec);
+        T Bc = cbf_->getConnBound(state, robot_states, eigenvec, h);
 
         Vector coefficients = -1.0 * Ac;
         T bound = Bc;

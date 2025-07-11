@@ -79,13 +79,13 @@ protected:
 // TEST_F(InitConnCBFTest, TwoRobotRail)
 // {
 //     /* Robots on x-axis, 1 m apart (within R_s) */
-//     Eigen::MatrixXd states(2, 6);
-//     states << 0.0, 0.0, 0, 0, 0, 0,
+//     Eigen::MatrixXd robot_states(2, 6);
+//     robot_states << 0.0, 0.0, 0, 0, 0, 0,
 //         1.0, 0.0, 0, 0, 0, 0;
 
 //     int self_idx = 0;
-//     Eigen::VectorXd state = states.row(self_idx).transpose();
-//     auto res = connectivity_cbf->initConnCBF(states,
+//     Eigen::VectorXd state = robot_states.row(self_idx).transpose();
+//     auto res = connectivity_cbf->initConnCBF(robot_states,
 //                                              state,
 //                                              self_idx);
 
@@ -100,30 +100,40 @@ TEST_F(InitConnCBFTest, Misc)
 {
     auto logger = common::initializeLogging();
     /* Robots on x-axis, 1 m apart (within R_s) */
-    Eigen::MatrixXd states(3, 6);
-    states << 1.0, 2.0, 0, 0, 0, 0,
+    Eigen::MatrixXd robot_states(3, 6);
+    robot_states << 1.0, 2.0, 0, 0, 0, 0,
         1.0, 4.0, 0, 0, 0, 0,
         1.0, 6.0, 0, 0, 0, 0;
 
     int self_idx = 0;
-    Eigen::VectorXd state = states.row(self_idx).transpose();
-    auto res = connectivity_cbf->initConnCBF(state,
-                                             states,
-                                             self_idx);
+    Eigen::VectorXd state = robot_states.row(self_idx).transpose();
+
+    const double epsilon = 0.1; // minimum eigenvalue threshold
+
+    const auto robot_positions = robot_states.leftCols(2); // Extract only the position columns (x, y)
+    auto [lambda2_val, eigenvec] = connectivity_cbf->getLambda2(robot_positions);
+    double h = lambda2_val - epsilon; // barrier function: h = λ₂ - λ₂_min
+    auto [Ac_sym, Bc_sym] = connectivity_cbf->initConnCBF(robot_states, 0);
+    Eigen::VectorXd Ac = connectivity_cbf->getConnConstraints(state, robot_states, eigenvec);
+    double Bc = connectivity_cbf->getConnBound(state, robot_states, eigenvec, h);
 }
 
 TEST_F(InitConnCBFTest, Misc2)
 {
     auto logger = common::initializeLogging();
     /* Robots on x-axis, 1 m apart (within R_s) */
-    Eigen::MatrixXd states(3, 6);
-    states << 0.212, 1.592, 0, -0.293, -0.21, 0.0,
+    Eigen::MatrixXd robot_states(3, 6);
+    robot_states << 0.212, 1.592, 0, -0.293, -0.21, 0.0,
         1.01, 4.20, 0, -1.2, 0.12, 0,
         -1.0, -0.02, 0, -0.2, 0.16, 0;
 
     int self_idx = 0;
-    Eigen::VectorXd state = states.row(self_idx).transpose();
-    auto res = connectivity_cbf->initConnCBF(state,
-                                             states,
-                                             self_idx);
+    Eigen::VectorXd state = robot_states.row(self_idx).transpose();
+    const double epsilon = 0.1;                            // minimum eigenvalue threshold
+    const auto robot_positions = robot_states.leftCols(2); // Extract only the position columns (x, y)
+    auto [lambda2_val, eigenvec] = connectivity_cbf->getLambda2(robot_positions);
+    double h = lambda2_val - epsilon; // barrier function: h = λ₂ - λ₂_min
+    auto [Ac_sym, Bc_sym] = connectivity_cbf->initConnCBF(robot_states, 0);
+    Eigen::VectorXd Ac = connectivity_cbf->getConnConstraints(state, robot_states, eigenvec);
+    double Bc = connectivity_cbf->getConnBound(state, robot_states, eigenvec, h);
 }
