@@ -42,7 +42,7 @@ namespace cbf {
          * @param cbf_u Output parameter for the optimized control input
          * @param desired_u Desired control input without CBF constraints
          * @param current_states Current states of all robots in the network
-         * @param ego_robot_idx Index of the ego robot for which we are computing control input
+         * @param self_idx Index of the ego robot for which we are computing control input
          * @param u_min Minimum allowable control inputs
          * @param u_max Maximum allowable control inputs
          * @return true if optimization was successful
@@ -51,7 +51,7 @@ namespace cbf {
         bool optimize(VectorDIM &cbf_u,
                       const VectorDIM &desired_u,
                       std::vector<State> current_states,
-                      size_t ego_robot_idx,
+                      size_t self_idx,
                       const VectorDIM &u_min,
                       const VectorDIM &u_max);
 

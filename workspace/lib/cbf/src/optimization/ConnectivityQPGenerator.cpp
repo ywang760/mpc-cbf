@@ -15,19 +15,19 @@ namespace cbf
     template <typename T, unsigned int DIM>
     void ConnectivityQPGenerator<T, DIM>::addConnConstraint(const Vector &state,
                                                             const Eigen::MatrixXd &robot_states,
+                                                            size_t self_idx,
                                                             bool use_slack,
                                                             std::size_t slack_idx)
     {
         double epsilon = 0.1;
+        const int N = robot_states.rows(); // Number of robots
         const auto robot_positions = robot_states.leftCols(2); // Extract only the position columns (x, y)
         auto [lambda2_val, eigenvec] = cbf_->getLambda2(robot_positions);
         double h = lambda2_val - epsilon; // barrier function: h = λ₂ - λ₂_min
-        cbf_->initConnCBF(robot_positions.rows(), 0); // second argument is self_idx
-        Eigen::VectorXd Ac = cbf_->getConnConstraints(state, robot_states, eigenvec);
-        T Bc = cbf_->getConnBound(state, robot_states, eigenvec, h);
+        cbf_->initConnCBF(N, self_idx);
 
-        Vector coefficients = -1.0 * Ac;
-        T bound = Bc;
+        Vector coefficients = -1.0 * cbf_->getConnConstraints(state, robot_states, eigenvec);
+        T bound = cbf_->getConnBound(state, robot_states, eigenvec, h);
 
         // Create a linear constraint with lower bound negative infinity
         LinearConstraint linear_constraint(coefficients, std::numeric_limits<T>::lowest(), bound);

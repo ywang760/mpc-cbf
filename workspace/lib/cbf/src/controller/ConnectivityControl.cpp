@@ -15,12 +15,14 @@ namespace cbf {
     bool ConnectivityControl<T, DIM>::optimize(VectorDIM &cbf_u,
                                                const VectorDIM &desired_u,
                                                std::vector<State> current_states,
-                                               size_t ego_robot_idx,
+                                               size_t self_idx,
                                                const VectorDIM &u_min,
                                                const VectorDIM &u_max)
     {
 
-        State current_state = current_states.at(ego_robot_idx);
+        State current_state = current_states.at(self_idx);
+        Vector state(2 * DIM);
+        state << current_state.pos_, current_state.vel_;
 
         // if slack_mode, compute the slack weights
         int num_neighbors = current_states.size() - 1; // Exclude the ego robot itself
@@ -41,14 +43,13 @@ namespace cbf {
         }
         
         // add constraints
-        Vector state(2*DIM);
-        state << current_state.pos_, current_state.vel_;
 
+        // Add safety constraints
         // for (size_t i = 0; i < num_neighbors; ++i)
         // {
         //     Vector neighbor_state(6);
-        //     neighbor_state << current_states.at(i + (i >= ego_robot_idx ? 1 : 0)).pos_,
-        //                       current_states.at(i + (i >= ego_robot_idx ? 1 : 0)).vel_;
+        //     neighbor_state << current_states.at(i + (i >= self_idx ? 1 : 0)).pos_,
+        //                       current_states.at(i + (i >= self_idx ? 1 : 0)).vel_;
 
         //     if (!slack_mode_) {
         //         qp_generator_.addSafetyConstraint(state, neighbor_state);
@@ -57,33 +58,20 @@ namespace cbf {
         //     }
         // }
 
-        // Add velocity constraints
+        // Add velocity and acceleration constraints
         qp_generator_.addMinVelConstraints(state);
         qp_generator_.addMaxVelConstraints(state);
         // qp_generator_.addControlBoundConstraint(u_min, u_max);
 
-        // Assemble robot_states matrix: [ego_robot; other_robots_in_order]
-        // TODO: this is kind of awkward: pass in current_states and ego_robot_idx
-        // to addConnConstraint and initConnCBF is a better solution
-        const int N = current_states.size();
-        Eigen::MatrixXd robot_states(N, 6);
-        robot_states.setZero();
-        robot_states.row(0) << current_state.pos_.transpose(), current_state.vel_.transpose();
-        size_t row_idx = 1;
-        for (size_t i = 0; i < current_states.size(); ++i)
-        {
-            if (i != ego_robot_idx)
-            {
-                robot_states.row(row_idx) << current_states[i].pos_.transpose(), current_states[i].vel_.transpose();
-                row_idx++;
-            }
-        }
-
         // Add connectivity constraint
+        Eigen::MatrixXd robot_states(current_states.size(), 6);
+        for (size_t i = 0; i < current_states.size(); ++i) {
+            robot_states.row(i) << current_states[i].pos_, current_states[i].vel_;
+        }
         if (slack_mode_) {
-            qp_generator_.addConnConstraint(state, robot_states, true, num_neighbors);
+            qp_generator_.addConnConstraint(state, robot_states, self_idx, true, num_neighbors);
         } else {
-            qp_generator_.addConnConstraint(state, robot_states);
+            qp_generator_.addConnConstraint(state, robot_states, self_idx);
         }
 
         // solve QP

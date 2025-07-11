@@ -41,7 +41,7 @@ namespace cbf {
          * @param use_slack Whether to use slack variables for this constraint
          * @param slack_idx Index of slack variable to use (if use_slack is true)
          */
-        void addConnConstraint(const Vector &state, const Eigen::MatrixXd &robot_states,
+        void addConnConstraint(const Vector &state, const Eigen::MatrixXd &robot_states, size_t self_idx,
                                bool use_slack = false, std::size_t slack_idx = 0);
 
         /**
