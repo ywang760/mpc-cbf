@@ -7,8 +7,8 @@
 namespace cbf
 {
     template <typename T, unsigned int DIM>
-    ConnectivityQPGenerator<T, DIM>::ConnectivityQPGenerator(std::shared_ptr<ConnectivityCBF> cbf, int num_neighbors, bool slack_mode)
-        : CBFQPGeneratorBase<T, DIM>(num_neighbors, slack_mode), cbf_(cbf)
+    ConnectivityQPGenerator<T, DIM>::ConnectivityQPGenerator(std::shared_ptr<ConnectivityCBF> cbf, int num_robots, bool slack_mode)
+        : CBFQPGeneratorBase<T, DIM>(num_robots, slack_mode), cbf_(cbf)
     {
     }
 
@@ -16,8 +16,7 @@ namespace cbf
     void ConnectivityQPGenerator<T, DIM>::addConnConstraint(const Vector &state,
                                                             const Eigen::MatrixXd &robot_states,
                                                             size_t self_idx,
-                                                            bool use_slack,
-                                                            std::size_t slack_idx)
+                                                            bool use_slack)
     {
         double epsilon = 0.1;
         const int N = robot_states.rows(); // Number of robots
@@ -37,6 +36,7 @@ namespace cbf
         {
             // Create a row vector for slack variable coefficients (all zeros except at slack_idx)
             Row slack_coefficients = Row::Zero(this->slack_variables_.size());
+            int slack_idx = this->slack_variables_.size() - 1; // Use the last slack variable
             slack_coefficients(slack_idx) = -1;  // Negative coefficient allows constraint relaxation
             
             // Add the constraint with slack variable to the QP problem

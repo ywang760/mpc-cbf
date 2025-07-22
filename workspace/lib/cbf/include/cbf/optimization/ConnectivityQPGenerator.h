@@ -28,10 +28,10 @@ namespace cbf {
          * @brief Constructor that takes a pointer to the ConnectivityCBF instance
          *
          * @param cbf Shared pointer to the Connectivity CBF implementation
-         * @param num_neighbors Number of neighboring agents (used for slack variables)
+         * @param num_robots Number of robots (used for slack variables)
          * @param slack_mode If true, add slack variables to allow constraint relaxation
          */
-        explicit ConnectivityQPGenerator(std::shared_ptr<ConnectivityCBF> cbf, int num_neighbors = 0, bool slack_mode = false);
+        explicit ConnectivityQPGenerator(std::shared_ptr<ConnectivityCBF> cbf, int num_robots = 0, bool slack_mode = false);
 
         /**
          * @brief Adds connectivity constraint between agents to maintain network connectivity
@@ -39,10 +39,9 @@ namespace cbf {
          * @param state Current state of the robot
          * @param robot_states Matrix of states for all robots in the network
          * @param use_slack Whether to use slack variables for this constraint
-         * @param slack_idx Index of slack variable to use (if use_slack is true)
          */
         void addConnConstraint(const Vector &state, const Eigen::MatrixXd &robot_states, size_t self_idx,
-                               bool use_slack = false, std::size_t slack_idx = 0);
+                               bool use_slack = false);
 
         /**
          * @brief Adds safety constraint between agents to prevent collisions

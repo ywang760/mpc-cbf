@@ -28,12 +28,12 @@ namespace cbf {
          * @brief Constructor for ConnectivityControl
          * 
          * @param cbf Shared pointer to ConnectivityCBF implementation
-         * @param number_neighbors Number of neighboring agents to consider
+         * @param num_robots Number of robots
          * @param slack_mode Whether to use slack variables in constraints
          * @param slack_cost Cost coefficient for slack variables
          * @param slack_decay_rate Decay rate for slack variables
          */
-        ConnectivityControl(std::shared_ptr<ConnectivityCBF> cbf, int number_neighbors=0, bool slack_mode=false, T slack_cost=1000, T slack_decay_rate=0.2);
+        ConnectivityControl(std::shared_ptr<ConnectivityCBF> cbf, int num_robots=0, bool slack_mode=false, T slack_cost=1000, T slack_decay_rate=0.2);
         ~ConnectivityControl()=default;
 
         /**
@@ -66,6 +66,7 @@ namespace cbf {
         bool slack_mode_;
         T slack_cost_;
         T slack_decay_rate_;
+        int num_robots_;
     };
 
 } // cbf

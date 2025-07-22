@@ -6,8 +6,8 @@
 
 namespace cbf {
     template <typename T, unsigned int DIM>
-    FovControl<T, DIM>::FovControl(std::shared_ptr<FovCBF> cbf, int number_neighbors, bool slack_mode, T slack_cost, T slack_decay_rate)
-        : qp_generator_(cbf, number_neighbors, slack_mode), slack_mode_(slack_mode), slack_cost_(slack_cost), slack_decay_rate_(slack_decay_rate)
+    FovControl<T, DIM>::FovControl(std::shared_ptr<FovCBF> cbf, int num_robots, bool slack_mode, T slack_cost, T slack_decay_rate)
+        : qp_generator_(cbf, num_robots, slack_mode), slack_mode_(slack_mode), slack_cost_(slack_cost), slack_decay_rate_(slack_decay_rate)
     {
     }
 

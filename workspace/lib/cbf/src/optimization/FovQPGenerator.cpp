@@ -6,8 +6,8 @@
 
 namespace cbf {
     template <typename T, unsigned int DIM>
-    FovQPGenerator<T, DIM>::FovQPGenerator(std::shared_ptr<FovCBF> cbf, int num_neighbors, bool slack_mode) 
-        : CBFQPGeneratorBase<T, DIM>(num_neighbors, slack_mode), cbf_(cbf) {
+    FovQPGenerator<T, DIM>::FovQPGenerator(std::shared_ptr<FovCBF> cbf, int num_robots, bool slack_mode) 
+        : CBFQPGeneratorBase<T, DIM>(num_robots, slack_mode), cbf_(cbf) {
     }
 
     template <typename T, unsigned int DIM>
