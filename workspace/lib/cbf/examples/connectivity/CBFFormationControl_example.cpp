@@ -30,7 +30,7 @@ int main(int argc, char *argv[])
     // Initialize logging with environment variable support
     auto logger = common::initializeLogging();
 
-    const std::string DF_CFG = "/usr/src/mpc-cbf/workspace/experiments/config/baseline/2r/line.json";
+    const std::string DF_CFG = "/usr/src/mpc-cbf/workspace/experiments/config/baseline/3r/line3.json";
     const std::string DF_OUT = "/usr/src/mpc-cbf/workspace/experiments/results/states.json";
 
     // Parse command-line arguments
@@ -136,6 +136,15 @@ int main(int argc, char *argv[])
 
     // Main simulation loop
     int loop_idx = 0;
+    int qp_total_count = 0;
+    int qp_failure_count = 0;
+    std::vector<int> failure_robot_idx;
+    std::vector<int> failure_timestep;
+    std::vector<Eigen::VectorXd> failure_Ac;
+    std::vector<Eigen::Vector3d> failure_positions;
+    std::vector<double> failure_Bc;
+    std::vector<double> failure_h;
+
     while (loop_idx < option_parse["max_steps"].as<int>())
     {
         // Print out current loop_idx if loop_idx is a multiple of 10
@@ -144,6 +153,18 @@ int main(int argc, char *argv[])
             logger->info("Timestep: {}", loop_idx);
         }
         // Process each robot in the simulation
+        Eigen::MatrixXd robot_states(num_robots, 6);
+        for (int i = 0; i < num_robots; ++i) {
+            robot_states.block<1, 3>(i, 0) = current_states[i].pos_.transpose();
+            robot_states.block<1, 3>(i, 3) = current_states[i].vel_.transpose();
+        }
+        // if (loop_idx == 0) {
+        //     for (int i = 0; i < num_robots; ++i) {
+        //         const auto& s = current_states[i];
+        //         logger->info("Initial state for robot {}: pos = [{}, {}, {}], vel = [{}, {}, {}]",
+        //                     i, s.pos_(0), s.pos_(1), s.pos_(2), s.vel_(0), s.vel_(1), s.vel_(2));
+        //     }
+        // }
         for (int robot_idx = 0; robot_idx < num_robots; ++robot_idx)
         {
             // Compute desired control using spring control toward target
@@ -165,14 +186,69 @@ int main(int argc, char *argv[])
             // Apply CBF to modify control for safety and connectivity
             ConnectivityControl connectivity_control(connectivity_cbf, num_neighbors, slack_mode, slack_cost, slack_decay_rate);
             VectorDIM cbf_u;
+            
             bool success = connectivity_control.optimize(cbf_u, desired_u, current_states, robot_idx, a_min, a_max);
+            qp_total_count++;
+            const auto& state = current_states.at(robot_idx);
+            Eigen::VectorXd x_self(6);
+            x_self << state.pos_, state.vel_;
+            // auto cbf_ptr = connectivity_control.getCBF();
+            // auto [Ac, Bc] = cbf_ptr->initConnCBF(robot_states, x_self, robot_idx);
+            // Ac = -1.0 * Ac;
             if (!success)
             {
+                qp_failure_count++;
                 logger->warn("Optimization failed for robot {} at timestep {}", robot_idx, loop_idx);
                 cbf_u = VectorDIM::Zero(); // Fallback to zero control if optimization fails
+                // logger->warn("Optimization failed for robot {} at timestep {}", robot_idx, loop_idx);
+                // logger->warn("  Position: {} {} {}", state.pos_(0), state.pos_(1), state.pos_(2));
+                // logger->warn("  Ac = {}", Ac.transpose());
+                // logger->warn("  Bc = {}", Bc);
+                // failure_robot_idx.push_back(robot_idx);
+                // failure_timestep.push_back(loop_idx);
+                // failure_Ac.push_back(Ac);  // 这里 Eigen::VectorXd 直接支持 push_back
+                // failure_Bc.push_back(Bc);
+                // failure_positions.push_back(state.pos_);
+
+                // const double sigma_val = d_max * d_max * d_max * d_max / std::log(2.0);
+                // auto [lambda2_val, _] = cbf::getLambda2FromL(robot_states.leftCols(2), d_max, sigma_val);
+                // double h_val = lambda2_val - connectivity_cbf->getEpsilon();
+                // failure_h.push_back(h_val);
                 // @quyichun recommended way is to simply use logger->warn to log failures
                 // and if you need to save the log, you can use the ./<executable> > log.txt syntax to log them
-            }
+
+                // 输出 CLF 信息
+                    // for (int i = 0; i < current_states.size(); ++i)
+                    // {
+                    //     if (i == robot_idx) continue; // 自己不需要与自己比
+
+                    //     const auto& neighbor_state = current_states.at(i);
+
+                    //     Eigen::VectorXd state_vec(6);
+                    //     state_vec << state.pos_, state.vel_;
+
+                    //     Eigen::VectorXd neighbor_vec(6);
+                    //     neighbor_vec << neighbor_state.pos_, neighbor_state.vel_;
+
+                    //     auto Ac_clf = connectivity_control.getCBF()->getCLFConstraints(state_vec, neighbor_vec);
+                    //     auto Bc_clf = connectivity_control.getCBF()->getCLFBound(state_vec, neighbor_vec);
+
+                    //     logger->warn("  [CLF] Failure diagnostics wrt neighbor {}:", i);
+                    //     logger->warn("    Self pos = {} {} {}", state.pos_(0), state.pos_(1), state.pos_(2));
+                    //     logger->warn("    Neighbor pos = {} {} {}", neighbor_state.pos_(0), neighbor_state.pos_(1), neighbor_state.pos_(2));
+                    //     logger->warn("    Ac_clf = {}", Ac_clf.transpose());
+                    //     logger->warn("    Bc_clf = {}", Bc_clf);
+                    // }
+            }//
+                // if (robot_idx == 0) {
+                //     h_this_timestep = h_val;
+                // }
+                // std::cout << "[CBF CHECK] robot " << robot_idx << ", timestep " << loop_idx << std::endl;
+                //std::cout << "  desired_u = " << desired_u.transpose() << std::endl;
+                //std::cout << "  actual_u  = " << cbf_u.transpose() << std::endl;
+                // std::cout << "  Ac * desired_u = " << Ac.dot(desired_u) << ", Bc = " << Bc << std::endl;
+                // std::cout << "  Ac * actual_u  = " << Ac.dot(cbf_u)    << ", Bc = " << Bc << std::endl;
+           //}
 
             // Apply control to robot model to get next state and add noise
             State next_state = pred_model_ptr->applyInput(current_states.at(robot_idx), cbf_u);
@@ -188,7 +264,16 @@ int main(int argc, char *argv[])
 
         loop_idx += 1;
     }
-    
+    // int num_records = std::min(10, static_cast<int>(failure_robot_idx.size()));
+    // for (int i = 0; i < num_records; ++i) {
+    //     logger->info("Failure {}: robot {} at timestep {}", i+1, failure_robot_idx[i], failure_timestep[i]);
+    //     logger->info("  Ac = {}", failure_Ac[i].transpose());
+    //     logger->info("  Bc = {}", failure_Bc[i]);
+    //     const auto& pos = failure_positions[i];
+    //     logger->info("  Position: [{}, {}, {}]", pos(0), pos(1), pos(2));
+    //     logger->info("  h = {}", failure_h[i]);
+    // }
+    logger->info("QP Summary: {} total, {} failures", qp_total_count, qp_failure_count);
     // Save simulation results to JSON file
     logger->info("Writing states to JSON file: {}", JSON_FILENAME);
     std::ofstream o(JSON_FILENAME, std::ofstream::trunc);

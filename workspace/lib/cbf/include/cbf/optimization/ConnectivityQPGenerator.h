@@ -76,7 +76,7 @@ namespace cbf {
         const std::shared_ptr<ConnectivityCBF>& getCBF() const {
             return cbf_;
         }
-
+        void addCLFConstraint(const Vector &state, const Vector &neighbor_state, bool use_slack, std::size_t slack_idx);
 
     private:
         std::shared_ptr<ConnectivityCBF> cbf_; ///< Pointer to the Connectivity CBF implementation
