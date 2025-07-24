@@ -1,12 +1,7 @@
-//
-// Created by lishuo on 9/21/24.
-//
-
 #include <mpc_cbf/optimization/PiecewiseBezierMPCCBFQPGenerator.h>
 #include <model/DoubleIntegratorXYYaw.h>
 #include <mpc_cbf/controller/BezierIMPCCBF.h>
 #include <math/collision_shapes/AlignedBoxCollisionShape.h>
-#include <particle_filter/detail/particle_filter.h>
 #include <nlohmann/json.hpp>
 #include <cxxopts.hpp>
 #include <fstream>
@@ -92,25 +87,6 @@ double convertYawInRange(double yaw) {
     }
 }
 
-bool insideFOV(Eigen::VectorXd robot, Eigen::VectorXd target, double fov, double range)
-{
-    double yaw = robot(2);
-
-    Eigen::Matrix3d R;
-    R << cos(yaw), sin(yaw), 0.0,
-            -sin(yaw), cos(yaw), 0.0,
-            0.0, 0.0, 1.0;
-    Eigen::VectorXd t_local = R.block<2,2>(0,0) * (target.head(2) - robot.head(2));
-    double dist = t_local.norm();
-    double angle = abs(atan2(t_local(1), t_local(0)));
-    if (angle <= 0.5*fov && dist <= range)
-    {
-        return true;
-    } else
-    {
-        return false;
-    }
-}
 
 math::VectorDIM<double, 3U> convertToClosestYaw(model::State<double, 3U>& state, const math::VectorDIM<double, 3U>& goal) {
     using VectorDIM = math::VectorDIM<double, 3U>;
@@ -170,7 +146,6 @@ math::Vector<double> addRandomNoise(const math::Vector<double>& xt, double pos_s
 
 int main(int argc, char* argv[]) {
     constexpr unsigned int DIM = 3U;
-    using FovCBF = cbf::FovCBF;
     using DoubleIntegratorXYYaw = model::DoubleIntegratorXYYaw<double>;
     using BezierIMPCCBF = mpc_cbf::BezierIMPCCBF<double, DIM>;
     using State = model::State<double, DIM>;
@@ -180,11 +155,9 @@ int main(int argc, char* argv[]) {
     using Matrix = math::Matrix<double>;
     using AlignedBox = math::AlignedBox<double, DIM>;
     using AlignedBoxCollisionShape = math::AlignedBoxCollisionShape<double, DIM>;
-    using ParticleFilter = pf::ParticleFilter;
 
     using PiecewiseBezierParams = mpc::PiecewiseBezierParams<double, DIM>;
     using MPCParams = mpc::MPCParams<double>;
-    using FoVCBFParams = cbf::FoVCBFParams<double>;
     using BezierMPCCBFParams = mpc_cbf::PiecewiseBezierMPCCBFQPOperations<double, DIM>::Params;
     using IMPCParams = mpc_cbf::BezierIMPCCBF<double, DIM>::IMPCParams;
     using IMPCCBFParams = mpc_cbf::BezierIMPCCBF<double, DIM>::Params;
@@ -201,8 +174,6 @@ int main(int argc, char* argv[]) {
              cxxopts::value<std::string>()->default_value("circle"))
             ("num_robots", "number of robots in the simulation",
              cxxopts::value<int>()->default_value(std::to_string(2)))
-            ("fov", "fov degree",
-             cxxopts::value<int>()->default_value(std::to_string(120)))
             ("slack_decay", "slack variable cost decay rate",
              cxxopts::value<double>()->default_value(std::to_string(0.1)))
             ("write_filename", "write to json filename",
@@ -215,7 +186,6 @@ int main(int argc, char* argv[]) {
     std::string instance_type = option_parse["instance_type"].as<std::string>();
     std::string instance_path = instance_type+"_instances/";
     const int num_robots_parse = option_parse["num_robots"].as<int>();
-    const int fov_beta_parse = option_parse["fov"].as<int>();
     std::string experiment_config_filename = "../../../experiments/instances/"+instance_path+instance_type+std::to_string(num_robots_parse)+"_config.json";
     std::fstream experiment_config_fc(experiment_config_filename.c_str(), std::ios_base::in);
     json experiment_config_json = json::parse(experiment_config_fc);
@@ -236,11 +206,6 @@ int main(int argc, char* argv[]) {
     Vector p_max = Vector::Zero(2);
     p_max << experiment_config_json["mpc_params"]["physical_limits"]["p_max"][0],
             experiment_config_json["mpc_params"]["physical_limits"]["p_max"][1];
-    // fov cbf params
-    double fov_beta = double(fov_beta_parse) * M_PI / 180.0;
-    std::cout << "fov_beta: " << double(fov_beta_parse) << "\n";
-    double fov_Ds = experiment_config_json["robot_params"]["collision_shape"]["aligned_box"][0];
-    double fov_Rs = experiment_config_json["fov_cbf_params"]["Rs"];
 
     // robot physical params
     VectorDIM v_min;
@@ -262,7 +227,7 @@ int main(int argc, char* argv[]) {
 
     VectorDIM aligned_box_collision_vec;
     aligned_box_collision_vec <<
-                              experiment_config_json["robot_params"]["collision_shape"]["aligned_box"][0],
+            experiment_config_json["robot_params"]["collision_shape"]["aligned_box"][0],
             experiment_config_json["robot_params"]["collision_shape"]["aligned_box"][1],
             experiment_config_json["robot_params"]["collision_shape"]["aligned_box"][2];
     AlignedBox robot_bbox_at_zero = {-aligned_box_collision_vec, aligned_box_collision_vec};
@@ -275,7 +240,6 @@ int main(int argc, char* argv[]) {
     // create params
     PiecewiseBezierParams piecewise_bezier_params = {num_pieces, num_control_points, piece_max_parameter};
     MPCParams mpc_params = {h, Ts, k_hor, {w_pos_err, w_u_eff, spd_f}, {p_min, p_max, v_min, v_max, a_min, a_max}};
-    FoVCBFParams fov_cbf_params = {fov_beta, fov_Ds, fov_Rs};
 
     // filter params
     int num_particles = 100;
@@ -293,13 +257,11 @@ int main(int argc, char* argv[]) {
     std::shared_ptr<DoubleIntegratorXYYaw> exe_model_ptr = std::make_shared<DoubleIntegratorXYYaw>(Ts);
     StatePropagator exe_A0 = exe_model_ptr->get_A0(int(h/Ts));
     StatePropagator exe_Lambda = exe_model_ptr->get_lambda(int(h/Ts));
-    // init cbf
-    std::shared_ptr<FovCBF> fov_cbf = std::make_unique<FovCBF>(fov_beta, fov_Ds, fov_Rs, v_min, v_max);
     // init bezier mpc-cbf
     uint64_t bezier_continuity_upto_degree = 3;
     int num_neighbors = experiment_config_json["tasks"]["so"].size() - 1;
     std::cout << "neighbor size: " << num_neighbors << "\n";
-    BezierMPCCBFParams bezier_mpc_cbf_params = {piecewise_bezier_params, mpc_params, fov_cbf_params};
+    BezierMPCCBFParams bezier_mpc_cbf_params = {piecewise_bezier_params, mpc_params};
     int cbf_horizon = 2;
     int impc_iter = 2;
     double slack_cost = 1000;
@@ -308,7 +270,7 @@ int main(int argc, char* argv[]) {
     bool slack_mode = true;
     IMPCParams impc_params = {cbf_horizon, impc_iter, slack_cost, slack_decay_rate, slack_mode};
     IMPCCBFParams impc_cbf_params = {bezier_mpc_cbf_params, impc_params};
-    BezierIMPCCBF bezier_impc_cbf(impc_cbf_params, pred_model_ptr, fov_cbf, bezier_continuity_upto_degree, aligned_box_collision_shape_ptr, num_neighbors);
+    BezierIMPCCBF bezier_impc_cbf(impc_cbf_params, pred_model_ptr, bezier_continuity_upto_degree, aligned_box_collision_shape_ptr, num_neighbors);
 
     // main loop
     // load the tasks
@@ -333,32 +295,6 @@ int main(int argc, char* argv[]) {
         target_pos << sf_json[i][0], sf_json[i][1], sf_json[i][2];
         target_positions.push_back(target_pos);
     }
-    // init filters
-    std::vector<std::vector<ParticleFilter>> filters;
-    std::vector<std::vector<size_t>> neighbor_ids(num_robots, std::vector<size_t>(num_robots-1));
-    for (size_t i = 0; i < num_robots; ++i) {
-        size_t neighbor_idx = 0;
-        for (size_t j = 0; j < num_robots; ++j) {
-            if (i == j) {
-                continue;
-            }
-            neighbor_ids[i][neighbor_idx] = j;
-            neighbor_idx += 1;
-        }
-    }
-
-    for (size_t i = 0; i < num_robots; ++i){
-        filters.emplace_back(num_robots-1);
-        for (size_t j = 0; j < num_robots-1; ++j) {
-            size_t neighbor_id = neighbor_ids.at(i).at(j);
-            // init particle filter
-            Vector neighbor_xy(DIM-1);
-            neighbor_xy << init_states.at(neighbor_id).pos_(0), init_states.at(neighbor_id).pos_(1);
-            filters[i][j].init(num_particles, neighbor_xy, initCov, processCov, measCov);
-        }
-        assert(filters[i].size() == num_robots-1);
-    }
-    assert(filters.size() == num_robots);
 
     // planning results
     std::vector<std::shared_ptr<SingleParameterPiecewiseCurve>> pred_traj_ptrs(num_robots);
@@ -376,37 +312,15 @@ int main(int argc, char* argv[]) {
             std::vector<VectorDIM> other_robot_positions;
             std::vector<Matrix> other_robot_covs;
             for (int j = 0; j < num_robots-1; ++j) {
-                size_t neighbor_id = neighbor_ids.at(robot_idx).at(j);
+                size_t neighbor_id = neighbor_id.at(robot_idx).at(j);
                 const VectorDIM& ego_pos = init_states.at(robot_idx).pos_;
                 const VectorDIM& neighbor_pos = init_states.at(neighbor_id).pos_;
-                ParticleFilter &filter = filters.at(robot_idx).at(j);
-                // update filter estimate
-                filter.predict();
-                Vector weights = filter.getWeights();
-                Matrix samples = filter.getParticles();
-                for (int s = 0; s < num_particles; ++s) {
-                    if (insideFOV(ego_pos, samples.col(s), fov_beta, fov_Rs)) {
-                        weights[s] /= 10.0;
-                    }
-                }
-                filter.setWeights(weights);
-
-                // emulate vision
-                if (insideFOV(ego_pos, neighbor_pos, fov_beta, fov_Rs)) {
-                    Vector neighbor_xy(DIM-1);
-                    neighbor_xy << neighbor_pos(0), neighbor_pos(1);
-                    filter.update(neighbor_xy);
-                }
-
-                filter.resample();
-                filter.estimateState();
 
                 // update variables
-                Vector estimate = filter.getState();
                 VectorDIM extended_estimate;
                 extended_estimate << estimate(0), estimate(1), 0;
-                Matrix cov(DIM-1, DIM-1);
-                cov = filter.getDistribution();
+                Matrix cov = Matrix::Zero(DIM, DIM);        //wtx (covariance matrix)
+                cov(0,0) = 0.1;  cov(1,1) = 0.1;            //wtx (position uncertainty)
                 other_robot_positions.push_back(extended_estimate);
                 Matrix extended_cov(DIM, DIM);
                 extended_cov << cov(0), cov(1), 0,
@@ -436,7 +350,7 @@ int main(int argc, char* argv[]) {
 //                                                                                                                     other_robot_cov(3), other_robot_cov(4), other_robot_cov(5),
 //                                                                                                                     other_robot_cov(6), other_robot_cov(7), other_robot_cov(8)});
             }
-//            BezierIMPCCBF bezier_impc_cbf(bezier_impc_cbf_params, pred_model_ptr, fov_cbf, bezier_continuity_upto_degree, aligned_box_collision_shape_ptr, impc_iter);
+//            BezierIMPCCBF bezier_impc_cbf(bezier_impc_cbf_params, pred_model_ptr, bezier_continuity_upto_degree, aligned_box_collision_shape_ptr, impc_iter);
             bezier_impc_cbf.resetProblem();
             Vector ref_positions(DIM*k_hor);
             // static target reference
