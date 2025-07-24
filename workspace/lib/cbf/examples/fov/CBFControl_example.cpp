@@ -58,7 +58,7 @@ int main(int argc, char* argv[]) {
     const int fov_beta_parse = option_parse["fov"].as<int>();
 
     // Configuration file path
-    std::string experiment_config_filename = "/usr/src/mpc-cbf/workspace/experiments/config/circle/circle4_config.json";
+    std::string experiment_config_filename = "/usr/src/mpc-cbf/workspace/experiments/config/circle/circle2_config.json";
     std::fstream experiment_config_fc(experiment_config_filename.c_str(), std::ios_base::in);
     json experiment_config_json = json::parse(experiment_config_fc);
 
@@ -189,7 +189,6 @@ int main(int argc, char* argv[]) {
                 const VectorDIM& ego_pos = init_states.at(robot_idx).pos_;
                 const VectorDIM &neighbor_pos = init_states.at(neighbor_id).pos_;
 
-                // TODO: use pf to update estimate or use fixed estimate (for debugging)
                 // ParticleFilter &filter = filters.at(robot_idx).at(j);
                 // auto [estimate, cov] = pf::PFApplications::processFovUpdate<double, DIM>(
                 //     filter, ego_pos, neighbor_pos, fov_beta, fov_Rs);

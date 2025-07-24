@@ -6,80 +6,100 @@
 #include <math/Helpers.h>
 #include <functional>
 #include <ginac/ginac.h>
+#include <vector>
+#include <common/logging.hpp>
 
 namespace cbf
 {
-    template <typename T>
-    struct ConnectivityCBFParams {
-        T beta_;     // Convergence rate parameter
-        T dmin_;     // Minimum connectivity distance
-        T dmax_;     // Maximum connectivity distance
-    };
 
     class ConnectivityCBF
     {
-        private:
-            // Constant params
-            double dmin;         // Minimum connectivity distance
-            double dmax;         // Maximum connectivity distance
-            Eigen::VectorXd vmin;         // min velocity
-            Eigen::VectorXd vmax;         // max velocity
-            int STATE_VARS;
-            int CONTROL_VARS;
-            double gamma;
+        // Friend declarations for helper functions
+        friend GiNaC::ex matrixSubs(GiNaC::matrix a, Eigen::VectorXd state, Eigen::VectorXd neighbor_state, const ConnectivityCBF &cbf);
+        friend GiNaC::ex valueSubs(GiNaC::ex a, Eigen::VectorXd state, Eigen::VectorXd neighbor_state, const ConnectivityCBF &cbf);
+        friend GiNaC::matrix matrixSubsMatrix(
+            const GiNaC::matrix &expr_matrix,
+            const Eigen::MatrixXd &robot_positions,
+            const Eigen::VectorXd &eigenvec,
+            const Eigen::Vector2d &self_position,
+            const ConnectivityCBF &cbf);
 
-            GiNaC::symbol px, py, th, vx, vy, w, xt, yt;
+    private:
+        // Parameters
+        double dmin, dmax;
+        Eigen::VectorXd vmin, vmax;
+        int STATE_VARS;
+        int CONTROL_VARS;
+        double gamma;
+        double epsilon;
+        // Symbols
+        GiNaC::symbol px, py, th, vx, vy, w;                        // State for ego agent
+        GiNaC::symbol px_n, py_n, vx_n, vy_n;                       // State for neighbor agent (omit th and w for simplicty)
+        std::vector<GiNaC::symbol> px_list, py_list, eigenvec_list; // TODO: px_n and px_list contains duplicate information: room for optimization
+        // System dynamics
+        GiNaC::matrix A, B, f, g;
+        // States for the ego and neighbor agent
+        GiNaC::matrix state, p_n, v_n;
+        // Symbolic constraints and bounds
+        GiNaC::matrix Ac_safe, Ac_connectivity;
+        GiNaC::matrix Ac_v1_max, Ac_v2_max, Ac_v3_max;
+        GiNaC::matrix Ac_v1_min, Ac_v2_min, Ac_v3_min;
+        GiNaC::ex Bc_safe, Bc_connectivity;
+        GiNaC::ex Bc_v1_max, Bc_v2_max, Bc_v3_max;
+        GiNaC::ex Bc_v1_min, Bc_v2_min, Bc_v3_min;
+        // Alpha function
+        std::function<GiNaC::ex(GiNaC::ex, double)> alpha;
+        // Internal initialization
+        std::pair<GiNaC::matrix, GiNaC::ex> initSafetyCBF();
+        std::pair<GiNaC::matrix, GiNaC::ex> initVelCBF(GiNaC::ex bv);
+        void initSymbolLists(int N);
+        // Helpers for connectivity CBF
+        GiNaC::matrix compute_dh_dx(int N, const GiNaC::ex &Rs, const GiNaC::ex &sigma);
+        GiNaC::matrix compute_d2h_dx2(const GiNaC::matrix &dh_dx_sym, int self_idx);
+        Eigen::VectorXd compute_dLf_h_dx(
+            const GiNaC::matrix &dh_dx_sym,
+            int self_idx,
+            const Eigen::MatrixXd &robot_positions,
+            const Eigen::VectorXd &eigenvec,
+            const Eigen::VectorXd &x_self);
+        // @quyichun check if the following functions are needed
+        // Eigen::MatrixXd ginacToEigen(const GiNaC::matrix& m);
+        // Eigen::Matrix2d compute_d2h_dx2_fd(
+        //     const GiNaC::matrix& dh_dx_sym,
+        //     const Eigen::MatrixXd& robot_positions,
+        //     const Eigen::VectorXd& eigenvec,
+        //     const Eigen::Vector2d& x_self,
+        //     int self_idx,
+        //     double Rs_val,
+        //     double sigma_val);
 
-            GiNaC::matrix state;
-            GiNaC::matrix agent_state;
-            GiNaC::matrix A;        // state matrix
-            GiNaC::matrix B;        // input matrix
-            GiNaC::matrix x;        // state variables
-            GiNaC::matrix x_agent;  // agent variables
-            GiNaC::matrix f;        // f(x)
-            GiNaC::matrix g;        // g(x)
-            std::vector<GiNaC::matrix> Ac_tot;              // Linear constraints
-            std::vector<GiNaC::ex> Bc_tot;                  // upper bounds
-            GiNaC::matrix Ac_safe;                          // Safety constraint
-            GiNaC::matrix Ac_connectivity;                  // Connectivity constraint
-            GiNaC::matrix Ac_v1_max;                        // Max velocity constraints
-            GiNaC::matrix Ac_v2_max;
-            GiNaC::matrix Ac_v3_max;
-            GiNaC::matrix Ac_v1_min;                        // Min velocity constraints
-            GiNaC::matrix Ac_v2_min;
-            GiNaC::matrix Ac_v3_min;
-
-            GiNaC::ex Bc_safe;                              // Safety bound
-            GiNaC::ex Bc_connectivity;                      // Connectivity bound
-            GiNaC::ex Bc_v1_max;                            // Max velocity bounds
-            GiNaC::ex Bc_v2_max;
-            GiNaC::ex Bc_v3_max;
-            GiNaC::ex Bc_v1_min;                            // Min velocity bounds
-            GiNaC::ex Bc_v2_min;
-            GiNaC::ex Bc_v3_min;
-
-            std::function<GiNaC::ex(GiNaC::ex, double)> alpha;
-
-            std::pair<GiNaC::matrix, GiNaC::ex> initSafetyCBF();
-            std::pair<GiNaC::matrix, GiNaC::ex> initConnectivityCBF();
-            std::pair<GiNaC::matrix, GiNaC::ex> initVelCBF(GiNaC::ex bv);
-            // TODO: these two are public helper functions -> could move to a helper class
-            GiNaC::ex matrixSubs(GiNaC::matrix a, Eigen::VectorXd state, Eigen::VectorXd agent_state);
-            GiNaC::ex valueSubs(GiNaC::ex m, Eigen::VectorXd state, Eigen::VectorXd agent_state);
-
-        public:
-            ConnectivityCBF(double min_dist, double max_dist, Eigen::VectorXd vmin, Eigen::VectorXd vmax);
-            ~ConnectivityCBF();
-            Eigen::VectorXd getSafetyConstraints(Eigen::VectorXd state, Eigen::VectorXd agent_state);
-            Eigen::VectorXd getConnectivityConstraints(Eigen::VectorXd state, Eigen::VectorXd agent_state);
-            Eigen::MatrixXd getMaxVelContraints(Eigen::VectorXd state);
-            Eigen::MatrixXd getMinVelContraints(Eigen::VectorXd state);
-            double getSafetyBound(Eigen::VectorXd state, Eigen::VectorXd agent_state);
-            double getMaxDistBound(Eigen::VectorXd state, Eigen::VectorXd agent_state);
-            Eigen::VectorXd getMaxVelBounds(Eigen::VectorXd state);
-            Eigen::VectorXd getMinVelBounds(Eigen::VectorXd state);
-            void setAlpha(std::function<GiNaC::ex(GiNaC::ex, double)> newAlpha);
+    public:
+        using Vector3d = math::VectorDIM<double, 3>;
+        ConnectivityCBF(double min_dist, double max_dist, Eigen::VectorXd vmin, Eigen::VectorXd vmax);
+        ~ConnectivityCBF();
+        // Basic constraints
+        Eigen::VectorXd getSafetyConstraints(Eigen::VectorXd state, Eigen::VectorXd neighbor_state);
+        double getSafetyBound(Eigen::VectorXd state, Eigen::VectorXd neighbor_state);
+        double getMaxDistBound(Eigen::VectorXd state, Eigen::VectorXd neighbor_state);
+        // Velocity constraints
+        Eigen::MatrixXd getMaxVelContraints(Eigen::VectorXd state);
+        Eigen::MatrixXd getMinVelContraints(Eigen::VectorXd state);
+        Eigen::VectorXd getMaxVelBounds(Eigen::VectorXd state);
+        Eigen::VectorXd getMinVelBounds(Eigen::VectorXd state);
+        std::pair<Eigen::VectorXd, double> initConnCBF(const Eigen::MatrixXd &robot_states,
+                                                       const Eigen::VectorXd &x_self,
+                                                       int self_idx);
+        // Connectivity constraint //TODO: deprecated
+        // Eigen::VectorXd getConnConstraints(const Eigen::VectorXd &x_self,
+        //                                               const std::vector<Eigen::VectorXd> &other_positions);
+        // double getConnBound(const Eigen::VectorXd &x_self,
+        //                             const std::vector<Eigen::VectorXd> &other_positions);
+        // Alpha setter
+        void setAlpha(std::function<GiNaC::ex(GiNaC::ex, double)> newAlpha);
     };
-}
-
+    // Free function
+    std::pair<double, Eigen::VectorXd> getLambda2FromL(const Eigen::MatrixXd &robot_positions,
+                                                       double Rs_value,
+                                                       double sigma_value);
+} // namespace cbf
 #endif // CONNECTIVITY_CBF_H
