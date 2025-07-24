@@ -17,6 +17,10 @@ def generate_points_on_circle(num_points, radius, angle_bias):
     x_coords = radius * np.cos(thetas)
     y_coords = radius * np.sin(thetas)
 
+    # make sure the points are rounded to 3 decimal places
+    x_coords = np.round(x_coords, 3)
+    y_coords = np.round(y_coords, 3)
+
     return x_coords, y_coords
 
 def compute_yaw(x, y, circle_center):
