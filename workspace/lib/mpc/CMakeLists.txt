@@ -25,6 +25,22 @@ if(NOT is_separating_hyperplanes_ADDED)
     add_subdirectory(../separating_hyperplanes ${CMAKE_CURRENT_BINARY_DIR}/separating_hyperplanes)
 endif()
 
+get_property(is_common_ADDED GLOBAL PROPERTY common_ADDED)
+if(NOT is_common_ADDED)
+    add_subdirectory(../common ${CMAKE_CURRENT_BINARY_DIR}/common)
+endif()
+
+# Add third-party dependencies
+if(NOT TARGET cxxopts)
+    add_subdirectory(../../../third_party/cxxopts
+            ${CMAKE_CURRENT_BINARY_DIR}/cxxopts)
+endif()
+
+if (NOT TARGET spdlog)
+    add_subdirectory(../../../third_party/spdlog
+        ${CMAKE_CURRENT_BINARY_DIR}/spdlog)
+endif()
+
 # add libraries
 add_library(mpc_optimization_PiecewiseBeizerMPCQPOperations SHARED src/optimization/PiecewiseBezierMPCQPOperations.cpp)
 target_include_directories(mpc_optimization_PiecewiseBeizerMPCQPOperations PUBLIC include)
@@ -53,5 +69,8 @@ target_include_directories(mpc_examples_BezierMPCXYYaw_example PUBLIC include ..
 target_link_libraries(mpc_examples_BezierMPCXYYaw_example PUBLIC
         mpc_controller_BezierMPC
         model_DoubleIntegratorXYYaw
-        math_collision_shapes_AlignedBoxCollisionShape)
+        math_collision_shapes_AlignedBoxCollisionShape
+        common_Logging
+        cxxopts
+        spdlog::spdlog_header_only)
 
