@@ -177,16 +177,16 @@ int main(int argc, char* argv[]) {
             ("slack_decay", "slack variable cost decay rate",
              cxxopts::value<double>()->default_value(std::to_string(0.1)))
             ("write_filename", "write to json filename",
-             cxxopts::value<std::string>()->default_value("../../../experiments/instances/results/circle2States.json"));
+             cxxopts::value<std::string>()->default_value("../../../tools/MPCCBFStates.json"));
     auto option_parse = options.parse(argc, argv);
 
     // load experiment config
     std::cout << "loading experiment settings...\n";
-//    std::string experiment_config_filename = "../../../config/config.json";
-    std::string instance_type = option_parse["instance_type"].as<std::string>();
-    std::string instance_path = instance_type+"_instances/";
-    const int num_robots_parse = option_parse["num_robots"].as<int>();
-    std::string experiment_config_filename = "../../../experiments/instances/"+instance_path+instance_type+std::to_string(num_robots_parse)+"_config.json";
+    std::string experiment_config_filename = "../../../config/config.json";
+    // std::string instance_type = option_parse["instance_type"].as<std::string>();
+    // std::string instance_path = instance_type+"_instances/";
+    // const int num_robots_parse = option_parse["num_robots"].as<int>();
+    // std::string experiment_config_filename = "../../../experiments/instances/"+instance_path+instance_type+std::to_string(num_robots_parse)+"_config.json";
     std::fstream experiment_config_fc(experiment_config_filename.c_str(), std::ios_base::in);
     json experiment_config_json = json::parse(experiment_config_fc);
     // piecewise bezier params

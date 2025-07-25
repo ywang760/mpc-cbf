@@ -52,27 +52,31 @@ target_link_libraries(mpc_cbf_controller_BezierIMPCCBF PUBLIC
         separating_hyperplanes_Voronoi)
 
 # add examples
-add_executable(mpc_cbf_examples_BezierIMPCCBFPFXYYaw_example examples/BezierIMPCCBFPFXYYaw_example.cpp)
-target_include_directories(mpc_cbf_examples_BezierIMPCCBFPFXYYaw_example PUBLIC include ../../../third_party/json/single_include)
-target_link_libraries(mpc_cbf_examples_BezierIMPCCBFPFXYYaw_example PUBLIC
-        mpc_cbf_controller_BezierIMPCCBF
-        model_DoubleIntegratorXYYaw
-        math_collision_shapes_AlignedBoxCollisionShape
-        cxxopts
-        ParticleFilter)
+# Example using MPC CBF
+add_executable(mpc_cbf_examples_BezierMPCCBFXYYaw_example examples/fov/BezierMPCCBFXYYaw_example.cpp)
+target_include_directories(mpc_cbf_examples_BezierMPCCBFXYYaw_example PUBLIC include ../../../third_party/json/single_include)
+target_link_libraries(mpc_cbf_examples_BezierMPCCBFXYYaw_example PUBLIC
+       mpc_cbf_controller_BezierMPCCBF
+       model_DoubleIntegratorXYYaw
+       math_collision_shapes_AlignedBoxCollisionShape
+       cxxopts
+       spdlog::spdlog_header_only)
 
-# TODO: remove the deprecated examples
-#add_executable(mpc_cbf_examples_BezierMPCCBFXYYaw_example examples/BezierMPCCBFXYYaw_example.cpp)
-#target_include_directories(mpc_cbf_examples_BezierMPCCBFXYYaw_example PUBLIC include ../../../third_party/json/single_include)
-#target_link_libraries(mpc_cbf_examples_BezierMPCCBFXYYaw_example PUBLIC
-#        mpc_cbf_controller_BezierMPCCBF
-#        model_DoubleIntegratorXYYaw
-#        math_collision_shapes_AlignedBoxCollisionShape)
-
-#add_executable(mpc_cbf_examples_BezierIMPCCBFXYYaw_example examples/BezierIMPCCBFXYYaw_example.cpp)
-#target_include_directories(mpc_cbf_examples_BezierIMPCCBFXYYaw_example PUBLIC include ../../../third_party/json/single_include)
-#target_link_libraries(mpc_cbf_examples_BezierIMPCCBFXYYaw_example PUBLIC
+# # Example using Iterative MPC CBF
+# add_executable(mpc_cbf_examples_BezierIMPCCBFXYYaw_example examples/BezierIMPCCBFXYYaw_example.cpp)
+# target_include_directories(mpc_cbf_examples_BezierIMPCCBFXYYaw_example PUBLIC include ../../../third_party/json/single_include)
+# target_link_libraries(mpc_cbf_examples_BezierIMPCCBFXYYaw_example PUBLIC
 #        mpc_cbf_controller_BezierIMPCCBF
 #        model_DoubleIntegratorXYYaw
 #        math_collision_shapes_AlignedBoxCollisionShape
 #        cxxopts)
+
+# # Example using Iterative MPC CBF with Particle Filter
+# add_executable(mpc_cbf_examples_BezierIMPCCBFPFXYYaw_example examples/BezierIMPCCBFPFXYYaw_example.cpp)
+# target_include_directories(mpc_cbf_examples_BezierIMPCCBFPFXYYaw_example PUBLIC include ../../../third_party/json/single_include)
+# target_link_libraries(mpc_cbf_examples_BezierIMPCCBFPFXYYaw_example PUBLIC
+#         mpc_cbf_controller_BezierIMPCCBF
+#         model_DoubleIntegratorXYYaw
+#         math_collision_shapes_AlignedBoxCollisionShape
+#         cxxopts
+#         ParticleFilter)

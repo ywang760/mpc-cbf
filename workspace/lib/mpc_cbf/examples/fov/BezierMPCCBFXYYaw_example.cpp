@@ -6,10 +6,13 @@
 #include <model/DoubleIntegratorXYYaw.h>
 #include <mpc_cbf/controller/BezierMPCCBF.h>
 #include <math/collision_shapes/AlignedBoxCollisionShape.h>
+#include <cbf/detail/FovCBF.h>
 #include <nlohmann/json.hpp>
+#include <cxxopts.hpp>
 #include <fstream>
+#include <spdlog/spdlog.h>
 
-int main() {
+int main(int argc, char* argv[]) {
     constexpr unsigned int DIM = 3U;
     using FovCBF = cbf::FovCBF;
     using DoubleIntegratorXYYaw = model::DoubleIntegratorXYYaw<double>;
@@ -30,8 +33,29 @@ int main() {
 
     using json = nlohmann::json;
 
-    // load experiment config
-    std::string experiment_config_filename = "../../../config/config.json";
+    // Initialize logging
+    auto logger = spdlog::default_logger();
+
+    const std::string DF_CFG = "/usr/src/mpc-cbf/workspace/config/config_new.json";
+    const std::string DF_OUT = "/usr/src/mpc-cbf/workspace/tools/CBFXYYawStates.json";
+
+    // Parse command-line arguments
+    cxxopts::Options options(
+        "simulation",
+        "Bezier MPC-CBF XYYaw simulation");
+
+    options.add_options()("config_file", "Path to experiment configuration file",
+                          cxxopts::value<std::string>()->default_value(DF_CFG))
+                         ("write_filename", "Write output JSON to this file",
+                          cxxopts::value<std::string>()->default_value(DF_OUT))
+                         ("max_steps", "Maximum number of simulation steps",
+                          cxxopts::value<int>()->default_value("200"));
+
+    auto option_parse = options.parse(argc, argv);
+    
+    // Load experiment configuration
+    logger->info("Starting Bezier MPC-CBF XYYaw Example...");
+    std::string experiment_config_filename = option_parse["config_file"].as<std::string>();
     std::fstream experiment_config_fc(experiment_config_filename.c_str(), std::ios_base::in);
     json experiment_config_json = json::parse(experiment_config_fc);
     // piecewise bezier params
@@ -45,34 +69,33 @@ int main() {
     double w_pos_err = experiment_config_json["mpc_params"]["mpc_tuning"]["w_pos_err"];
     double w_u_eff = experiment_config_json["mpc_params"]["mpc_tuning"]["w_u_eff"];
     int spd_f = experiment_config_json["mpc_params"]["mpc_tuning"]["spd_f"];
-    Vector p_min = Vector::Zero(2);
-    p_min << experiment_config_json["mpc_params"]["physical_limits"]["p_min"][0],
-            experiment_config_json["mpc_params"]["physical_limits"]["p_min"][1];
-    Vector p_max = Vector::Zero(2);
-    p_max << experiment_config_json["mpc_params"]["physical_limits"]["p_max"][0],
-            experiment_config_json["mpc_params"]["physical_limits"]["p_max"][1];
     // fov cbf params
     double fov_beta = double(experiment_config_json["fov_cbf_params"]["beta"]) * M_PI / 180.0;
     double fov_Ds = experiment_config_json["robot_params"]["collision_shape"]["aligned_box"][0];
     double fov_Rs = experiment_config_json["fov_cbf_params"]["Rs"];
-
-    // robot physical params
+    
+    Vector p_min = Vector::Zero(2);
+    p_min << experiment_config_json["physical_limits"]["p_min"][0],
+            experiment_config_json["physical_limits"]["p_min"][1];
+    Vector p_max = Vector::Zero(2);
+    p_max << experiment_config_json["physical_limits"]["p_max"][0],
+            experiment_config_json["physical_limits"]["p_max"][1];
     VectorDIM v_min;
-    v_min << experiment_config_json["mpc_params"]["physical_limits"]["v_min"][0],
-            experiment_config_json["mpc_params"]["physical_limits"]["v_min"][1],
-            experiment_config_json["mpc_params"]["physical_limits"]["v_min"][2];
+    v_min << experiment_config_json["physical_limits"]["v_min"][0],
+            experiment_config_json["physical_limits"]["v_min"][1],
+            experiment_config_json["physical_limits"]["v_min"][2];
     VectorDIM v_max;
-    v_max << experiment_config_json["mpc_params"]["physical_limits"]["v_max"][0],
-            experiment_config_json["mpc_params"]["physical_limits"]["v_max"][1],
-            experiment_config_json["mpc_params"]["physical_limits"]["v_max"][2];
+    v_max << experiment_config_json["physical_limits"]["v_max"][0],
+            experiment_config_json["physical_limits"]["v_max"][1],
+            experiment_config_json["physical_limits"]["v_max"][2];
     VectorDIM a_min;
-    a_min << experiment_config_json["mpc_params"]["physical_limits"]["a_min"][0],
-            experiment_config_json["mpc_params"]["physical_limits"]["a_min"][1],
-            experiment_config_json["mpc_params"]["physical_limits"]["a_min"][2];
+    a_min << experiment_config_json["physical_limits"]["a_min"][0],
+            experiment_config_json["physical_limits"]["a_min"][1],
+            experiment_config_json["physical_limits"]["a_min"][2];
     VectorDIM a_max;
-    a_max << experiment_config_json["mpc_params"]["physical_limits"]["a_max"][0],
-            experiment_config_json["mpc_params"]["physical_limits"]["a_max"][1],
-            experiment_config_json["mpc_params"]["physical_limits"]["a_max"][2];
+    a_max << experiment_config_json["physical_limits"]["a_max"][0],
+            experiment_config_json["physical_limits"]["a_max"][1],
+            experiment_config_json["physical_limits"]["a_max"][2];
 
     VectorDIM aligned_box_collision_vec;
     aligned_box_collision_vec <<
@@ -88,7 +111,7 @@ int main() {
     FoVCBFParams fov_cbf_params = {fov_beta, fov_Ds, fov_Rs};
 
     // json for record
-    std::string JSON_FILENAME = "../../../tools/CBFXYYawStates.json";
+    std::string JSON_FILENAME = option_parse["write_filename"].as<std::string>();
     json states;
     states["dt"] = h;
     states["Ts"] = Ts;
@@ -98,27 +121,23 @@ int main() {
     StatePropagator exe_A0 = exe_model_ptr->get_A0(int(h/Ts));
     StatePropagator exe_Lambda = exe_model_ptr->get_lambda(int(h/Ts));
     // init cbf
-    std::shared_ptr<FovCBF> fov_cbf = std::make_unique<FovCBF>(fov_beta, fov_Ds, fov_Rs);
+    std::shared_ptr<FovCBF> fov_cbf = std::make_unique<FovCBF>(fov_beta, fov_Ds, fov_Rs, v_min, v_max);
     // init bezier mpc-cbf
     uint64_t bezier_continuity_upto_degree = 4;
     BezierMPCCBFParams bezier_mpc_cbf_params = {piecewise_bezier_params, mpc_params, fov_cbf_params};
 
     // main loop
-    // load the tasks
-    std::vector<State> init_states;
-    std::vector<Vector> current_states;
+    // load the tasks - simplified state management
+    std::vector<State> current_states;
     std::vector<VectorDIM> target_positions;
     size_t num_robots = experiment_config_json["tasks"]["so"].size();
     json so_json = experiment_config_json["tasks"]["so"];
     json sf_json = experiment_config_json["tasks"]["sf"];
     for (size_t i = 0; i < num_robots; ++i) {
-        // load init states
-        State init_state;
-        init_state.pos_ << so_json[i][0], so_json[i][1], so_json[i][2];
-        init_state.vel_ << VectorDIM::Zero();
-        init_states.push_back(init_state);
-        Vector current_state(6);
-        current_state << init_state.pos_, init_state.vel_;
+        // load initial positions and set current state to initial state
+        State current_state;
+        current_state.pos_ << so_json[i][0], so_json[i][1], so_json[i][2];
+        current_state.vel_ << VectorDIM::Zero();
         current_states.push_back(current_state);
         // load target positions
         VectorDIM target_pos;
@@ -127,17 +146,19 @@ int main() {
     }
 
     SingleParameterPiecewiseCurve traj;
-    double sim_runtime = 20;
-    double sim_t = 0;
     int loop_idx = 0;
-    while (sim_t < sim_runtime) {
+    while (loop_idx < option_parse["max_steps"].as<int>()) {
+        // Print out current loop_idx if loop_idx is a multiple of 10
+        if (loop_idx % 10 == 0) {
+            logger->info("Timestep: {}", loop_idx);
+        }
         for (int robot_idx = 0; robot_idx < num_robots; ++robot_idx) {
             std::vector<VectorDIM> other_robot_positions;
             for (int j = 0; j < num_robots; ++j) {
                 if (j==robot_idx) {
                     continue;
                 }
-                other_robot_positions.push_back(init_states.at(j).pos_);
+                other_robot_positions.push_back(current_states.at(j).pos_);
             }
             BezierMPCCBF bezier_mpc_cbf(bezier_mpc_cbf_params, pred_model_ptr, fov_cbf, bezier_continuity_upto_degree, aligned_box_collision_shape_ptr);
 
@@ -145,11 +166,11 @@ int main() {
             // static target reference
             ref_positions = target_positions.at(robot_idx).replicate(k_hor, 1);
 
-//            std::cout << "ref_positions shape: (" << ref_positions.rows() << ", " << ref_positions.cols() << ")\n";
-//            std::cout << "ref_positions: " << ref_positions.transpose() << "\n";
-            bool success = bezier_mpc_cbf.optimize(traj, init_states.at(robot_idx), other_robot_positions, ref_positions);
+            bool success = bezier_mpc_cbf.optimize(traj, current_states.at(robot_idx), other_robot_positions, ref_positions);
+            if (!success) {
+                logger->warn("Optimization failed for robot {} at timestep {}", robot_idx, loop_idx);
+            }
             Vector U = bezier_mpc_cbf.generatorDerivativeControlInputs(2);
-//            std::cout << "curve eval: " << traj.eval(1.5, 0) << "\n";
 
             // log down the optimized curve prediction
             double t = 0;
@@ -158,13 +179,17 @@ int main() {
                 states["robots"][std::to_string(robot_idx)]["pred_curve"][loop_idx].push_back({pred_pos(0), pred_pos(1), pred_pos(2)});
                 t += 0.05;
             }
-            //
 
-
-            Matrix x_pos_pred = exe_A0.pos_ * current_states.at(robot_idx) + exe_Lambda.pos_ * U;
-            Matrix x_vel_pred = exe_A0.vel_ * current_states.at(robot_idx) + exe_Lambda.vel_ * U;
+            // Multi-rate discrete control: execute control at higher frequency Ts within MPC timestep h
+            // Convert State to Vector format for matrix operations
+            Vector current_state_vec(6);
+            current_state_vec << current_states.at(robot_idx).pos_, current_states.at(robot_idx).vel_;
+            
+            Matrix x_pos_pred = exe_A0.pos_ * current_state_vec + exe_Lambda.pos_ * U;
+            Matrix x_vel_pred = exe_A0.vel_ * current_state_vec + exe_Lambda.vel_ * U;
             assert(int(h/Ts)*DIM == x_pos_pred.rows());
             int ts_idx = 0;
+            Vector final_state_vec(6);
             for (size_t i = 0; i < int(h / Ts); ++i) {
                 Vector x_t_pos = x_pos_pred.middleRows(ts_idx, 3);
                 Vector x_t_vel = x_vel_pred.middleRows(ts_idx, 3);
@@ -172,21 +197,21 @@ int main() {
                 x_t << x_t_pos, x_t_vel;
                 states["robots"][std::to_string(robot_idx)]["states"].push_back({x_t[0], x_t[1], x_t[2], x_t[3], x_t[4], x_t[5]});
                 ts_idx += 3;
-                current_states.at(robot_idx) = x_t;
+                final_state_vec = x_t;
             }
-            init_states.at(robot_idx).pos_(0) = current_states.at(robot_idx)(0);
-            init_states.at(robot_idx).pos_(1) = current_states.at(robot_idx)(1);
-            init_states.at(robot_idx).pos_(2) = current_states.at(robot_idx)(2);
-            init_states.at(robot_idx).vel_(0) = current_states.at(robot_idx)(3);
-            init_states.at(robot_idx).vel_(1) = current_states.at(robot_idx)(4);
-            init_states.at(robot_idx).vel_(2) = current_states.at(robot_idx)(5);
+            // Update current state from the discrete control execution
+            current_states.at(robot_idx).pos_(0) = final_state_vec(0);
+            current_states.at(robot_idx).pos_(1) = final_state_vec(1);
+            current_states.at(robot_idx).pos_(2) = final_state_vec(2);
+            current_states.at(robot_idx).vel_(0) = final_state_vec(3);
+            current_states.at(robot_idx).vel_(1) = final_state_vec(4);
+            current_states.at(robot_idx).vel_(2) = final_state_vec(5);
         }
-        sim_t += h;
         loop_idx += 1;
     }
 
-    // write states to json
-    std::cout << "writing to file " << JSON_FILENAME << ".\n";
+    // Save simulation results to JSON file
+    logger->info("Writing states to JSON file: {}", JSON_FILENAME);
     std::ofstream o(JSON_FILENAME, std::ofstream::trunc);
     o << std::setw(4) << states << std::endl;
     return 0;
