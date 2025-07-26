@@ -60,12 +60,12 @@ namespace cbf {
         }
 
 
-
     private:
         QPGenerator qp_generator_;
         bool slack_mode_;
         T slack_cost_;
         T slack_decay_rate_;
+        std::shared_ptr<ConnectivityCBF> cbf_;
     };
 
 } // cbf
