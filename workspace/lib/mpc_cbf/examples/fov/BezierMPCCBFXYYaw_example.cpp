@@ -37,7 +37,7 @@ int main(int argc, char* argv[]) {
     auto logger = spdlog::default_logger();
 
     const std::string DF_CFG = "/usr/src/mpc-cbf/workspace/config/config_new.json";
-    const std::string DF_OUT = "/usr/src/mpc-cbf/workspace/tools/CBFXYYawStates.json";
+    const std::string DF_OUT = "/usr/src/mpc-cbf/workspace/experiments/results/BezierMPCCBFXYYawStates.json";
 
     // Parse command-line arguments
     cxxopts::Options options(

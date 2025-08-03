@@ -5,6 +5,11 @@ set_property(GLOBAL PROPERTY mpc_cbf_ADDED "ON")
 set(CMAKE_CXX_STANDARD 17)
 
 # add local library
+get_property(is_common_ADDED GLOBAL PROPERTY common_ADDED)
+if(NOT is_common_ADDED)
+    add_subdirectory(../common ${CMAKE_CURRENT_BINARY_DIR}/common)
+endif()
+
 get_property(is_mpc_ADDED GLOBAL PROPERTY mpc_ADDED)
 if(NOT is_mpc_ADDED)
     add_subdirectory(../mpc ${CMAKE_CURRENT_BINARY_DIR}/mpc)
@@ -60,8 +65,10 @@ target_link_libraries(mpc_cbf_examples_BezierMPCCBFXYYaw_example PUBLIC
        model_DoubleIntegratorXYYaw
        math_collision_shapes_AlignedBoxCollisionShape
        cxxopts
+       common_Logging
        spdlog::spdlog_header_only)
 
+#        TODO: fix the following examples
 # # Example using Iterative MPC CBF
 # add_executable(mpc_cbf_examples_BezierIMPCCBFXYYaw_example examples/BezierIMPCCBFXYYaw_example.cpp)
 # target_include_directories(mpc_cbf_examples_BezierIMPCCBFXYYaw_example PUBLIC include ../../../third_party/json/single_include)
@@ -71,12 +78,28 @@ target_link_libraries(mpc_cbf_examples_BezierMPCCBFXYYaw_example PUBLIC
 #        math_collision_shapes_AlignedBoxCollisionShape
 #        cxxopts)
 
-# # Example using Iterative MPC CBF with Particle Filter
-# add_executable(mpc_cbf_examples_BezierIMPCCBFPFXYYaw_example examples/BezierIMPCCBFPFXYYaw_example.cpp)
-# target_include_directories(mpc_cbf_examples_BezierIMPCCBFPFXYYaw_example PUBLIC include ../../../third_party/json/single_include)
-# target_link_libraries(mpc_cbf_examples_BezierIMPCCBFPFXYYaw_example PUBLIC
-#         mpc_cbf_controller_BezierIMPCCBF
-#         model_DoubleIntegratorXYYaw
-#         math_collision_shapes_AlignedBoxCollisionShape
-#         cxxopts
-#         ParticleFilter)
+# Example using Iterative MPC CBF with Particle Filter
+add_executable(mpc_cbf_examples_BezierIMPCCBFPFXYYaw_example examples/fov/BezierIMPCCBFPFXYYaw_example.cpp)
+target_include_directories(mpc_cbf_examples_BezierIMPCCBFPFXYYaw_example PUBLIC include ../../../third_party/json/single_include)
+target_link_libraries(mpc_cbf_examples_BezierIMPCCBFPFXYYaw_example PUBLIC
+        mpc_cbf_controller_BezierIMPCCBF
+        model_DoubleIntegratorXYYaw
+        math_collision_shapes_AlignedBoxCollisionShape
+        math_Geometry
+        math_Random
+        cxxopts
+        common_Logging
+        spdlog::spdlog_header_only)
+
+# Connectivity Examples
+add_executable(mpc_cbf_examples_MPCCBFFormationControl_example examples/connectivity/MPCCBFFormationControl_example.cpp)
+target_include_directories(mpc_cbf_examples_MPCCBFFormationControl_example PUBLIC include ../../../third_party/json/single_include)
+target_link_libraries(mpc_cbf_examples_MPCCBFFormationControl_example PUBLIC
+        mpc_cbf_controller_BezierIMPCCBF
+        model_DoubleIntegratorXYYaw
+        math_collision_shapes_AlignedBoxCollisionShape
+        math_Geometry
+        math_Random
+        cxxopts
+        common_Logging
+        spdlog::spdlog_header_only)
