@@ -38,14 +38,15 @@ class ConnectivityMPCCBFQPOperations : public MPCCBFQPOperationsBase<T, DIM> {
     // Connectivity-specific constraint methods
     LinearConstraint safetyCBFConstraint(const Vector& current_state, const Vector& neighbor_state,
                                          T slack_value = 0);
-    LinearConstraint connectivityConstraint(const Vector& current_state,
-                                            const Vector& neighbor_state, T slack_value = 0);
+    LinearConstraint connectivityConstraint(const Eigen::MatrixXd& robot_states, size_t self_idx,
+                                            T slack_value = 0);
 
     // Predicted constraints
     std::vector<LinearConstraint> predSafetyCBFConstraints(const std::vector<State>& pred_states,
                                                            const Vector& neighbor_state);
     std::vector<LinearConstraint> predConnectivityConstraints(const std::vector<State>& pred_states,
-                                                              const Vector& neighbor_state);
+                                                              const Eigen::MatrixXd& robot_states,
+                                                              size_t self_idx);
 
     // Accessors
     std::unique_ptr<PiecewiseBezierMPCQPOperations> piecewise_mpc_operations_ptr();

@@ -31,7 +31,7 @@ class ConnectivityMPCCBFQPGenerator : public MPCCBFQPGeneratorBase<T, DIM> {
     // Connectivity-specific constraint methods
     void addSafetyCBFConstraint(const Vector& current_state, const Vector& neighbor_state,
                                 T slack_value = 0);
-    void addConnectivityConstraint(const Vector& current_state, const Vector& neighbor_state,
+    void addConnectivityConstraint(const Eigen::MatrixXd& robot_states, size_t self_idx,
                                    T slack_value = 0);
 
     // Connectivity-specific predicted constraint methods
@@ -39,24 +39,23 @@ class ConnectivityMPCCBFQPGenerator : public MPCCBFQPGeneratorBase<T, DIM> {
                                      const Vector& neighbor_state,
                                      const std::vector<T>& slack_values);
     void addPredConnectivityConstraints(const std::vector<State>& pred_states,
-                                        const Vector& neighbor_state,
+                                        const Eigen::MatrixXd& robot_states, size_t self_idx,
                                         const std::vector<T>& slack_values);
 
     // Connectivity-specific constraint methods with slack variables
     void addSafetyCBFConstraintWithSlackVariables(const Vector& current_state,
                                                   const Vector& neighbor_state,
                                                   std::size_t neighbor_idx);
-    void addConnectivityConstraintWithSlackVariables(const Vector& current_state,
-                                                     const Vector& neighbor_state,
-                                                     std::size_t neighbor_idx);
+    void addConnectivityConstraintWithSlackVariables(const Eigen::MatrixXd& robot_states,
+                                                     size_t self_idx, std::size_t slack_idx);
 
     // Connectivity-specific predicted constraint methods with slack variables
     void addPredSafetyCBFConstraintsWithSlackVariables(const std::vector<State>& pred_states,
                                                        const Vector& neighbor_state,
                                                        std::size_t neighbor_idx);
     void addPredConnectivityConstraintsWithSlackVariables(const std::vector<State>& pred_states,
-                                                          const Vector& neighbor_state,
-                                                          std::size_t neighbor_idx);
+                                                          const Eigen::MatrixXd& robot_states,
+                                                          size_t self_idx, std::size_t slack_idx);
 
   private:
     std::unique_ptr<ConnectivityMPCCBFQPOperations> piecewise_mpc_cbf_operations_ptr_;

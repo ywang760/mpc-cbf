@@ -35,8 +35,7 @@ ConnectivityIMPCCBF<T, DIM>::ConnectivityIMPCCBF(
     const T h = p.mpc_cbf_params.mpc_params.h_;
     const T Ts = p.mpc_cbf_params.mpc_params.Ts_;
     assert(Ts <= h);
-    assert(std::abs(h - static_cast<int>(h / Ts) * Ts) <
-           1e-10); // Use epsilon for floating point comparison
+    assert(std::abs(h - static_cast<int>(h / Ts) * Ts) < 1e-10);
 
     // control sequence U control point coefficient
     const int u_interp = static_cast<int>(h / Ts);
@@ -59,17 +58,16 @@ bool ConnectivityIMPCCBF<T, DIM>::optimize(
     const VectorDIM& current_pos = current_state.pos_;
     const VectorDIM& current_vel = current_state.vel_;
 
-    // Extract other robot states (both position and velocity) from
-    // current_states (excluding self)
-    std::vector<VectorDIM> other_robot_positions;
-    std::vector<Vector> other_robot_states; // Full state vectors for CBF
+    // Create robot_states matrix with all robot states (including self)
+    Eigen::MatrixXd robot_states(current_states.size(), 2 * DIM);
+    std::vector<Vector> other_robot_states; // Full state vectors for CBF (excluding self)
     for (size_t i = 0; i < current_states.size(); ++i) {
+        Vector robot_state(2 * DIM);
+        robot_state << current_states[i].pos_, current_states[i].vel_;
+        robot_states.row(i) = robot_state.transpose();
+
         if (i != self_idx) {
-            other_robot_positions.push_back(current_states[i].pos_);
-            // Create full state vector (position + velocity)
-            Vector neighbor_state_vec(2 * DIM);
-            neighbor_state_vec << current_states[i].pos_, current_states[i].vel_;
-            other_robot_states.push_back(neighbor_state_vec);
+            other_robot_states.push_back(robot_state);
         }
     }
 
@@ -86,11 +84,11 @@ bool ConnectivityIMPCCBF<T, DIM>::optimize(
         // Pre-compute distances to avoid repeated calculations
         std::vector<T> distances(num_neighbors);
         for (size_t i = 0; i < num_neighbors; ++i) {
-            // Use spatial dimensions only (ignore orientation)
+            // Use spatial dimensions only (ignore orientation) from other_robot_states
             constexpr size_t spatial_dims = 2; // FIXME: adapt to 3D
+            VectorDIM other_robot_pos = other_robot_states[i].head(DIM);
             distances[i] =
-                (other_robot_positions[i].head(spatial_dims) - current_pos.head(spatial_dims))
-                    .norm();
+                (other_robot_pos.head(spatial_dims) - current_pos.head(spatial_dims)).norm();
         }
 
         // Sort by pre-computed distances (closer robots get priority)
@@ -140,7 +138,8 @@ bool ConnectivityIMPCCBF<T, DIM>::optimize(
         // add the collision avoidance constraints
         AlignedBox robot_bbox_at_zero = collision_shape_ptr_->boundingBox(VectorDIM::Zero());
         for (size_t i = 0; i < num_neighbors; ++i) {
-            const VectorDIM& other_robot_pos = other_robot_positions[i];
+            // Extract position from other_robot_states
+            const VectorDIM other_robot_pos = other_robot_states[i].head(DIM);
 
             // TODO: this is model specific, here the last dimension is
             // orientation data
@@ -162,21 +161,24 @@ bool ConnectivityIMPCCBF<T, DIM>::optimize(
 
         // connectivity cbf constraints
         if (iter == 0) {
+            // TODO: currently all slack_value are set as 0
+            // Set to different values for priority scheduling
+            T slack_value = 0;
             for (size_t i = 0; i < num_neighbors; ++i) {
-                T slack_value = 0; // TODO: pass in param
                 if (!slack_mode_) {
                     qp_generator_.addSafetyCBFConstraint(state, other_robot_states[i], slack_value);
-                    // FIXME: Implement connectivity-specific constraint methods
-                    // qp_generator_.addConnectivityConstraint(state,
-                    // other_robot_states[i], slack_value);
                 } else {
                     qp_generator_.addSafetyCBFConstraintWithSlackVariables(
                         state, other_robot_states[i], i);
-                    // FIXME: Implement connectivity-specific constraint methods
-                    // with slack
-                    // qp_generator_.addConnectivityConstraintWithSlackVariables(state,
-                    // other_robot_states[i], i);
                 }
+            }
+
+            // Add connectivity constraint once per iteration
+            if (!slack_mode_) {
+                qp_generator_.addConnectivityConstraint(robot_states, self_idx, slack_value);
+            } else {
+                qp_generator_.addConnectivityConstraintWithSlackVariables(robot_states, self_idx,
+                                                                          0);
             }
         } else if (iter > 0 && success) {
             // pred the robot's position in the horizon, use for the CBF
@@ -191,24 +193,27 @@ bool ConnectivityIMPCCBF<T, DIM>::optimize(
             }
 
             // Create slack values once per neighbor (not growing with horizon)
-            const std::vector<T> slack_values(cbf_horizon_,
-                                              0); // TODO: pass in param
+            // TODO: currently all slack_values are set as 0
+            // Set to different values for priority scheduling
+            const std::vector<T> slack_values(cbf_horizon_, 0);
 
             for (size_t i = 0; i < num_neighbors; ++i) {
                 if (!slack_mode_) {
                     qp_generator_.addPredSafetyCBFConstraints(pred_states, other_robot_states[i],
                                                               slack_values);
-                    // FIXME: Implement predicted connectivity constraint methods
-                    // qp_generator_.addPredConnectivityConstraints(pred_states,
-                    // other_robot_states[i], slack_values);
                 } else {
                     qp_generator_.addPredSafetyCBFConstraintsWithSlackVariables(
                         pred_states, other_robot_states[i], i);
-                    // FIXME: Implement predicted connectivity constraint methods
-                    // with slack
-                    // qp_generator_.addPredConnectivityConstraintsWithSlackVariables(pred_states,
-                    // other_robot_states[i], i);
                 }
+            }
+
+            // Add predicted connectivity constraints once per iteration
+            if (!slack_mode_) {
+                qp_generator_.addPredConnectivityConstraints(pred_states, robot_states, self_idx,
+                                                             slack_values);
+            } else {
+                qp_generator_.addPredConnectivityConstraintsWithSlackVariables(
+                    pred_states, robot_states, self_idx, 0);
             }
         }
 

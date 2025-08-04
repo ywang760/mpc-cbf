@@ -43,25 +43,27 @@ ConnectivityMPCCBFQPOperations<T, DIM>::safetyCBFConstraint(const Vector& curren
 
 template <typename T, unsigned int DIM>
 typename ConnectivityMPCCBFQPOperations<T, DIM>::LinearConstraint
-ConnectivityMPCCBFQPOperations<T, DIM>::connectivityConstraint(const Vector& current_state,
-                                                               const Vector& neighbor_state,
-                                                               T slack_value) {
-    // FIXME: this is not working
-    // For connectivity constraint, implement a simple distance-based upper
-    // bound Since getConnConstraints requires robot_states and eigenvec not
-    // available here, we use a simplified approach based on maximum
-    // distance constraint
-    Vector a = Vector::Zero(DIM);
-    VectorDIM current_pos = current_state.segment(0, DIM);
-    VectorDIM neighbor_pos = neighbor_state.segment(0, DIM);
-    VectorDIM relative_pos = current_pos - neighbor_pos;
-    T distance = relative_pos.norm();
-    if (distance > 0.01) {                            // Avoid division by zero
-        a.segment(0, DIM) = -relative_pos / distance; // Negative for upper bound constraint
-    }
+ConnectivityMPCCBFQPOperations<T, DIM>::connectivityConstraint(const Eigen::MatrixXd& robot_states,
+                                                               size_t self_idx, T slack_value) {
+    // Extract current robot state
+    Vector current_state = robot_states.row(self_idx);
 
-    T b = 10.0; // Connectivity bound (distance <= 10.0) - should match
-                // dmax parameter
+    // Extract position information for lambda2 calculation
+    const auto robot_positions = robot_states.leftCols(2); // Extract only position columns (x, y)
+
+    // Calculate lambda2 and eigenvector for connectivity
+    auto [lambda2_val, eigenvec] = connectivity_cbf_ptr_->getLambda2(robot_positions);
+    double epsilon = 0.1;             // lambda2_min for connectivity CBF
+    double h = lambda2_val - epsilon; // barrier function: h = λ₂ - λ₂_min
+
+    // Initialize connectivity CBF with actual number of robots and self index
+    const int num_robots = robot_states.rows();
+    connectivity_cbf_ptr_->initConnCBF(num_robots, self_idx);
+
+    // Get actual connectivity constraints from CBF
+    Vector a = connectivity_cbf_ptr_->getConnConstraints(current_state, robot_states, eigenvec);
+    T b = connectivity_cbf_ptr_->getConnBound(current_state, robot_states, eigenvec, h);
+
     Vector A0 = Vector::Zero(DIM * this->k_hor_);
     A0.segment(0, DIM) = a;
     Row A_control_pts = -1.0 * A0.transpose() * this->U_basis_;
@@ -95,25 +97,35 @@ ConnectivityMPCCBFQPOperations<T, DIM>::predSafetyCBFConstraints(
 template <typename T, unsigned int DIM>
 std::vector<typename ConnectivityMPCCBFQPOperations<T, DIM>::LinearConstraint>
 ConnectivityMPCCBFQPOperations<T, DIM>::predConnectivityConstraints(
-    const std::vector<State>& pred_states, const Vector& neighbor_state) {
+    const std::vector<State>& pred_states, const Eigen::MatrixXd& robot_states, size_t self_idx) {
     std::vector<LinearConstraint> linear_constraints;
+
+    // Extract position information for lambda2 calculation (using current robot states)
+    const auto robot_positions = robot_states.leftCols(2); // Extract only position columns (x, y)
+
+    // Calculate lambda2 and eigenvector for connectivity
+    auto [lambda2_val, eigenvec] = connectivity_cbf_ptr_->getLambda2(robot_positions);
+    double epsilon = 0.1;             // lambda2_min for connectivity CBF
+    double h = lambda2_val - epsilon; // barrier function: h = λ₂ - λ₂_min
+
+    // Initialize connectivity CBF with actual number of robots and self index
+    const int num_robots = robot_states.rows();
+    connectivity_cbf_ptr_->initConnCBF(num_robots, self_idx);
+
     for (size_t k = 0; k < pred_states.size(); ++k) {
         const State& pred_state = pred_states.at(k);
+        Vector current_pred_state(2 * DIM);
+        current_pred_state << pred_state.pos_, pred_state.vel_;
 
-        // FIXME: this is not working
-        // For connectivity constraint, implement a simple distance-based
-        // upper bound Since getConnConstraints requires robot_states and
-        // eigenvec not available here, we use a simplified approach based
-        // on maximum distance constraint
-        Vector ak = Vector::Zero(DIM);
-        VectorDIM neighbor_pos = neighbor_state.segment(0, DIM);
-        VectorDIM relative_pos = pred_state.pos_ - neighbor_pos;
-        T distance = relative_pos.norm();
-        if (distance > 0.01) {
-            ak.segment(0, DIM) = -relative_pos / distance; // Negative for upper bound
-        }
-        T bk = 10.0; // Connectivity bound (distance <= 10.0) - should
-                     // match dmax parameter
+        // Create updated robot_states matrix with predicted state for current robot
+        Eigen::MatrixXd updated_robot_states = robot_states;
+        updated_robot_states.row(self_idx) = current_pred_state.transpose();
+
+        // Get actual connectivity constraints from CBF
+        Vector ak = connectivity_cbf_ptr_->getConnConstraints(current_pred_state,
+                                                              updated_robot_states, eigenvec);
+        T bk = connectivity_cbf_ptr_->getConnBound(current_pred_state, updated_robot_states,
+                                                   eigenvec, h);
 
         Vector Ak = Vector::Zero(DIM * this->k_hor_);
         Ak.segment(k * DIM, DIM) = ak;
