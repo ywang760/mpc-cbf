@@ -19,25 +19,33 @@ def rectangles_collide(xA, yA, widthA, heightA, xB, yB, widthB, heightB):
             yA + heightA > yB
     )
 
-def collision_check(x1, y1, x2, y2, collision_shape):
+def collision_check(x1, y1, x2, y2, collision_shape, shape_type):
     """x1, y1 is the center of pos, collision shape is the half of the collision width and height"""
-    collision_x = collision_shape[0]
-    collision_y = collision_shape[1]
-    xA = x1 - collision_x/2
-    yA = y1 - collision_y/2
-    xB = x2 - collision_x/2
-    yB = y2 - collision_y/2
-    widthA = 2*collision_x
-    heightA = 2*collision_y
-    widthB = 2*collision_x
-    heightB = 2*collision_y
-    return rectangles_collide(xA, yA, widthA, heightA, xB, yB, widthB, heightB)
+    if shape_type == "circle":
+        radius = collision_shape
+        dist = np.hypot(x2 - x1, y2 - y1)
+        return dist <= 2 * radius  # 两个半径重叠
+    elif shape_type == "box":
+        collision_x = collision_shape[0]
+        collision_y = collision_shape[1]
+        xA = x1 - collision_x / 2
+        yA = y1 - collision_y / 2
+        xB = x2 - collision_x / 2
+        yB = y2 - collision_y / 2
+        widthA = 2 * collision_x
+        heightA = 2 * collision_y
+        widthB = 2 * collision_x
+        heightB = 2 * collision_y
+        return rectangles_collide(xA, yA, widthA, heightA, xB, yB, widthB, heightB)
+    else:
+        raise ValueError(f"Unknown shape_type: {shape_type}")
+
 
 def reach_goal_area(pos, goal, radius=1):
     dist = np.linalg.norm(pos - goal)
     return dist <= radius
 
-def instance_success(traj, goals, radius, collision_shape):
+def instance_success(traj, goals, radius, collision_shape, shape_type):
     """traj: [n_robot, ts, dim]"""
     n_robot = traj.shape[0]
     ts = traj.shape[1]
@@ -60,7 +68,7 @@ def instance_success(traj, goals, radius, collision_shape):
                 reach_goals[i] = True
             for j in range(i+1, n_robot):
                 pos_2 = traj[j, t, :3]  # [3, ]
-                if collision_check(pos_1[0], pos_1[1], pos_2[0], pos_2[1], collision_shape):
+                if collision_check(pos_1[0], pos_1[1], pos_2[0], pos_2[1], collision_shape, shape_type):
                     d = np.linalg.norm(pos_1[:2] - pos_2[:2])
                     print("collision happens at timestep: ", t)
                     print(
@@ -81,6 +89,16 @@ if __name__ == '__main__':
     states_json = load_states(args.states)
     num_robots = len(states_json["robots"])
     traj = np.array([states_json["robots"][str(_)]["states"] for _ in range(num_robots)])  # [n_robot, ts, dim]
-    collision_shape = config_json["robot_params"]["collision_shape"]["aligned_box"][:2]
+    shape_config = config_json["robot_params"]["collision_shape"]
+    if "aligned_box" in shape_config:
+        collision_shape = shape_config["aligned_box"][:2]
+        shape_type = "box"
+    elif "radius" in shape_config:
+        collision_shape = shape_config["radius"]  # 单个 float
+        shape_type = "circle"
+    else:
+        raise ValueError("Missing collision shape: must provide either 'aligned_box' or 'radius'")
+
     goals = np.array(config_json["tasks"]["sf"])
-    success = instance_success(traj, goals, radius=1, collision_shape=collision_shape)
+    success = instance_success(traj, goals, radius=1, collision_shape=collision_shape, shape_type=shape_type)
+

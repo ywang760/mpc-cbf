@@ -1,0 +1,8 @@
+{
+  "obstacles": [
+    {
+      "position": [2.0, 2.0, 0.0],
+      "radius": 1.0
+    }
+  ]
+}

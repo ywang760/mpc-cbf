@@ -19,7 +19,7 @@ INPUT=(
 DEFAULT_STATES_PATH="/usr/src/mpc-cbf/workspace/experiments/results/states.json"
 BASE_CONFIG_FILE="/usr/src/mpc-cbf/workspace/experiments/config/base_config.json"
 VIZ_OUTPUT_DIR="/usr/src/mpc-cbf/workspace/experiments/results/viz"
-MAX_STEPS=5000
+MAX_STEPS=300
 
 # Build the CBF examples once before running experiments
 echo "Building CBF Formation Control example"
@@ -55,6 +55,15 @@ for config_file in "${INPUT[@]}"; do
         --write_filename ${DEFAULT_STATES_PATH} \
         --max_steps ${MAX_STEPS}
 
+    # Step 3: Check for collisions and success
+    echo "Step 3: Checking for collisions and success of the robot trajectories"
+    python3 /usr/src/mpc-cbf/workspace/experiments/python/metrics/collision_check.py \
+        --config ${config_file} \
+        --states ${DEFAULT_STATES_PATH}
+    
+    echo "Completed processing: $(basename ${config_file})"
+    echo ""
+
     # Step 2: Visualize the results
     echo "Step 2: Visualizing the results from the experiment"
     python3 /usr/src/mpc-cbf/workspace/experiments/python/visualization/plot_results.py \
@@ -65,14 +74,6 @@ for config_file in "${INPUT[@]}"; do
         --anim_format mp4
         # can add the --create_anim flag if needed
 
-    # Step 3: Check for collisions and success
-    echo "Step 3: Checking for collisions and success of the robot trajectories"
-    python3 /usr/src/mpc-cbf/workspace/experiments/python/metrics/collision_check.py \
-        --config ${config_file} \
-        --states ${DEFAULT_STATES_PATH}
-    
-    echo "Completed processing: $(basename ${config_file})"
-    echo ""
 done
 
 cd /usr/src/mpc-cbf/workspace/experiments/scripts

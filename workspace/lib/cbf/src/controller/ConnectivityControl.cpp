@@ -58,18 +58,18 @@ namespace cbf {
         Vector state(2*DIM);
         state << current_state.pos_, current_state.vel_;
 
-        // for (size_t i = 0; i < num_neighbors; ++i)
-        // {
-        //     Vector neighbor_state(6);
-        //     neighbor_state << current_states.at(i + (i >= ego_robot_idx ? 1 : 0)).pos_, 
-        //                       current_states.at(i + (i >= ego_robot_idx ? 1 : 0)).vel_;
+        for (size_t i = 0; i < num_neighbors; ++i)
+        {
+            Vector neighbor_state(6);
+            neighbor_state << current_states.at(i + (i >= ego_robot_idx ? 1 : 0)).pos_, 
+                              current_states.at(i + (i >= ego_robot_idx ? 1 : 0)).vel_;
 
-        //     if (!slack_mode_) {
-        //         qp_generator_.addSafetyConstraint(state, neighbor_state);
-        //     } else {
-        //         qp_generator_.addSafetyConstraint(state, neighbor_state, true, i);
-        //     }
-        // }
+            if (!slack_mode_) {
+                qp_generator_.addSafetyConstraint(state, neighbor_state);
+            } else {
+                qp_generator_.addSafetyConstraint(state, neighbor_state, true, i);
+            }
+        }
 
         // Add velocity constraints
         qp_generator_.addMinVelConstraints(state);
