@@ -46,7 +46,7 @@ namespace cbf {
         // Add safety constraints
         for (size_t i = 0; i < num_robots_ - 1; ++i)
         {
-            Vector neighbor_state(6);
+            Vector neighbor_state(2 * DIM);
             neighbor_state << current_states.at(i + (i >= self_idx ? 1 : 0)).pos_,
                               current_states.at(i + (i >= self_idx ? 1 : 0)).vel_;
 

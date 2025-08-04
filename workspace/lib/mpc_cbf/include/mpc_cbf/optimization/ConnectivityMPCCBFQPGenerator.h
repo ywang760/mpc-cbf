@@ -27,22 +27,38 @@ namespace mpc_cbf {
         void addPiecewise(std::unique_ptr<ConnectivityMPCCBFQPOperations>&& piecewise_mpc_cbf_operations_ptr, int num_neighbors, bool slack_mode);
         
         // Connectivity-specific constraint methods
-        void addSafetyCBFConstraint(const State& current_state, const Vector& other_pos, T slack_value=0);
-        void addConnectivityConstraint(const State& current_state, const Vector& other_pos, T slack_value=0);
+        void addSafetyCBFConstraint(const Vector& current_state,
+                                    const Vector& neighbor_state,
+                                    T slack_value = 0);
+        void addConnectivityConstraint(const Vector& current_state,
+                                       const Vector& neighbor_state,
+                                       T slack_value = 0);
 
         // Connectivity-specific predicted constraint methods
-        void addPredSafetyCBFConstraints(const std::vector<State>& pred_states, const Vector& other_pos, const std::vector<T>& slack_values);
-        void addPredConnectivityConstraints(const std::vector<State>& pred_states, const Vector& other_pos, const std::vector<T>& slack_values);
+        void addPredSafetyCBFConstraints(const std::vector<State>& pred_states,
+                                         const Vector& neighbor_state,
+                                         const std::vector<T>& slack_values);
+        void addPredConnectivityConstraints(
+            const std::vector<State>& pred_states, const Vector& neighbor_state,
+            const std::vector<T>& slack_values);
 
         // Connectivity-specific constraint methods with slack variables
-        void addSafetyCBFConstraintWithSlackVariables(const State& current_state, const Vector& other_pos, std::size_t neighbor_idx);
-        void addConnectivityConstraintWithSlackVariables(const State& current_state, const Vector& other_pos, std::size_t neighbor_idx);
+        void addSafetyCBFConstraintWithSlackVariables(
+            const Vector& current_state, const Vector& neighbor_state,
+            std::size_t neighbor_idx);
+        void addConnectivityConstraintWithSlackVariables(
+            const Vector& current_state, const Vector& neighbor_state,
+            std::size_t neighbor_idx);
 
         // Connectivity-specific predicted constraint methods with slack variables
-        void addPredSafetyCBFConstraintsWithSlackVariables(const std::vector<State>& pred_states, const Vector& other_pos, std::size_t neighbor_idx);
-        void addPredConnectivityConstraintsWithSlackVariables(const std::vector<State>& pred_states, const Vector& other_pos, std::size_t neighbor_idx);
+        void addPredSafetyCBFConstraintsWithSlackVariables(
+            const std::vector<State>& pred_states, const Vector& neighbor_state,
+            std::size_t neighbor_idx);
+        void addPredConnectivityConstraintsWithSlackVariables(
+            const std::vector<State>& pred_states, const Vector& neighbor_state,
+            std::size_t neighbor_idx);
 
-    private:
+       private:
         std::unique_ptr<ConnectivityMPCCBFQPOperations> piecewise_mpc_cbf_operations_ptr_;
     };
 

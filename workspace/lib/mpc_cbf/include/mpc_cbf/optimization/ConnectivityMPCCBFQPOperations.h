@@ -35,12 +35,20 @@ namespace mpc_cbf {
         ConnectivityMPCCBFQPOperations(Params &p, std::shared_ptr<DoubleIntegrator> model_ptr, std::shared_ptr<ConnectivityCBF> connectivity_cbf_ptr);
 
         // Connectivity-specific constraint methods
-        LinearConstraint safetyCBFConstraint(const State& current_state, const Vector& other_pos, T slack_value = 0);
-        LinearConstraint connectivityConstraint(const State& current_state, const Vector& other_pos, T slack_value = 0);
-        
+        LinearConstraint safetyCBFConstraint(const Vector& current_state,
+                                             const Vector& neighbor_state,
+                                             T slack_value = 0);
+        LinearConstraint connectivityConstraint(const Vector& current_state,
+                                                const Vector& neighbor_state,
+                                                T slack_value = 0);
+
         // Predicted constraints
-        std::vector<LinearConstraint> predSafetyCBFConstraints(const std::vector<State>& pred_states, const Vector& other_pos);
-        std::vector<LinearConstraint> predConnectivityConstraints(const std::vector<State>& pred_states, const Vector& other_pos);
+        std::vector<LinearConstraint> predSafetyCBFConstraints(
+            const std::vector<State>& pred_states,
+            const Vector& neighbor_state);
+        std::vector<LinearConstraint> predConnectivityConstraints(
+            const std::vector<State>& pred_states,
+            const Vector& neighbor_state);
 
         // Accessors
         std::unique_ptr<PiecewiseBezierMPCQPOperations> piecewise_mpc_operations_ptr();

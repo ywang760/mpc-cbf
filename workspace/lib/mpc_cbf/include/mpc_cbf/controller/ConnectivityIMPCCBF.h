@@ -56,13 +56,10 @@ namespace mpc_cbf {
         ~ConnectivityIMPCCBF()=default;
 
         bool optimize(std::vector<SingleParameterPiecewiseCurve> &result_curve,
-                      const State &current_state,
-                      const std::vector<VectorDIM>& other_robot_positions,
+                      const std::vector<State> &current_states, size_t self_idx,
                       const Vector &ref_positions);
 
         void resetProblem();
-
-        Vector generatorDerivativeControlInputs(uint64_t derivative_degree);
 
     private:
         TuningParams mpc_tuning_;

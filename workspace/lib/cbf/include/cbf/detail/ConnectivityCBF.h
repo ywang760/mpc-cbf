@@ -11,10 +11,10 @@
 
 namespace cbf
 {
-template <typename T>
-struct ConnectivityCBFParams {
-  T dmin_, dmax_;
-};
+    template <typename T>
+    struct ConnectivityCBFParams {
+        T dmin_, dmax_;
+    };
 
     class ConnectivityCBF
     {
