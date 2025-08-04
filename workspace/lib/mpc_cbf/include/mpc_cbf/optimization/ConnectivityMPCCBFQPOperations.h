@@ -1,0 +1,54 @@
+//
+// Created by yutong on 8/4/25.
+//
+
+#ifndef MPC_CBF_CONNECTIVITYMPCQPOPERATIONS_H
+#define MPC_CBF_CONNECTIVITYMPCQPOPERATIONS_H
+
+#include <mpc_cbf/optimization/MPCCBFQPOperationsBase.h>
+#include <cbf/detail/ConnectivityCBF.h>
+#include <mpc/optimization/PiecewiseBezierMPCQPOperations.h>
+
+namespace mpc_cbf {
+    template <typename T, unsigned int DIM>
+    class ConnectivityMPCCBFQPOperations : public MPCCBFQPOperationsBase<T, DIM> {
+    public:
+        using Base = MPCCBFQPOperationsBase<T, DIM>;
+        using ConnectivityCBF = cbf::ConnectivityCBF;
+        using PiecewiseBezierMPCQPOperations = mpc::PiecewiseBezierMPCQPOperations<T, DIM>;
+        using DoubleIntegrator = typename PiecewiseBezierMPCQPOperations::DoubleIntegrator;
+        using typename Base::QPOperation;
+        using typename Base::CostAddition;
+        using typename Base::LinearConstraint;
+        using typename Base::State;
+        using typename Base::Vector;
+        using typename Base::VectorDIM;
+        using typename Base::Matrix;
+        using Row = math::Row<T>;
+
+        struct Params {
+            mpc::PiecewiseBezierParams<T, DIM> &piecewise_bezier_params;
+            mpc::MPCParams<T> &mpc_params;
+            cbf::ConnectivityCBFParams<T> &connectivity_cbf_params;
+        };
+
+        ConnectivityMPCCBFQPOperations(Params &p, std::shared_ptr<DoubleIntegrator> model_ptr, std::shared_ptr<ConnectivityCBF> connectivity_cbf_ptr);
+
+        // Connectivity-specific constraint methods
+        LinearConstraint safetyCBFConstraint(const State& current_state, const Vector& other_pos, T slack_value = 0);
+        LinearConstraint connectivityConstraint(const State& current_state, const Vector& other_pos, T slack_value = 0);
+        
+        // Predicted constraints
+        std::vector<LinearConstraint> predSafetyCBFConstraints(const std::vector<State>& pred_states, const Vector& other_pos);
+        std::vector<LinearConstraint> predConnectivityConstraints(const std::vector<State>& pred_states, const Vector& other_pos);
+
+        // Accessors
+        std::unique_ptr<PiecewiseBezierMPCQPOperations> piecewise_mpc_operations_ptr();
+
+    private:
+        std::shared_ptr<ConnectivityCBF> connectivity_cbf_ptr_;
+    };
+
+} // mpc_cbf
+
+#endif //MPC_CBF_CONNECTIVITYMPCQPOPERATIONS_H
