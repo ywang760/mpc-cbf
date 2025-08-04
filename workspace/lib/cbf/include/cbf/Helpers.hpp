@@ -43,26 +43,58 @@ namespace cbf {
         return tmp;
     }
 
-    inline GiNaC::matrix matrixSubsMatrix(
+    inline GiNaC::matrix matrixSubsFull(
         const GiNaC::matrix &expr_matrix,
-        const Eigen::MatrixXd &robot_positions,
+        const Eigen::MatrixXd &robot_states,
         const Eigen::VectorXd &eigenvec,
-        const Eigen::Vector2d &self_position,
+        const Eigen::VectorXd &state,
         const ConnectivityCBF &cbf)
     {
         GiNaC::exmap substitutions;
         // 机器人位置和特征值向量替换
-        for (int i = 0; i < robot_positions.rows(); ++i)
+        for (int i = 0; i < robot_states.rows(); ++i)
         {
-            substitutions[cbf.px_list[i]] = robot_positions(i, 0);
-            substitutions[cbf.py_list[i]] = robot_positions(i, 1);
+            substitutions[cbf.px_list[i]] = robot_states(i, 0);
+            substitutions[cbf.py_list[i]] = robot_states(i, 1);
+            // TODO: potentially add other lists
             substitutions[cbf.eigenvec_list[i]] = eigenvec(i);
         }
         // 当前机器人的自身位置
-        substitutions[cbf.px] = self_position(0);
-        substitutions[cbf.py] = self_position(1);
+        substitutions[cbf.px] = state(0);
+        substitutions[cbf.py] = state(1);
+        // substitutions[cbf.th] = state(2);
+        substitutions[cbf.vx] = state(3);
+        substitutions[cbf.vy] = state(4);
+        // substitutions[cbf.w] = state(5);
         // 对整个矩阵统一替换
         GiNaC::matrix result = GiNaC::ex_to<GiNaC::matrix>(expr_matrix.subs(substitutions));
+        return result;
+    }
+
+    inline GiNaC::ex valueSubsFull(
+        const GiNaC::ex &expr,
+        const Eigen::MatrixXd &robot_states,
+        const Eigen::VectorXd &eigenvec,
+        const Eigen::VectorXd &state,
+        const ConnectivityCBF &cbf)
+    {
+        GiNaC::exmap substitutions;
+        // Substitute robot positions and eigenvector values
+        for (int i = 0; i < robot_states.rows(); ++i)
+        {
+            substitutions[cbf.px_list[i]] = robot_states(i, 0);
+            substitutions[cbf.py_list[i]] = robot_states(i, 1);
+            // TODO: potentially add other lists
+            substitutions[cbf.eigenvec_list[i]] = eigenvec(i);
+        }
+        // Substitute self position
+        substitutions[cbf.px] = state(0);
+        substitutions[cbf.py] = state(1);
+        // substitutions[cbf.th] = state(2);
+        substitutions[cbf.vx] = state(3);
+        substitutions[cbf.vy] = state(4);
+        // substitutions[cbf.w] = state(5);
+        GiNaC::ex result = expr.subs(substitutions);
         return result;
     }
 } // namespace cbf

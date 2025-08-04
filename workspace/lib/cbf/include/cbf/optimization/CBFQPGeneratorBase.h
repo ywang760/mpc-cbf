@@ -28,12 +28,12 @@ namespace cbf {
         using Matrix = math::Matrix<T>;
 
         /**
-         * @brief Constructor with number of neighbors and slack mode
+         * @brief Constructor with number of robots and slack mode
          *
-         * @param num_neighbors Number of neighboring agents (used for slack variables)
+         * @param num_robots Number of robots (used for slack variables)
          * @param slack_mode If true, add slack variables to allow constraint relaxation
          */
-        explicit CBFQPGeneratorBase(int num_neighbors = 0, bool slack_mode = false);
+        explicit CBFQPGeneratorBase(int num_robots = 0, bool slack_mode = false);
 
         /**
          * @brief Virtual destructor

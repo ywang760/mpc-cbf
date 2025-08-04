@@ -99,7 +99,6 @@ int main(int argc, char *argv[])
     std::vector<State> current_states;
     std::vector<VectorDIM> target_positions;
     size_t num_robots = experiment_config_json["tasks"]["so"].size();
-    size_t num_neighbors = num_robots - 1;
     json so_json = experiment_config_json["tasks"]["so"];
     json sf_json = experiment_config_json["tasks"]["sf"];
     for (size_t i = 0; i < num_robots; ++i)
@@ -163,15 +162,13 @@ int main(int argc, char *argv[])
             // );
 
             // Apply CBF to modify control for safety and connectivity
-            ConnectivityControl connectivity_control(connectivity_cbf, num_neighbors, slack_mode, slack_cost, slack_decay_rate);
+            ConnectivityControl connectivity_control(connectivity_cbf, num_robots, slack_mode, slack_cost, slack_decay_rate);
             VectorDIM cbf_u;
             bool success = connectivity_control.optimize(cbf_u, desired_u, current_states, robot_idx, a_min, a_max);
             if (!success)
             {
                 logger->warn("Optimization failed for robot {} at timestep {}", robot_idx, loop_idx);
                 cbf_u = VectorDIM::Zero(); // Fallback to zero control if optimization fails
-                // @quyichun recommended way is to simply use logger->warn to log failures
-                // and if you need to save the log, you can use the ./<executable> > log.txt syntax to log them
             }
 
             // Apply control to robot model to get next state and add noise
