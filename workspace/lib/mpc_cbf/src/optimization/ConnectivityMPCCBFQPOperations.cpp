@@ -7,23 +7,28 @@
 namespace mpc_cbf {
 template <typename T, unsigned int DIM>
 ConnectivityMPCCBFQPOperations<T, DIM>::ConnectivityMPCCBFQPOperations(
-    Params& p, std::shared_ptr<DoubleIntegrator> model_ptr, std::shared_ptr<ConnectivityCBF> connectivity_cbf_ptr)
+    Params& p, std::shared_ptr<DoubleIntegrator> model_ptr,
+    std::shared_ptr<ConnectivityCBF> connectivity_cbf_ptr)
     : MPCCBFQPOperationsBase<T, DIM>(model_ptr), connectivity_cbf_ptr_(connectivity_cbf_ptr) {
     // mpc operations
-    typename PiecewiseBezierMPCQPOperations::Params bezier_mpc_p = {p.piecewise_bezier_params, p.mpc_params};
-    this->piecewise_mpc_operations_ptr_ = std::make_unique<PiecewiseBezierMPCQPOperations>(bezier_mpc_p, model_ptr);
+    typename PiecewiseBezierMPCQPOperations::Params bezier_mpc_p = {p.piecewise_bezier_params,
+                                                                    p.mpc_params};
+    this->piecewise_mpc_operations_ptr_ =
+        std::make_unique<PiecewiseBezierMPCQPOperations>(bezier_mpc_p, model_ptr);
 
     // mpc params
     this->h_ = p.mpc_params.h_;
     this->k_hor_ = p.mpc_params.k_hor_;
     this->mpc_tuning_ = p.mpc_params.tuning_;
     // control input predict
-    this->U_basis_ = this->piecewise_mpc_operations_ptr_->U_basis(); // [3K, num_piece*dim*num_control_pts]
+    this->U_basis_ =
+        this->piecewise_mpc_operations_ptr_->U_basis(); // [3K, num_piece*dim*num_control_pts]
 }
 
 template <typename T, unsigned int DIM>
 typename ConnectivityMPCCBFQPOperations<T, DIM>::LinearConstraint
-ConnectivityMPCCBFQPOperations<T, DIM>::safetyCBFConstraint(const Vector& current_state, const Vector& neighbor_state,
+ConnectivityMPCCBFQPOperations<T, DIM>::safetyCBFConstraint(const Vector& current_state,
+                                                            const Vector& neighbor_state,
                                                             T slack_value) {
     // Use connectivity_cbf_ptr_ for proper constraint generation
     Vector a = connectivity_cbf_ptr_->getSafetyConstraints(current_state, neighbor_state);
@@ -39,7 +44,8 @@ ConnectivityMPCCBFQPOperations<T, DIM>::safetyCBFConstraint(const Vector& curren
 template <typename T, unsigned int DIM>
 typename ConnectivityMPCCBFQPOperations<T, DIM>::LinearConstraint
 ConnectivityMPCCBFQPOperations<T, DIM>::connectivityConstraint(const Vector& current_state,
-                                                               const Vector& neighbor_state, T slack_value) {
+                                                               const Vector& neighbor_state,
+                                                               T slack_value) {
     // FIXME: this is not working
     // For connectivity constraint, implement a simple distance-based upper
     // bound Since getConnConstraints requires robot_states and eigenvec not
@@ -65,8 +71,8 @@ ConnectivityMPCCBFQPOperations<T, DIM>::connectivityConstraint(const Vector& cur
 
 template <typename T, unsigned int DIM>
 std::vector<typename ConnectivityMPCCBFQPOperations<T, DIM>::LinearConstraint>
-ConnectivityMPCCBFQPOperations<T, DIM>::predSafetyCBFConstraints(const std::vector<State>& pred_states,
-                                                                 const Vector& neighbor_state) {
+ConnectivityMPCCBFQPOperations<T, DIM>::predSafetyCBFConstraints(
+    const std::vector<State>& pred_states, const Vector& neighbor_state) {
     std::vector<LinearConstraint> linear_constraints;
     for (size_t k = 0; k < pred_states.size(); ++k) {
         const State& pred_state = pred_states.at(k);
@@ -80,15 +86,16 @@ ConnectivityMPCCBFQPOperations<T, DIM>::predSafetyCBFConstraints(const std::vect
         Vector Ak = Vector::Zero(DIM * this->k_hor_);
         Ak.segment(k * DIM, DIM) = ak;
         Row Ak_control_pts = -1.0 * Ak.transpose() * this->U_basis_;
-        linear_constraints.push_back(LinearConstraint(Ak_control_pts, std::numeric_limits<T>::lowest(), bk));
+        linear_constraints.push_back(
+            LinearConstraint(Ak_control_pts, std::numeric_limits<T>::lowest(), bk));
     }
     return linear_constraints;
 }
 
 template <typename T, unsigned int DIM>
 std::vector<typename ConnectivityMPCCBFQPOperations<T, DIM>::LinearConstraint>
-ConnectivityMPCCBFQPOperations<T, DIM>::predConnectivityConstraints(const std::vector<State>& pred_states,
-                                                                    const Vector& neighbor_state) {
+ConnectivityMPCCBFQPOperations<T, DIM>::predConnectivityConstraints(
+    const std::vector<State>& pred_states, const Vector& neighbor_state) {
     std::vector<LinearConstraint> linear_constraints;
     for (size_t k = 0; k < pred_states.size(); ++k) {
         const State& pred_state = pred_states.at(k);
@@ -111,7 +118,8 @@ ConnectivityMPCCBFQPOperations<T, DIM>::predConnectivityConstraints(const std::v
         Vector Ak = Vector::Zero(DIM * this->k_hor_);
         Ak.segment(k * DIM, DIM) = ak;
         Row Ak_control_pts = -1.0 * Ak.transpose() * this->U_basis_;
-        linear_constraints.push_back(LinearConstraint(Ak_control_pts, std::numeric_limits<T>::lowest(), bk));
+        linear_constraints.push_back(
+            LinearConstraint(Ak_control_pts, std::numeric_limits<T>::lowest(), bk));
     }
     return linear_constraints;
 }

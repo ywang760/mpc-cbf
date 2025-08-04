@@ -2,14 +2,14 @@
 // Created by lishuo on 9/21/24.
 //
 
-#include <mpc_cbf/optimization/PiecewiseBezierMPCCBFQPGenerator.h>
-#include <model/DoubleIntegratorXYYaw.h>
-#include <mpc_cbf/controller/BezierMPCCBF.h>
-#include <math/collision_shapes/AlignedBoxCollisionShape.h>
 #include <cbf/detail/FovCBF.h>
-#include <nlohmann/json.hpp>
 #include <cxxopts.hpp>
 #include <fstream>
+#include <math/collision_shapes/AlignedBoxCollisionShape.h>
+#include <model/DoubleIntegratorXYYaw.h>
+#include <mpc_cbf/controller/BezierMPCCBF.h>
+#include <mpc_cbf/optimization/PiecewiseBezierMPCCBFQPGenerator.h>
+#include <nlohmann/json.hpp>
 #include <spdlog/spdlog.h>
 
 int main(int argc, char* argv[]) {
@@ -37,22 +37,21 @@ int main(int argc, char* argv[]) {
     auto logger = spdlog::default_logger();
 
     const std::string DF_CFG = "/usr/src/mpc-cbf/workspace/config/config_new.json";
-    const std::string DF_OUT = "/usr/src/mpc-cbf/workspace/experiments/results/BezierMPCCBFXYYawStates.json";
+    const std::string DF_OUT =
+        "/usr/src/mpc-cbf/workspace/experiments/results/BezierMPCCBFXYYawStates.json";
 
     // Parse command-line arguments
-    cxxopts::Options options(
-        "simulation",
-        "Bezier MPC-CBF XYYaw simulation");
+    cxxopts::Options options("simulation", "Bezier MPC-CBF XYYaw simulation");
 
     options.add_options()("config_file", "Path to experiment configuration file",
-                          cxxopts::value<std::string>()->default_value(DF_CFG))
-                         ("write_filename", "Write output JSON to this file",
-                          cxxopts::value<std::string>()->default_value(DF_OUT))
-                         ("max_steps", "Maximum number of simulation steps",
-                          cxxopts::value<int>()->default_value("200"));
+                          cxxopts::value<std::string>()->default_value(DF_CFG))(
+        "write_filename", "Write output JSON to this file",
+        cxxopts::value<std::string>()->default_value(DF_OUT))(
+        "max_steps", "Maximum number of simulation steps",
+        cxxopts::value<int>()->default_value("200"));
 
     auto option_parse = options.parse(argc, argv);
-    
+
     // Load experiment configuration
     logger->info("Starting Bezier MPC-CBF XYYaw Example...");
     std::string experiment_config_filename = option_parse["config_file"].as<std::string>();
@@ -73,41 +72,43 @@ int main(int argc, char* argv[]) {
     double fov_beta = double(experiment_config_json["fov_cbf_params"]["beta"]) * M_PI / 180.0;
     double fov_Ds = experiment_config_json["robot_params"]["collision_shape"]["aligned_box"][0];
     double fov_Rs = experiment_config_json["fov_cbf_params"]["Rs"];
-    
+
     Vector p_min = Vector::Zero(2);
     p_min << experiment_config_json["physical_limits"]["p_min"][0],
-            experiment_config_json["physical_limits"]["p_min"][1];
+        experiment_config_json["physical_limits"]["p_min"][1];
     Vector p_max = Vector::Zero(2);
     p_max << experiment_config_json["physical_limits"]["p_max"][0],
-            experiment_config_json["physical_limits"]["p_max"][1];
+        experiment_config_json["physical_limits"]["p_max"][1];
     VectorDIM v_min;
     v_min << experiment_config_json["physical_limits"]["v_min"][0],
-            experiment_config_json["physical_limits"]["v_min"][1],
-            experiment_config_json["physical_limits"]["v_min"][2];
+        experiment_config_json["physical_limits"]["v_min"][1],
+        experiment_config_json["physical_limits"]["v_min"][2];
     VectorDIM v_max;
     v_max << experiment_config_json["physical_limits"]["v_max"][0],
-            experiment_config_json["physical_limits"]["v_max"][1],
-            experiment_config_json["physical_limits"]["v_max"][2];
+        experiment_config_json["physical_limits"]["v_max"][1],
+        experiment_config_json["physical_limits"]["v_max"][2];
     VectorDIM a_min;
     a_min << experiment_config_json["physical_limits"]["a_min"][0],
-            experiment_config_json["physical_limits"]["a_min"][1],
-            experiment_config_json["physical_limits"]["a_min"][2];
+        experiment_config_json["physical_limits"]["a_min"][1],
+        experiment_config_json["physical_limits"]["a_min"][2];
     VectorDIM a_max;
     a_max << experiment_config_json["physical_limits"]["a_max"][0],
-            experiment_config_json["physical_limits"]["a_max"][1],
-            experiment_config_json["physical_limits"]["a_max"][2];
+        experiment_config_json["physical_limits"]["a_max"][1],
+        experiment_config_json["physical_limits"]["a_max"][2];
 
     VectorDIM aligned_box_collision_vec;
-    aligned_box_collision_vec <<
-    experiment_config_json["robot_params"]["collision_shape"]["aligned_box"][0],
-    experiment_config_json["robot_params"]["collision_shape"]["aligned_box"][1],
-    experiment_config_json["robot_params"]["collision_shape"]["aligned_box"][2];
+    aligned_box_collision_vec
+        << experiment_config_json["robot_params"]["collision_shape"]["aligned_box"][0],
+        experiment_config_json["robot_params"]["collision_shape"]["aligned_box"][1],
+        experiment_config_json["robot_params"]["collision_shape"]["aligned_box"][2];
     AlignedBox robot_bbox_at_zero = {-aligned_box_collision_vec, aligned_box_collision_vec};
     std::shared_ptr<const AlignedBoxCollisionShape> aligned_box_collision_shape_ptr =
-            std::make_shared<const AlignedBoxCollisionShape>(robot_bbox_at_zero);
+        std::make_shared<const AlignedBoxCollisionShape>(robot_bbox_at_zero);
     // create params
-    PiecewiseBezierParams piecewise_bezier_params = {num_pieces, num_control_points, piece_max_parameter};
-    MPCParams mpc_params = {h, Ts, k_hor, {w_pos_err, w_u_eff, spd_f}, {p_min, p_max, v_min, v_max, a_min, a_max}};
+    PiecewiseBezierParams piecewise_bezier_params = {num_pieces, num_control_points,
+                                                     piece_max_parameter};
+    MPCParams mpc_params = {
+        h, Ts, k_hor, {w_pos_err, w_u_eff, spd_f}, {p_min, p_max, v_min, v_max, a_min, a_max}};
     FoVCBFParams fov_cbf_params = {fov_beta, fov_Ds, fov_Rs};
 
     // json for record
@@ -116,15 +117,19 @@ int main(int argc, char* argv[]) {
     states["dt"] = h;
     states["Ts"] = Ts;
     // init model
-    std::shared_ptr<DoubleIntegratorXYYaw> pred_model_ptr = std::make_shared<DoubleIntegratorXYYaw>(h);
-    std::shared_ptr<DoubleIntegratorXYYaw> exe_model_ptr = std::make_shared<DoubleIntegratorXYYaw>(Ts);
-    StatePropagator exe_A0 = exe_model_ptr->get_A0(int(h/Ts));
-    StatePropagator exe_Lambda = exe_model_ptr->get_lambda(int(h/Ts));
+    std::shared_ptr<DoubleIntegratorXYYaw> pred_model_ptr =
+        std::make_shared<DoubleIntegratorXYYaw>(h);
+    std::shared_ptr<DoubleIntegratorXYYaw> exe_model_ptr =
+        std::make_shared<DoubleIntegratorXYYaw>(Ts);
+    StatePropagator exe_A0 = exe_model_ptr->get_A0(int(h / Ts));
+    StatePropagator exe_Lambda = exe_model_ptr->get_lambda(int(h / Ts));
     // init cbf
-    std::shared_ptr<FovCBF> fov_cbf = std::make_unique<FovCBF>(fov_beta, fov_Ds, fov_Rs, v_min, v_max);
+    std::shared_ptr<FovCBF> fov_cbf =
+        std::make_unique<FovCBF>(fov_beta, fov_Ds, fov_Rs, v_min, v_max);
     // init bezier mpc-cbf
     uint64_t bezier_continuity_upto_degree = 4;
-    BezierMPCCBFParams bezier_mpc_cbf_params = {piecewise_bezier_params, mpc_params, fov_cbf_params};
+    BezierMPCCBFParams bezier_mpc_cbf_params = {piecewise_bezier_params, mpc_params,
+                                                fov_cbf_params};
 
     // main loop
     // load the tasks - simplified state management
@@ -155,20 +160,24 @@ int main(int argc, char* argv[]) {
         for (int robot_idx = 0; robot_idx < num_robots; ++robot_idx) {
             std::vector<VectorDIM> other_robot_positions;
             for (int j = 0; j < num_robots; ++j) {
-                if (j==robot_idx) {
+                if (j == robot_idx) {
                     continue;
                 }
                 other_robot_positions.push_back(current_states.at(j).pos_);
             }
-            BezierMPCCBF bezier_mpc_cbf(bezier_mpc_cbf_params, pred_model_ptr, fov_cbf, bezier_continuity_upto_degree, aligned_box_collision_shape_ptr);
+            BezierMPCCBF bezier_mpc_cbf(bezier_mpc_cbf_params, pred_model_ptr, fov_cbf,
+                                        bezier_continuity_upto_degree,
+                                        aligned_box_collision_shape_ptr);
 
-            Vector ref_positions(DIM*k_hor);
+            Vector ref_positions(DIM * k_hor);
             // static target reference
             ref_positions = target_positions.at(robot_idx).replicate(k_hor, 1);
 
-            bool success = bezier_mpc_cbf.optimize(traj, current_states.at(robot_idx), other_robot_positions, ref_positions);
+            bool success = bezier_mpc_cbf.optimize(traj, current_states.at(robot_idx),
+                                                   other_robot_positions, ref_positions);
             if (!success) {
-                logger->warn("Optimization failed for robot {} at timestep {}", robot_idx, loop_idx);
+                logger->warn("Optimization failed for robot {} at timestep {}", robot_idx,
+                             loop_idx);
             }
             Vector U = bezier_mpc_cbf.generatorDerivativeControlInputs(2);
 
@@ -176,18 +185,20 @@ int main(int argc, char* argv[]) {
             double t = 0;
             while (t <= 1.5) {
                 VectorDIM pred_pos = traj.eval(t, 0);
-                states["robots"][std::to_string(robot_idx)]["pred_curve"][loop_idx].push_back({pred_pos(0), pred_pos(1), pred_pos(2)});
+                states["robots"][std::to_string(robot_idx)]["pred_curve"][loop_idx].push_back(
+                    {pred_pos(0), pred_pos(1), pred_pos(2)});
                 t += 0.05;
             }
 
-            // Multi-rate discrete control: execute control at higher frequency Ts within MPC timestep h
-            // Convert State to Vector format for matrix operations
+            // Multi-rate discrete control: execute control at higher frequency Ts within MPC
+            // timestep h Convert State to Vector format for matrix operations
             Vector current_state_vec(6);
-            current_state_vec << current_states.at(robot_idx).pos_, current_states.at(robot_idx).vel_;
-            
+            current_state_vec << current_states.at(robot_idx).pos_,
+                current_states.at(robot_idx).vel_;
+
             Matrix x_pos_pred = exe_A0.pos_ * current_state_vec + exe_Lambda.pos_ * U;
             Matrix x_vel_pred = exe_A0.vel_ * current_state_vec + exe_Lambda.vel_ * U;
-            assert(int(h/Ts)*DIM == x_pos_pred.rows());
+            assert(int(h / Ts) * DIM == x_pos_pred.rows());
             int ts_idx = 0;
             Vector final_state_vec(6);
             for (size_t i = 0; i < int(h / Ts); ++i) {
@@ -195,7 +206,8 @@ int main(int argc, char* argv[]) {
                 Vector x_t_vel = x_vel_pred.middleRows(ts_idx, 3);
                 Vector x_t(6);
                 x_t << x_t_pos, x_t_vel;
-                states["robots"][std::to_string(robot_idx)]["states"].push_back({x_t[0], x_t[1], x_t[2], x_t[3], x_t[4], x_t[5]});
+                states["robots"][std::to_string(robot_idx)]["states"].push_back(
+                    {x_t[0], x_t[1], x_t[2], x_t[3], x_t[4], x_t[5]});
                 ts_idx += 3;
                 final_state_vec = x_t;
             }

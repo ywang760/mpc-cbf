@@ -32,6 +32,7 @@ endif()
 
 # add libraries
 
+# optimization base classes
 add_library(mpc_cbf_optimization_MPCCBFQPOperationsBase SHARED src/optimization/MPCCBFQPOperationsBase.cpp)
 target_include_directories(mpc_cbf_optimization_MPCCBFQPOperationsBase PUBLIC include)
 target_link_libraries(mpc_cbf_optimization_MPCCBFQPOperationsBase PUBLIC
@@ -43,59 +44,79 @@ target_link_libraries(mpc_cbf_optimization_MPCCBFQPGeneratorBase PUBLIC
         mpc_cbf_optimization_MPCCBFQPOperationsBase
         mpc_optimization_PiecewiseBezierMPCQPGenerator)
 
-# Legacy Operations (to be refactored into FoV-specific implementation)
-add_library(mpc_cbf_optimization_PiecewiseBezierMPCCBFQPOperations SHARED src/optimization/PiecewiseBezierMPCCBFQPOperations.cpp)
-target_include_directories(mpc_cbf_optimization_PiecewiseBezierMPCCBFQPOperations PUBLIC include)
-target_link_libraries(mpc_cbf_optimization_PiecewiseBezierMPCCBFQPOperations PUBLIC
+# FoV-specific implementation
+add_library(mpc_cbf_optimization_FovMPCCBFQPOperations SHARED src/optimization/FovMPCCBFQPOperations.cpp)
+target_include_directories(mpc_cbf_optimization_FovMPCCBFQPOperations PUBLIC include)
+target_link_libraries(mpc_cbf_optimization_FovMPCCBFQPOperations PUBLIC
+        mpc_cbf_optimization_MPCCBFQPOperationsBase
         mpc_optimization_PiecewiseBeizerMPCQPOperations
         cbf_detail_FovCBF)
 
-add_library(mpc_cbf_optimization_PiecewiseBezierMPCCBFQPGenerator SHARED src/optimization/PiecewiseBezierMPCCBFQPGenerator.cpp)
-target_include_directories(mpc_cbf_optimization_PiecewiseBezierMPCCBFQPGenerator PUBLIC include)
-target_link_libraries(mpc_cbf_optimization_PiecewiseBezierMPCCBFQPGenerator PUBLIC
-        mpc_cbf_optimization_PiecewiseBezierMPCCBFQPOperations
-        mpc_optimization_PiecewiseBezierMPCQPGenerator)
+add_library(mpc_cbf_optimization_FovMPCCBFQPGenerator SHARED src/optimization/FovMPCCBFQPGenerator.cpp)
+target_include_directories(mpc_cbf_optimization_FovMPCCBFQPGenerator PUBLIC include)
+target_link_libraries(mpc_cbf_optimization_FovMPCCBFQPGenerator PUBLIC
+        mpc_cbf_optimization_MPCCBFQPGeneratorBase
+        mpc_cbf_optimization_FovMPCCBFQPOperations
+        mpc_optimization_PiecewiseBeizerMPCQPOperations
+        mpc_optimization_PiecewiseBezierMPCQPGenerator
+        cbf_detail_FovCBF)
 
-add_library(mpc_cbf_controller_BezierMPCCBF SHARED src/controller/BezierMPCCBF.cpp)
-target_include_directories(mpc_cbf_controller_BezierMPCCBF PUBLIC include)
-target_link_libraries(mpc_cbf_controller_BezierMPCCBF PUBLIC
-        mpc_cbf_optimization_PiecewiseBezierMPCCBFQPGenerator
-        qpcpp_solvers_CPLEX)
+# Connectivity-specific implementation
+add_library(mpc_cbf_optimization_ConnectivityMPCCBFQPOperations SHARED src/optimization/ConnectivityMPCCBFQPOperations.cpp)
+target_include_directories(mpc_cbf_optimization_ConnectivityMPCCBFQPOperations PUBLIC include)
+target_link_libraries(mpc_cbf_optimization_ConnectivityMPCCBFQPOperations PUBLIC
+        mpc_cbf_optimization_MPCCBFQPOperationsBase
+        mpc_optimization_PiecewiseBeizerMPCQPOperations
+        cbf_detail_ConnectivityCBF)
 
-add_library(mpc_cbf_controller_BezierIMPCCBF SHARED src/controller/BezierIMPCCBF.cpp)
-target_include_directories(mpc_cbf_controller_BezierIMPCCBF PUBLIC include)
-target_link_libraries(mpc_cbf_controller_BezierIMPCCBF PUBLIC
-        mpc_cbf_optimization_PiecewiseBezierMPCCBFQPGenerator
+add_library(mpc_cbf_optimization_ConnectivityMPCCBFQPGenerator SHARED src/optimization/ConnectivityMPCCBFQPGenerator.cpp)
+target_include_directories(mpc_cbf_optimization_ConnectivityMPCCBFQPGenerator PUBLIC include)
+target_link_libraries(mpc_cbf_optimization_ConnectivityMPCCBFQPGenerator PUBLIC
+        mpc_cbf_optimization_MPCCBFQPGeneratorBase
+        mpc_cbf_optimization_ConnectivityMPCCBFQPOperations
+        mpc_optimization_PiecewiseBeizerMPCQPOperations
+        mpc_optimization_PiecewiseBezierMPCQPGenerator
+        cbf_detail_ConnectivityCBF)
+
+# Controllers
+# MPC CBF controller (commented out - needs refactoring)
+# add_library(mpc_cbf_controller_BezierMPCCBF SHARED src/controller/BezierMPCCBF.cpp)
+# target_include_directories(mpc_cbf_controller_BezierMPCCBF PUBLIC include)
+# target_link_libraries(mpc_cbf_controller_BezierMPCCBF PUBLIC
+#         mpc_cbf_optimization_PiecewiseBezierMPCCBFQPGenerator
+#         qpcpp_solvers_CPLEX)
+
+add_library(mpc_cbf_controller_FovBezierIMPCCBF SHARED src/controller/FovBezierIMPCCBF.cpp)
+target_include_directories(mpc_cbf_controller_FovBezierIMPCCBF PUBLIC include)
+target_link_libraries(mpc_cbf_controller_FovBezierIMPCCBF PUBLIC
+        mpc_cbf_optimization_FovMPCCBFQPGenerator
+        qpcpp_solvers_CPLEX
+        separating_hyperplanes_Voronoi)
+
+add_library(mpc_cbf_controller_ConnectivityIMPCCBF SHARED src/controller/ConnectivityIMPCCBF.cpp)
+target_include_directories(mpc_cbf_controller_ConnectivityIMPCCBF PUBLIC include)
+target_link_libraries(mpc_cbf_controller_ConnectivityIMPCCBF PUBLIC
+        mpc_cbf_optimization_ConnectivityMPCCBFQPGenerator
         qpcpp_solvers_CPLEX
         separating_hyperplanes_Voronoi)
 
 # add examples
-# Example using MPC CBF
-add_executable(mpc_cbf_examples_BezierMPCCBFXYYaw_example examples/fov/BezierMPCCBFXYYaw_example.cpp)
-target_include_directories(mpc_cbf_examples_BezierMPCCBFXYYaw_example PUBLIC include ../../../third_party/json/single_include)
-target_link_libraries(mpc_cbf_examples_BezierMPCCBFXYYaw_example PUBLIC
-       mpc_cbf_controller_BezierMPCCBF
-       model_DoubleIntegratorXYYaw
-       math_collision_shapes_AlignedBoxCollisionShape
-       cxxopts
-       common_Logging
-       spdlog::spdlog_header_only)
-
-#        TODO: fix the following examples
-# # Example using Iterative MPC CBF
-# add_executable(mpc_cbf_examples_BezierIMPCCBFXYYaw_example examples/BezierIMPCCBFXYYaw_example.cpp)
-# target_include_directories(mpc_cbf_examples_BezierIMPCCBFXYYaw_example PUBLIC include ../../../third_party/json/single_include)
-# target_link_libraries(mpc_cbf_examples_BezierIMPCCBFXYYaw_example PUBLIC
-#        mpc_cbf_controller_BezierIMPCCBF
+# FoV Example using MPC CBF (commented out - needs refactoring)
+# add_executable(mpc_cbf_examples_BezierMPCCBFXYYaw_example examples/fov/BezierMPCCBFXYYaw_example.cpp)
+# target_include_directories(mpc_cbf_examples_BezierMPCCBFXYYaw_example PUBLIC include ../../../third_party/json/single_include)
+# target_link_libraries(mpc_cbf_examples_BezierMPCCBFXYYaw_example PUBLIC
+#        mpc_cbf_controller_BezierMPCCBF
 #        model_DoubleIntegratorXYYaw
 #        math_collision_shapes_AlignedBoxCollisionShape
-#        cxxopts)
+#        cxxopts
+#        common_Logging
+#        spdlog::spdlog_header_only)
 
-# Example using Iterative MPC CBF with Particle Filter
+# FoV Example using Iterative MPC CBF
 add_executable(mpc_cbf_examples_BezierIMPCCBFPFXYYaw_example examples/fov/BezierIMPCCBFPFXYYaw_example.cpp)
 target_include_directories(mpc_cbf_examples_BezierIMPCCBFPFXYYaw_example PUBLIC include ../../../third_party/json/single_include)
 target_link_libraries(mpc_cbf_examples_BezierIMPCCBFPFXYYaw_example PUBLIC
-        mpc_cbf_controller_BezierIMPCCBF
+        mpc_cbf_controller_FovBezierIMPCCBF
         model_DoubleIntegratorXYYaw
         math_collision_shapes_AlignedBoxCollisionShape
         math_Geometry
@@ -104,11 +125,11 @@ target_link_libraries(mpc_cbf_examples_BezierIMPCCBFPFXYYaw_example PUBLIC
         common_Logging
         spdlog::spdlog_header_only)
 
-# Connectivity Examples
+# Connectivity Example using Iterative MPC CBF
 add_executable(mpc_cbf_examples_MPCCBFFormationControl_example examples/connectivity/MPCCBFFormationControl_example.cpp)
 target_include_directories(mpc_cbf_examples_MPCCBFFormationControl_example PUBLIC include ../../../third_party/json/single_include)
 target_link_libraries(mpc_cbf_examples_MPCCBFFormationControl_example PUBLIC
-        mpc_cbf_controller_BezierIMPCCBF
+        mpc_cbf_controller_ConnectivityIMPCCBF
         model_DoubleIntegratorXYYaw
         math_collision_shapes_AlignedBoxCollisionShape
         math_Geometry
