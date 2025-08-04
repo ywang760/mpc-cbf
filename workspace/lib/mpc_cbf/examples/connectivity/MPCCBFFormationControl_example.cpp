@@ -10,6 +10,7 @@
 #include <mpc_cbf/controller/ConnectivityIMPCCBF.h>
 
 #include <common/logging.hpp>
+#include <common/parsing.hpp>
 #include <cxxopts.hpp>
 #include <fstream>
 #include <nlohmann/json.hpp>
@@ -62,91 +63,33 @@ int main(int argc, char* argv[]) {
     std::fstream experiment_config_fc(experiment_config_filename.c_str(), std::ios_base::in);
     json experiment_config_json = json::parse(experiment_config_fc);
 
-    // piecewise bezier params
-    size_t num_pieces = experiment_config_json["bezier_params"]["num_pieces"];
-    size_t num_control_points = experiment_config_json["bezier_params"]["num_control_points"];
-    double piece_max_parameter = experiment_config_json["bezier_params"]["piece_max_parameter"];
-
-    // mpc params
-    double h = experiment_config_json["mpc_params"]["h"];
-    double Ts = experiment_config_json["mpc_params"]["Ts"];
-    int k_hor = experiment_config_json["mpc_params"]["k_hor"];
-    double w_pos_err = experiment_config_json["mpc_params"]["mpc_tuning"]["w_pos_err"];
-    double w_u_eff = experiment_config_json["mpc_params"]["mpc_tuning"]["w_u_eff"];
-    int spd_f = experiment_config_json["mpc_params"]["mpc_tuning"]["spd_f"];
-
-    // cbf params
-    bool slack_mode = experiment_config_json["cbf_params"]["slack_mode"];
-    double slack_cost = experiment_config_json["cbf_params"]["slack_cost"];
-    double slack_decay_rate = experiment_config_json["cbf_params"]["slack_decay_rate"];
-
-    // physical settings
-    Vector p_min = Vector::Zero(2);
-    p_min << experiment_config_json["physical_limits"]["p_min"][0],
-        experiment_config_json["physical_limits"]["p_min"][1];
-
-    Vector p_max = Vector::Zero(2);
-    p_max << experiment_config_json["physical_limits"]["p_max"][0],
-        experiment_config_json["physical_limits"]["p_max"][1];
-
-    VectorDIM v_min;
-    v_min << experiment_config_json["physical_limits"]["v_min"][0],
-        experiment_config_json["physical_limits"]["v_min"][1],
-        experiment_config_json["physical_limits"]["v_min"][2];
-
-    VectorDIM v_max;
-    v_max << experiment_config_json["physical_limits"]["v_max"][0],
-        experiment_config_json["physical_limits"]["v_max"][1],
-        experiment_config_json["physical_limits"]["v_max"][2];
-
-    VectorDIM a_min;
-    a_min << experiment_config_json["physical_limits"]["a_min"][0],
-        experiment_config_json["physical_limits"]["a_min"][1],
-        experiment_config_json["physical_limits"]["a_min"][2];
-
-    VectorDIM a_max;
-    a_max << experiment_config_json["physical_limits"]["a_max"][0],
-        experiment_config_json["physical_limits"]["a_max"][1],
-        experiment_config_json["physical_limits"]["a_max"][2];
-
-    VectorDIM aligned_box_collision_vec;
-    aligned_box_collision_vec
-        << experiment_config_json["robot_params"]["collision_shape"]["aligned_box"][0],
-        experiment_config_json["robot_params"]["collision_shape"]["aligned_box"][1],
-        experiment_config_json["robot_params"]["collision_shape"]["aligned_box"][2];
-    AlignedBox robot_bbox_at_zero = {-aligned_box_collision_vec, aligned_box_collision_vec};
+    // Parse parameters using helper functions
+    PiecewiseBezierParams piecewise_bezier_params =
+        common::parsePiecewiseBezierParams<double, DIM>(experiment_config_json);
+    MPCParams mpc_params = common::parseMPCParams<double>(experiment_config_json);
+    IMPCParams impc_params = common::parseIMPCParams<double, DIM>(experiment_config_json);
+    ConnectivityCBFParams connectivity_cbf_params =
+        common::parseConnectivityCBFParams<double>(experiment_config_json);
     std::shared_ptr<const AlignedBoxCollisionShape> aligned_box_collision_shape_ptr =
-        std::make_shared<const AlignedBoxCollisionShape>(robot_bbox_at_zero);
+        common::parseCollisionShape<double, DIM>(experiment_config_json);
 
-    double pos_std = experiment_config_json["physical_limits"]["pos_std"];
-    double vel_std = experiment_config_json["physical_limits"]["vel_std"];
-
-    // create params
-    PiecewiseBezierParams piecewise_bezier_params = {num_pieces, num_control_points,
-                                                     piece_max_parameter};
-    MPCParams mpc_params = {
-        h, Ts, k_hor, {w_pos_err, w_u_eff, spd_f}, {p_min, p_max, v_min, v_max, a_min, a_max}};
-
-    // connectivity cbf params
-    double d_min = experiment_config_json["cbf_params"]["d_min"];
-    double d_max = experiment_config_json["cbf_params"]["d_max"];
-    ConnectivityCBFParams connectivity_cbf_params = {d_min, d_max};
-
-    // TODO: move these to input json
-    int cbf_horizon = 2;
-    int impc_iter = 2;
-    IMPCParams impc_params = {cbf_horizon, impc_iter, slack_cost, slack_decay_rate, slack_mode};
+    // Assemble connectivity cbf params
     ConnectivityMPCCBFParams connectivity_mpc_cbf_params = {piecewise_bezier_params, mpc_params,
                                                             connectivity_cbf_params};
     IMPCCBFParams impc_cbf_params = {connectivity_mpc_cbf_params, impc_params};
 
+    // additional parameters
+    double pos_std = experiment_config_json["physical_limits"]["pos_std"];
+    double vel_std = experiment_config_json["physical_limits"]["vel_std"];
+
     // init model
     std::shared_ptr<DoubleIntegratorXYYaw> pred_model_ptr =
-        std::make_shared<DoubleIntegratorXYYaw>(h);
+        std::make_shared<DoubleIntegratorXYYaw>(mpc_params.h_);
 
     // init connectivity cbf
-    std::shared_ptr<ConnectivityCBF> connectivity_cbf =
-        std::make_shared<ConnectivityCBF>(d_min, d_max, v_min, v_max);
+    std::shared_ptr<ConnectivityCBF> connectivity_cbf = std::make_shared<ConnectivityCBF>(
+        connectivity_cbf_params.dmin_, connectivity_cbf_params.dmax_, mpc_params.limits_.v_min_,
+        mpc_params.limits_.v_max_);
 
     // init connectivity mpc-cbf
     size_t num_robots = experiment_config_json["tasks"]["so"].size();
@@ -176,13 +119,14 @@ int main(int argc, char* argv[]) {
     // planning results
     std::vector<std::shared_ptr<SingleParameterPiecewiseCurve>> pred_traj_ptrs(num_robots);
     std::vector<double> traj_eval_ts(num_robots, 0);
-    double pred_horizon = num_pieces * piece_max_parameter;
+    double pred_horizon =
+        piecewise_bezier_params.num_pieces_ * piecewise_bezier_params.piece_max_parameter_;
 
     // json for record
     std::string JSON_FILENAME = option_parse["write_filename"].as<std::string>();
     json states;
-    states["dt"] = h;
-    states["Ts"] = Ts;
+    states["dt"] = mpc_params.h_;
+    states["Ts"] = mpc_params.Ts_;
 
     // main simulation loop
     double sim_runtime = option_parse["sim_runtime"].as<double>();
@@ -196,8 +140,8 @@ int main(int argc, char* argv[]) {
         for (int robot_idx = 0; robot_idx < num_robots; ++robot_idx) {
             connectivity_impc_cbf.resetProblem();
 
-            Vector ref_positions(DIM * k_hor);
-            ref_positions = target_positions.at(robot_idx).replicate(k_hor, 1);
+            Vector ref_positions(DIM * mpc_params.k_hor_);
+            ref_positions = target_positions.at(robot_idx).replicate(mpc_params.k_hor_, 1);
 
             std::vector<SingleParameterPiecewiseCurve> trajs;
             bool success = connectivity_impc_cbf.optimize(trajs, /*current_states=*/current_states,
@@ -235,8 +179,8 @@ int main(int argc, char* argv[]) {
 
             // log down the trajectory
             double eval_t = 0;
-            for (int t_idx = 1; t_idx <= int(h / Ts); ++t_idx) {
-                eval_t = traj_eval_ts.at(robot_idx) + Ts * t_idx;
+            for (int t_idx = 1; t_idx <= int(mpc_params.h_ / mpc_params.Ts_); ++t_idx) {
+                eval_t = traj_eval_ts.at(robot_idx) + mpc_params.Ts_ * t_idx;
                 if (eval_t > pred_traj_ptrs.at(robot_idx)->max_parameter()) {
                     eval_t = pred_traj_ptrs.at(robot_idx)->max_parameter();
                 }
@@ -253,7 +197,7 @@ int main(int argc, char* argv[]) {
             }
             traj_eval_ts.at(robot_idx) = eval_t;
         }
-        sim_t += h;
+        sim_t += mpc_params.h_;
         loop_idx += 1;
     }
 
