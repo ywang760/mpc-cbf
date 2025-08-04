@@ -2,11 +2,11 @@
 // Created by lishuo on 9/22/24.
 //
 
-#include <mpc_cbf/controller/BezierIMPCCBF.h>
+#include <mpc_cbf/controller/FovBezierIMPCCBF.h>
 
 namespace mpc_cbf {
     template <typename T, unsigned int DIM>
-    BezierIMPCCBF<T, DIM>::BezierIMPCCBF(Params &p, std::shared_ptr<DoubleIntegrator> model_ptr,
+    FovBezierIMPCCBF<T, DIM>::FovBezierIMPCCBF(Params &p, std::shared_ptr<DoubleIntegrator> model_ptr,
                                          std::shared_ptr<FovCBF> fov_cbf_ptr, uint64_t bezier_continuity_upto_degree,
                                          std::shared_ptr<const CollisionShape> collision_shape_ptr,
                                          int num_neighbors)
@@ -19,9 +19,9 @@ namespace mpc_cbf {
         slack_decay_rate_ = p.impc_params.slack_decay_rate_;
         slack_mode_ = p.impc_params.slack_mode_;
         // Initiate the qp_generator
-        std::unique_ptr<PiecewiseBezierMPCCBFQPOperations> piecewise_mpc_cbf_operations_ptr =
-                std::make_unique<PiecewiseBezierMPCCBFQPOperations>(p.mpc_cbf_params, model_ptr, fov_cbf_ptr);
-        qp_generator_.addPiecewise(std::move(piecewise_mpc_cbf_operations_ptr), num_neighbors, slack_mode_);
+        std::unique_ptr<FovMPCCBFQPOperations> fov_mpc_cbf_operations_ptr =
+                std::make_unique<FovMPCCBFQPOperations>(p.mpc_cbf_params, model_ptr, fov_cbf_ptr);
+        qp_generator_.addPiecewise(std::move(fov_mpc_cbf_operations_ptr), num_neighbors, slack_mode_);
 
         // load mpc tuning params
         mpc_tuning_ = p.mpc_cbf_params.mpc_params.tuning_;
@@ -45,7 +45,7 @@ namespace mpc_cbf {
     }
 
     template <typename T, unsigned int DIM>
-    bool BezierIMPCCBF<T, DIM>::optimize(std::vector<SingleParameterPiecewiseCurve> &result_curves,
+    bool FovBezierIMPCCBF<T, DIM>::optimize(std::vector<SingleParameterPiecewiseCurve> &result_curves,
                                          const State &current_state,
                                          const std::vector<VectorDIM> &other_robot_positions,
                                          const std::vector<Matrix> &other_robot_covs,
@@ -85,7 +85,7 @@ namespace mpc_cbf {
             size_t num_pieces = qp_generator_.piecewise_mpc_qp_generator_ptr()->numPieces();
             // add the position error cost
             qp_generator_.piecewise_mpc_qp_generator_ptr()->addPositionErrorPenaltyCost(current_state, ref_positions);
-//            qp_generator_.piecewise_mpc_qp_generator_ptr()->addEvalPositionErrorPenaltyCost(ref_positions);
+
             // minimize the control effort for the curve up to specified degree
             for (size_t d = 1; d <= bezier_continuity_upto_degree_; ++d) {
                 qp_generator_.piecewise_mpc_qp_generator_ptr()->addIntegratedSquaredDerivativeCost(d,
@@ -186,11 +186,6 @@ namespace mpc_cbf {
             qp_generator_.piecewise_mpc_qp_generator_ptr()->addEvalBoundConstraints(2, a_min_, a_max_);
             qp_generator_.piecewise_mpc_qp_generator_ptr()->addEvalBoundConstraints(1, v_min_, v_max_);
 
-//            AlignedBox acc_derivative_bbox(a_min_vec, a_max_vec);
-//            AlignedBox vel_derivative_bbox(v_min_vec, v_max_vec);
-//            qp_generator_.piecewise_mpc_qp_generator_ptr()->addBoundingBoxConstraintAll(acc_derivative_bbox, 2);
-//            qp_generator_.piecewise_mpc_qp_generator_ptr()->addBoundingBoxConstraintAll(vel_derivative_bbox, 1);
-
             // solve QP
             Problem &problem = qp_generator_.problem();
             CPLEXSolver cplex_solver;
@@ -204,20 +199,13 @@ namespace mpc_cbf {
                 break;
             }
 
-//            // generate bezier
-//            result_curves.push_back(qp_generator_.piecewise_mpc_qp_generator_ptr()->generateCurveFromSolution());
         }
 
         return success;
     }
 
     template <typename T, unsigned int DIM>
-    T BezierIMPCCBF<T, DIM>::sigmoid(T x) {
-        return 1 / (1 + exp(-2*x));
-    }
-
-    template <typename T, unsigned int DIM>
-    T BezierIMPCCBF<T, DIM>::distanceToEllipse(const VectorDIM &robot_pos,
+    T FovBezierIMPCCBF<T, DIM>::distanceToEllipse(const VectorDIM &robot_pos,
                                                const Vector &target_mean,
                                                const Matrix &target_cov) {
         assert(DIM == 3); // DIM other than 3 is not implemented yet.
@@ -284,24 +272,24 @@ namespace mpc_cbf {
     }
 
     template <typename T, unsigned int DIM>
-    bool BezierIMPCCBF<T, DIM>::compareDist(const VectorDIM& p_current,
+    bool FovBezierIMPCCBF<T, DIM>::compareDist(const VectorDIM& p_current,
                                             const std::pair<VectorDIM, Matrix>& a,
                                             const std::pair<VectorDIM, Matrix>& b) {
         return distanceToEllipse(p_current, a.first, a.second) < distanceToEllipse(p_current, b.first, b.second);
     }
 
     template <typename T, unsigned int DIM>
-    void BezierIMPCCBF<T, DIM>::resetProblem() {
+    void FovBezierIMPCCBF<T, DIM>::resetProblem() {
         qp_generator_.problem().resetProblem();
     }
 
     template <typename T, unsigned int DIM>
-    typename BezierIMPCCBF<T, DIM>::Vector
-    BezierIMPCCBF<T, DIM>::generatorDerivativeControlInputs(uint64_t derivative_degree) {
+    typename FovBezierIMPCCBF<T, DIM>::Vector
+    FovBezierIMPCCBF<T, DIM>::generatorDerivativeControlInputs(uint64_t derivative_degree) {
         Matrix U_basis = qp_generator_.piecewise_mpc_qp_generator_ptr()->piecewise_operations_ptr()->evalSamplingBasisMatrix(ts_samples_, derivative_degree); // [3I, num_piece*dim*num_control_pts]
         Vector control_pts_variables_value = qp_generator_.piecewise_mpc_qp_generator_ptr()->getVariablesValue(); // [num_piece*dim*num_control_pts, 1]
         return U_basis * control_pts_variables_value;
     }
 
-    template class BezierIMPCCBF<double, 3U>;
+    template class FovBezierIMPCCBF<double, 3U>;
 } // mpc_cbf

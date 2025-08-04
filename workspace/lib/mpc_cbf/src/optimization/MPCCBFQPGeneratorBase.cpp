@@ -116,6 +116,25 @@ namespace mpc_cbf {
         }
     }
 
+    template <typename T, unsigned int DIM>
+    void MPCCBFQPGeneratorBase<T, DIM>::addSlackCost(
+        const std::vector<double>& slack_weights) {
+      size_t num_slack_variables = slack_variables_.size();
+
+      if (slack_weights.size() != num_slack_variables) {
+        throw std::runtime_error(
+            "MPCCBFQPGeneratorBase::addSlackCost: "
+            "number of slack weights does not match number of slack variables");
+      }
+
+      // Add linear cost terms for slack variables
+      for (size_t i = 0; i < num_slack_variables; ++i) {
+        const qpcpp::Variable<T>* var_ptr = slack_variables_.at(i);
+        problem().cost_function()->addLinearTerm(
+            var_ptr, static_cast<T>(slack_weights[i]));
+      }
+    }
+
     // Explicit template instantiation
     template class MPCCBFQPGeneratorBase<double, 3U>;
 

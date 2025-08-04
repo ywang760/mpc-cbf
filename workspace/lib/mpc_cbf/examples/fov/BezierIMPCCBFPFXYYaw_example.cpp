@@ -2,21 +2,22 @@
 // Created by lishuo on 9/21/24.
 //
 
-#include <mpc_cbf/optimization/PiecewiseBezierMPCCBFQPGenerator.h>
-#include <model/DoubleIntegratorXYYaw.h>
-#include <mpc_cbf/controller/BezierIMPCCBF.h>
-#include <math/collision_shapes/AlignedBoxCollisionShape.h>
 #include <math/Geometry.h>
 #include <math/Random.h>
-#include <nlohmann/json.hpp>
+#include <math/collision_shapes/AlignedBoxCollisionShape.h>
+#include <model/DoubleIntegratorXYYaw.h>
+#include <mpc_cbf/controller/FovBezierIMPCCBF.h>
+#include <mpc_cbf/optimization/FovMPCCBFQPGenerator.h>
+
 #include <cxxopts.hpp>
 #include <fstream>
+#include <nlohmann/json.hpp>
 
 int main(int argc, char* argv[]) {
     constexpr unsigned int DIM = 3U;
     using FovCBF = cbf::FovCBF;
     using DoubleIntegratorXYYaw = model::DoubleIntegratorXYYaw<double>;
-    using BezierIMPCCBF = mpc_cbf::BezierIMPCCBF<double, DIM>;
+    using FovBezierIMPCCBF = mpc_cbf::FovBezierIMPCCBF<double, DIM>;
     using State = model::State<double, DIM>;
     using VectorDIM = math::VectorDIM<double, DIM>;
     using Vector = math::Vector<double>;
@@ -27,9 +28,10 @@ int main(int argc, char* argv[]) {
     using PiecewiseBezierParams = mpc::PiecewiseBezierParams<double, DIM>;
     using MPCParams = mpc::MPCParams<double>;
     using FoVCBFParams = cbf::FoVCBFParams<double>;
-    using BezierMPCCBFParams = mpc_cbf::PiecewiseBezierMPCCBFQPOperations<double, DIM>::Params;
-    using IMPCParams = mpc_cbf::BezierIMPCCBF<double, DIM>::IMPCParams;
-    using IMPCCBFParams = mpc_cbf::BezierIMPCCBF<double, DIM>::Params;
+    using BezierMPCCBFParams =
+        mpc_cbf::FovMPCCBFQPOperations<double, DIM>::Params;
+    using IMPCParams = mpc_cbf::FovBezierIMPCCBF<double, DIM>::IMPCParams;
+    using IMPCCBFParams = mpc_cbf::FovBezierIMPCCBF<double, DIM>::Params;
     using SingleParameterPiecewiseCurve = splines::SingleParameterPiecewiseCurve<double, DIM>;
 
     using json = nlohmann::json;
@@ -138,7 +140,9 @@ int main(int argc, char* argv[]) {
     bool slack_mode = true;
     IMPCParams impc_params = {cbf_horizon, impc_iter, slack_cost, slack_decay_rate, slack_mode};
     IMPCCBFParams impc_cbf_params = {bezier_mpc_cbf_params, impc_params};
-    BezierIMPCCBF bezier_impc_cbf(impc_cbf_params, pred_model_ptr, fov_cbf, bezier_continuity_upto_degree, aligned_box_collision_shape_ptr, num_neighbors);
+    FovBezierIMPCCBF bezier_impc_cbf(
+        impc_cbf_params, pred_model_ptr, fov_cbf, bezier_continuity_upto_degree,
+        aligned_box_collision_shape_ptr, num_neighbors);
 
     // main loop
     // load the tasks
