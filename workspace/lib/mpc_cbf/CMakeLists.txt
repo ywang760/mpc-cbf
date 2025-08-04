@@ -31,6 +31,19 @@ if(NOT is_pf_ADDED)
 endif()
 
 # add libraries
+
+add_library(mpc_cbf_optimization_MPCCBFQPOperationsBase SHARED src/optimization/MPCCBFQPOperationsBase.cpp)
+target_include_directories(mpc_cbf_optimization_MPCCBFQPOperationsBase PUBLIC include)
+target_link_libraries(mpc_cbf_optimization_MPCCBFQPOperationsBase PUBLIC
+        mpc_optimization_PiecewiseBeizerMPCQPOperations)
+
+add_library(mpc_cbf_optimization_MPCCBFQPGeneratorBase SHARED src/optimization/MPCCBFQPGeneratorBase.cpp)
+target_include_directories(mpc_cbf_optimization_MPCCBFQPGeneratorBase PUBLIC include)
+target_link_libraries(mpc_cbf_optimization_MPCCBFQPGeneratorBase PUBLIC
+        mpc_cbf_optimization_MPCCBFQPOperationsBase
+        mpc_optimization_PiecewiseBezierMPCQPGenerator)
+
+# Legacy Operations (to be refactored into FoV-specific implementation)
 add_library(mpc_cbf_optimization_PiecewiseBezierMPCCBFQPOperations SHARED src/optimization/PiecewiseBezierMPCCBFQPOperations.cpp)
 target_include_directories(mpc_cbf_optimization_PiecewiseBezierMPCCBFQPOperations PUBLIC include)
 target_link_libraries(mpc_cbf_optimization_PiecewiseBezierMPCCBFQPOperations PUBLIC
