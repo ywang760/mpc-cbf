@@ -8,23 +8,23 @@
 #include <cbf/detail/ConnectivityCBF.h>
 #include <cbf/optimization/ConnectivityQPGenerator.h>
 #include <model/DoubleIntegrator.h>
-#include <qpcpp/solvers/CPLEX.h>
 #include <numeric>
+#include <qpcpp/solvers/CPLEX.h>
 
 namespace cbf {
-    template <typename T, unsigned int DIM>
-    class ConnectivityControl {
-    public:
-        using QPGenerator = cbf::ConnectivityQPGenerator<T, DIM>;
-        using Problem = qpcpp::Problem<T>;
-        using CPLEXSolver = qpcpp::CPLEXSolver<T>;
-        using SolveStatus = qpcpp::SolveStatus;
-        using Vector = math::Vector<T>;
-        using VectorDIM = math::VectorDIM<T, DIM>;
-        using Matrix = math::Matrix<T>;
-        using State = model::State<T, DIM>;
+template <typename T, unsigned int DIM>
+class ConnectivityControl {
+  public:
+    using QPGenerator = cbf::ConnectivityQPGenerator<T, DIM>;
+    using Problem = qpcpp::Problem<T>;
+    using CPLEXSolver = qpcpp::CPLEXSolver<T>;
+    using SolveStatus = qpcpp::SolveStatus;
+    using Vector = math::Vector<T>;
+    using VectorDIM = math::VectorDIM<T, DIM>;
+    using Matrix = math::Matrix<T>;
+    using State = model::State<T, DIM>;
 
-        /**
+    /**
          * @brief Constructor for ConnectivityControl
          * 
          * @param cbf Shared pointer to ConnectivityCBF implementation
@@ -33,10 +33,11 @@ namespace cbf {
          * @param slack_cost Cost coefficient for slack variables
          * @param slack_decay_rate Decay rate for slack variables
          */
-        ConnectivityControl(std::shared_ptr<ConnectivityCBF> cbf, int num_robots=0, bool slack_mode=false, T slack_cost=1000, T slack_decay_rate=0.2);
-        ~ConnectivityControl()=default;
+    ConnectivityControl(std::shared_ptr<ConnectivityCBF> cbf, int num_robots = 0,
+                        bool slack_mode = false, T slack_cost = 1000, T slack_decay_rate = 0.2);
+    ~ConnectivityControl() = default;
 
-        /**
+    /**
          * @brief Solve the optimization problem to get connectivity-preserving control input
          *
          * @param cbf_u Output parameter for the optimized control input
@@ -48,22 +49,18 @@ namespace cbf {
          * @return true if optimization was successful
          * @return false if optimization failed
          */
-        bool optimize(VectorDIM &cbf_u,
-                      const VectorDIM &desired_u,
-                      std::vector<State> current_states,
-                      size_t self_idx,
-                      const VectorDIM &u_min,
-                      const VectorDIM &u_max);
+    bool optimize(VectorDIM& cbf_u, const VectorDIM& desired_u, std::vector<State> current_states,
+                  size_t self_idx, const VectorDIM& u_min, const VectorDIM& u_max);
 
-    private:
-        QPGenerator qp_generator_;
-        bool slack_mode_;
-        T slack_cost_;
-        T slack_decay_rate_;
-        int num_robots_;
-        std::shared_ptr<ConnectivityCBF> cbf_;
-    };
+  private:
+    QPGenerator qp_generator_;
+    bool slack_mode_;
+    T slack_cost_;
+    T slack_decay_rate_;
+    int num_robots_;
+    std::shared_ptr<ConnectivityCBF> cbf_;
+};
 
-} // cbf
+} // namespace cbf
 
 #endif //CBF_CONNECTIVITYCONTROL_H

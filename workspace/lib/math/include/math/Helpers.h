@@ -1,13 +1,13 @@
 #ifndef MATH_HELPERS_H
 #define MATH_HELPERS_H
 
+#include <limits>
 #include <math/Types.h>
 #include <memory>
 #include <vector>
-#include <limits>
 
 namespace math {
-    /**
+/**
      * @brief Returns the corner points of the given box
      *
      * @tparam T Floating point number type
@@ -15,10 +15,10 @@ namespace math {
      * @param box Box for which corner points are computed
      * @return std::vector<VectorDIM<T, DIM>> Corner points of the box
      */
-    template <typename T, unsigned int DIM>
-    std::vector<VectorDIM<T, DIM>> cornerPoints(const AlignedBox<T, DIM>& box);
+template <typename T, unsigned int DIM>
+std::vector<VectorDIM<T, DIM>> cornerPoints(const AlignedBox<T, DIM>& box);
 
-    /**
+/**
      * @brief Shifts hyperplane so that when the position of the given box is in the
      * negative side of the resulting hyperplane, box itself will be in the negative
      * side of the given hyperplane.
@@ -32,11 +32,11 @@ namespace math {
      * @param box_at_zero Box when placed at position 0
      * @return Hyperplane<T, DIM> Shifted hyperplane
      */
-    template <typename T, unsigned int DIM>
-    Hyperplane<T, DIM> shiftHyperplane(const Hyperplane<T, DIM>& hyperplane,
-                                       const AlignedBox<T, DIM>& box_at_zero);
+template <typename T, unsigned int DIM>
+Hyperplane<T, DIM> shiftHyperplane(const Hyperplane<T, DIM>& hyperplane,
+                                   const AlignedBox<T, DIM>& box_at_zero);
 
-    /**
+/**
      * @brief Buffers aligned_box so that when the position of the given box_at_zero
      * is inside of the resulting box, the box_at_zero shifted by its position will
      * be inside of the given aligned_box.
@@ -47,11 +47,11 @@ namespace math {
      * @param box_at_zero Box when placed at position 0
      * @return AlignedBox<T, DIM> Buffered aligned box
      */
-    template <typename T, unsigned int DIM>
-    AlignedBox<T, DIM> bufferAlignedBox(const AlignedBox<T, DIM>& aligned_box,
-                                        const AlignedBox<T, DIM>& box_at_zero);
+template <typename T, unsigned int DIM>
+AlignedBox<T, DIM> bufferAlignedBox(const AlignedBox<T, DIM>& aligned_box,
+                                    const AlignedBox<T, DIM>& box_at_zero);
 
-    /**
+/**
      * @brief Stacks VectorDIMs into a single Vector
      *
      * @tparam T Floating point number type
@@ -59,10 +59,10 @@ namespace math {
      * @param vectordims VectorDIMs that are stacked
      * @return Vector<T> Stacked Vector of VectorDIMs
      */
-    template <typename T, unsigned int DIM>
-    Vector<T> stackVectorDIMs(const std::vector<VectorDIM<T, DIM>>& vectordims);
+template <typename T, unsigned int DIM>
+Vector<T> stackVectorDIMs(const std::vector<VectorDIM<T, DIM>>& vectordims);
 
-    /**
+/**
      * @brief Unstack a vector to VectorDIMs such that each DIM number of rows in
      * vector becomes a VectorDIM.
      *
@@ -73,10 +73,10 @@ namespace math {
      * unstacked VectorDIMs. Return status is not OK if vector's number of rows is
      * not divisible by DIM.
      */
-    template <typename T, unsigned int DIM>
-    std::vector<VectorDIM<T, DIM>> unstackVector(const Vector<T>& vector);
+template <typename T, unsigned int DIM>
+std::vector<VectorDIM<T, DIM>> unstackVector(const Vector<T>& vector);
 
-    /**
+/**
      * @brief Returns whether two floating point numbers are approximately equal
      *
      * @tparam T Floating point number type
@@ -87,10 +87,10 @@ namespace math {
      * @return true If lhs is approximately equal to rhs
      * @return false If lhs is not approximately equal to rhs
      */
-    template <typename T>
-    bool isApproximatelyEqual(T lhs, T rhs, T tolerance = 1e-10);
+template <typename T>
+bool isApproximatelyEqual(T lhs, T rhs, T tolerance = 1e-10);
 
-    /**
+/**
      * @brief Returns whether two VectorDIMs are component-wise approximately equal
      *
      * @tparam T Floating point number type
@@ -103,11 +103,11 @@ namespace math {
      * @return true If lhs is component-wise approximately equal to rhs
      * @return false If lhs is not component-wise approximately equal to rhs
      */
-    template <typename T, unsigned int DIM>
-    bool isApproximatelyEqual(const VectorDIM<T, DIM>& lhs,
-                              const VectorDIM<T, DIM>& rhs, T tolerance = 1e-10);
+template <typename T, unsigned int DIM>
+bool isApproximatelyEqual(const VectorDIM<T, DIM>& lhs, const VectorDIM<T, DIM>& rhs,
+                          T tolerance = 1e-10);
 
-    /**
+/**
      * @brief Generic function to check if two Eigen expressions are approximately equal
      *
      * @tparam Derived1 First Eigen derived type
@@ -119,12 +119,12 @@ namespace math {
      * @return true if expressions are approximately equal
      * @return false otherwise
      */
-    template <typename Derived1, typename Derived2, typename T = typename Derived1::Scalar>
-    bool isApproximatelyEqual(const Eigen::MatrixBase<Derived1> &lhs,
-                              const Eigen::MatrixBase<Derived2> &rhs,
-                              T tolerance = static_cast<T>(1e-10));
+template <typename Derived1, typename Derived2, typename T = typename Derived1::Scalar>
+bool isApproximatelyEqual(const Eigen::MatrixBase<Derived1>& lhs,
+                          const Eigen::MatrixBase<Derived2>& rhs,
+                          T tolerance = static_cast<T>(1e-10));
 
-    /**
+/**
      * @brief Return whether two MatrixRCs are component-wise approximately equal
      *
      * @tparam T Floating point number type
@@ -138,11 +138,11 @@ namespace math {
      * @return true If lhs is component-wise approximately equal to rhs
      * @return false If lhs is not component-wise approximately equal to rhs
      */
-    template <typename T, unsigned int R, unsigned int C>
-    bool isApproximatelyEqual(const MatrixRC<T, R, C>& lhs,
-                              const MatrixRC<T, R, C>& rhs, T tolerance = 1e-10);
+template <typename T, unsigned int R, unsigned int C>
+bool isApproximatelyEqual(const MatrixRC<T, R, C>& lhs, const MatrixRC<T, R, C>& rhs,
+                          T tolerance = 1e-10);
 
-    /**
+/**
      * @brief Return whether box is completely in the positive side of the
      * hyperplane
      *
@@ -155,11 +155,10 @@ namespace math {
      * (i.e. either completely in the negative side or intersects with the
      * hyperplane)
      */
-    template <typename T, unsigned int DIM>
-    bool isInPositiveSide(const Hyperplane<T, DIM>& hyperplane,
-                          const AlignedBox<T, DIM>& box);
+template <typename T, unsigned int DIM>
+bool isInPositiveSide(const Hyperplane<T, DIM>& hyperplane, const AlignedBox<T, DIM>& box);
 
-    /**
+/**
      * @brief Return whether all points are in the positive side of the hyperplane
      *
      * @tparam T Floating point number type
@@ -169,11 +168,11 @@ namespace math {
      * @return true If all points are in the positive side of the hyperplane
      * @return false If any point is not in the positive side of the hyperplane
      */
-    template <typename T, unsigned int DIM>
-    bool isInPositiveSide(const Hyperplane<T, DIM>& hyperplane,
-                          const std::vector<VectorDIM<T, DIM>>& points);
+template <typename T, unsigned int DIM>
+bool isInPositiveSide(const Hyperplane<T, DIM>& hyperplane,
+                      const std::vector<VectorDIM<T, DIM>>& points);
 
-    /**
+/**
      * @brief Snap hyperplane to the convex hull of the points so that all points
      * are on the non-negative side of the hyperplane but any additional positive
      * shift along the normal causes at least one point to be in the negative side
@@ -188,12 +187,11 @@ namespace math {
      * @param points Points that hyperplanes are snapped to
      * @return Hyperplane<T, DIM> Snapped hyperplane
      */
-    template <typename T, unsigned int DIM>
-    Hyperplane<T, DIM> snapHyperplane(const Hyperplane<T, DIM>& hyperplane,
-                                      const std::vector<VectorDIM<T, DIM>>& points);
+template <typename T, unsigned int DIM>
+Hyperplane<T, DIM> snapHyperplane(const Hyperplane<T, DIM>& hyperplane,
+                                  const std::vector<VectorDIM<T, DIM>>& points);
 
-
-    /**
+/**
      * @brief Return the vector of hyperplanes bounding the given aligned box
      *
      * @tparam T Floating point type
@@ -202,11 +200,10 @@ namespace math {
      * @return std::vector<Hyperplane<T, DIM>> Vector of hyperplanes bounding the
      * aligned box
      */
-    template <typename T, unsigned int DIM>
-    std::vector<Hyperplane<T, DIM>> boundingHyperplanes(
-            const AlignedBox<T, DIM>& box);
+template <typename T, unsigned int DIM>
+std::vector<Hyperplane<T, DIM>> boundingHyperplanes(const AlignedBox<T, DIM>& box);
 
-    /**
+/**
      * @brief Linear interpolate on the line defined by two points
      *
      * @tparam T Floating point type
@@ -216,12 +213,11 @@ namespace math {
      * @param t Queried parameter
      * @return VectorDIM<T, DIM> Interpolated point at the queried parameter
      */
-    template <typename T, unsigned int DIM>
-    VectorDIM<T, DIM> linearInterpolate(
-            const std::pair<T, VectorDIM<T, DIM>>& point1,
-            const std::pair<T, VectorDIM<T, DIM>>& point2, T t);
+template <typename T, unsigned int DIM>
+VectorDIM<T, DIM> linearInterpolate(const std::pair<T, VectorDIM<T, DIM>>& point1,
+                                    const std::pair<T, VectorDIM<T, DIM>>& point2, T t);
 
-    /**
+/**
      * @brief Compute a perpendicular vector to the given vector
      *
      * @details The returned vector is not necessarily normalized. If vector is
@@ -232,8 +228,8 @@ namespace math {
      * @param vector Vector for which a perpendicular vector is computed
      * @return VectorDIM<T, DIM> Perpendicular vector
      */
-    template <typename T, unsigned int DIM>
-    VectorDIM<T, DIM> computeAPerpendicularVector(const VectorDIM<T, DIM>& vector);
-}  // namespace math
+template <typename T, unsigned int DIM>
+VectorDIM<T, DIM> computeAPerpendicularVector(const VectorDIM<T, DIM>& vector);
+} // namespace math
 
 #endif //MATH_HELPERS_H

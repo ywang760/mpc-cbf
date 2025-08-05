@@ -8,7 +8,7 @@
 #include <math/Types.h>
 
 namespace splines {
-    /**
+/**
      * @brief For a Bezier curve with degree bezier_degree and max parameter
      * max_parameter, return the bernstein basis polynomials that would result in
      * the evaluation of the derivative_degree^{th} derivative of bezier curve at
@@ -24,12 +24,11 @@ namespace splines {
      * [0, max_parameter], return status is not OK. If anything overflows during the
      * computation, return status is not OK.
      */
-    template <typename T>
-    math::Row<T> bernsteinBasis(uint64_t bezier_degree,
-                                 T max_parameter, T parameter,
-                                 uint64_t derivative_degree);
+template <typename T>
+math::Row<T> bernsteinBasis(uint64_t bezier_degree, T max_parameter, T parameter,
+                            uint64_t derivative_degree);
 
-    /**
+/**
      * @brief Compute the polynomial coefficient matrix for the
      * {derivative_degree}^{th} derivative of bernstein base functions where each
      * row r with index i contains polynomial coefficients for the
@@ -50,10 +49,10 @@ namespace splines {
      * computation, or bezier_degree = maximum uint64_t or max_parameter is
      * negative.
      */
-    template <typename T>
-    math::Matrix<T> bernsteinCoefficientMatrix(uint64_t bezier_degree, T max_parameter, uint64_t derivative_degree);
+template <typename T>
+math::Matrix<T> bernsteinCoefficientMatrix(uint64_t bezier_degree, T max_parameter,
+                                           uint64_t derivative_degree);
 
-
-} // splines
+} // namespace splines
 
 #endif //SPLINES_BEZIEROPERATIONS_H

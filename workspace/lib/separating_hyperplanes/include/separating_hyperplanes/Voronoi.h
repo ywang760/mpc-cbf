@@ -8,7 +8,7 @@
 #include <separating_hyperplanes/Types.h>
 
 namespace separating_hyperplanes {
-    /**
+/**
      * Computes a Voronoi separating hyperplane between two points.
      * 
      * The Voronoi hyperplane is the perpendicular bisector of the line segment
@@ -27,11 +27,10 @@ namespace separating_hyperplanes {
      * @param second_position Second point (will be on the positive side of hyperplane)
      * @return Hyperplane that is equidistant from both input points
      */
-    template <typename T, unsigned int DIM>
-    Hyperplane<T, DIM> voronoi(
-            const VectorDIM<T, DIM>& first_position,
-            const VectorDIM<T, DIM>& second_position);
+template <typename T, unsigned int DIM>
+Hyperplane<T, DIM> voronoi(const VectorDIM<T, DIM>& first_position,
+                           const VectorDIM<T, DIM>& second_position);
 
-} // separating_hyperplanes
+} // namespace separating_hyperplanes
 
 #endif //SEPARATINGHYPERPLANES_VORONOI_H
