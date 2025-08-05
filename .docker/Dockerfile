@@ -49,6 +49,11 @@ RUN set -x && \
     fi
 RUN rm -rf /usr/src/mpc-cbf/.docker/cplex
 
+# Install latest version of node and npm
+RUN curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - && \
+    apt-get install -y nodejs
+RUN node --version && npm --version
+
 # Initialize shell
 WORKDIR /usr/src/mpc-cbf
 ENV DEBIAN_FRONTEND=dialog

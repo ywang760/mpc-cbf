@@ -13,13 +13,14 @@ INPUT=(
     "/usr/src/mpc-cbf/workspace/experiments/config/baseline/6r/circle.json"
     "/usr/src/mpc-cbf/workspace/experiments/config/baseline/6r/upward.json"
     "/usr/src/mpc-cbf/workspace/experiments/config/baseline/8r/circle.json"
+    "/usr/src/mpc-cbf/workspace/experiments/config/baseline/8r/circle2.json"
     "/usr/src/mpc-cbf/workspace/experiments/config/baseline/8r/diverge.json"
 )
 
 DEFAULT_STATES_PATH="/usr/src/mpc-cbf/workspace/experiments/results/states.json"
 BASE_CONFIG_FILE="/usr/src/mpc-cbf/workspace/experiments/config/base_config.json"
 VIZ_OUTPUT_DIR="/usr/src/mpc-cbf/workspace/experiments/results/viz"
-MAX_STEPS=1000
+MAX_STEPS=300
 
 # Build the CBF examples once before running experiments
 echo "Building CBF Formation Control example"
@@ -34,6 +35,8 @@ fi
 
 # Set logging level to debug
 export SPDLOG_LEVEL=info
+#export SPDLOG_LEVEL=debug
+#export SPDLOG_LEVEL=warn
 
 # Iterate over each configuration file
 for config_file in "${INPUT[@]}"; do
@@ -59,7 +62,9 @@ for config_file in "${INPUT[@]}"; do
     python3 /usr/src/mpc-cbf/workspace/experiments/python/visualization/plot_results.py \
         --config ${config_file} \
         --states ${DEFAULT_STATES_PATH} \
-        --output_dir ${VIZ_OUTPUT_DIR}
+        --output_dir ${VIZ_OUTPUT_DIR}\
+        # --create_anim \
+        # --anim_format mp4
         # can add the --create_anim flag if needed
 
     # Step 3: Check for collisions and success
