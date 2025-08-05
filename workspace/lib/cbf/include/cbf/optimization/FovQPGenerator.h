@@ -27,10 +27,10 @@ namespace cbf {
          * @brief Constructor that takes a pointer to the FovCBF instance
          *
          * @param cbf Shared pointer to the Field of View CBF implementation
-         * @param num_neighbors Number of neighboring agents (used for slack variables)
+         * @param num_robots Number of neighboring agents (used for slack variables)
          * @param slack_mode If true, add slack variables to allow constraint relaxation
          */
-        explicit FovQPGenerator(std::shared_ptr<FovCBF> cbf, int num_neighbors = 0, bool slack_mode = false);
+        explicit FovQPGenerator(std::shared_ptr<FovCBF> cbf, int num_robots = 0, bool slack_mode = false);
 
         /**
          * @brief Adds safety constraint between agents to prevent collisions

@@ -1,7 +1,7 @@
 {
     "mpc_params": {
         "h": 0.1,
-        "Ts": 1,
+        "Ts": 0.01,
         "k_hor": 16,
         "mpc_tuning": {
             "w_pos_err": 10,

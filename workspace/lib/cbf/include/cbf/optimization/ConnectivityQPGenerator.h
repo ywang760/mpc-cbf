@@ -28,22 +28,31 @@ namespace cbf {
          * @brief Constructor that takes a pointer to the ConnectivityCBF instance
          *
          * @param cbf Shared pointer to the Connectivity CBF implementation
-         * @param num_neighbors Number of neighboring agents (used for slack variables)
+         * @param num_robots Number of robots (used for slack variables)
          * @param slack_mode If true, add slack variables to allow constraint relaxation
          */
-        explicit ConnectivityQPGenerator(std::shared_ptr<ConnectivityCBF> cbf, int num_neighbors = 0, bool slack_mode = false);
+        explicit ConnectivityQPGenerator(std::shared_ptr<ConnectivityCBF> cbf, int num_robots = 0, bool slack_mode = false);
 
         /**
          * @brief Adds connectivity constraint between agents to maintain network connectivity
          *
          * @param state Current state of the robot
-         * @param other_positions Positions of other agents in the network
+         * @param robot_states Matrix of states for all robots in the network
+         * @param use_slack Whether to use slack variables for this constraint
+         */
+        void addConnConstraint(const Vector &state, const Eigen::MatrixXd &robot_states, size_t self_idx,
+                               bool use_slack = false);
+
+        /**
+         * @brief Adds CLF connectivity constraint
+         *
+         * @param state Current state of the robot
+         * @param neighbor_state State of the target/neighboring robot
          * @param use_slack Whether to use slack variables for this constraint
          * @param slack_idx Index of slack variable to use (if use_slack is true)
-         */
-        void addConnConstraint(const Vector &state, const std::vector<VectorDIM> &other_positions,
-                               bool use_slack = false, std::size_t slack_idx = 0);
-
+         */                    
+        void addCLFConstraint(const Vector &state, const Vector &neighbor_state, bool use_slack, std::size_t slack_idx);
+        
         /**
          * @brief Adds safety constraint between agents to prevent collisions
          *
@@ -69,14 +78,6 @@ namespace cbf {
          */
         void addMaxVelConstraints(const Vector& state) override;
 
-        /**
-        * @brief Accessor for the internal ConnectivityCBF instance
-        * @return Shared pointer to the ConnectivityCBF object
-        */
-        const std::shared_ptr<ConnectivityCBF>& getCBF() const {
-            return cbf_;
-        }
-        void addCLFConstraint(const Vector &state, const Vector &neighbor_state, bool use_slack, std::size_t slack_idx);
 
     private:
         std::shared_ptr<ConnectivityCBF> cbf_; ///< Pointer to the Connectivity CBF implementation

@@ -6,7 +6,7 @@
 
 namespace cbf {
     template <typename T, unsigned int DIM>
-    CBFQPGeneratorBase<T, DIM>::CBFQPGeneratorBase(int num_neighbors, bool slack_mode) {
+    CBFQPGeneratorBase<T, DIM>::CBFQPGeneratorBase(int num_robots, bool slack_mode) {
         // Allocate the decision variables for the control input
         size_t num_decision_variables = DIM;
         for (size_t decision_variable_idx = 0;
@@ -19,7 +19,7 @@ namespace cbf {
         // Add slack variables to the problem if in slack mode
         // Slack variables allow constraints to be violated by paying a penalty in the cost function
         if (slack_mode) {
-            for (size_t i = 0; i < num_neighbors; ++i) {
+            for (size_t i = 0; i < num_robots; ++i) {
                 qpcpp::Variable<T>* variable_ptr = problem().addVariable(0, std::numeric_limits<T>::max()); // slack variables are non-negative
                 slack_variables_.push_back(variable_ptr);
             }
