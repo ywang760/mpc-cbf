@@ -22,7 +22,8 @@ RUN apt-get update && apt-get install -y \
     doxygen \
     git \
     ninja-build \
-    ffmpeg
+    ffmpeg \
+    clang-format
 
 # Copy the current directory contents into the container
 COPY . .

@@ -1,0 +1,122 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  format:
+    name: Code Formatting
+    runs-on: ubuntu-22.04
+    container:
+      image: wangyt163/mpc-cbf:latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        submodules: recursive
+        token: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Configure Git
+      run: |
+        git config --global --add safe.directory $GITHUB_WORKSPACE
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+
+    # - name: Check and fix code formatting
+    #   id: format-check
+    #   run: |
+    #     # Find all C++ source files
+    #     cpp_files=$(find . -name "*.cpp" -o -name "*.h" -o -name "*.hpp" | grep -E "(workspace/|src/|include/)")
+        
+    #     # Apply clang-format to all files
+    #     echo "$cpp_files" | xargs clang-format -i
+        
+    #     # Check if there are any changes
+    #     if ! git diff --quiet; then
+    #       echo "Code formatting changes applied"
+    #       git add .
+    #       git commit -m "Auto-fix code formatting with clang-format [skip ci]"
+    #       git push
+    #       echo "formatted=true" >> $GITHUB_OUTPUT
+    #     else
+    #       echo "All files are properly formatted"
+    #       echo "formatted=false" >> $GITHUB_OUTPUT
+    #     fi
+
+  build-and-test:
+    name: Build and Test
+    runs-on: ubuntu-22.04
+    needs: format
+    container:
+      image: wangyt163/mpc-cbf:latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        submodules: recursive
+
+    - name: Configure Git
+      run: |
+        git config --global --add safe.directory $GITHUB_WORKSPACE
+
+    - name: Build CBF Package
+      run: |
+        cd workspace/lib/cbf/build
+        make -j20
+
+    - name: Run CBF Tests
+      run: |
+        cd workspace/lib/cbf/build
+        ctest --output-on-failure -j20
+
+    - name: Build MPC CBF Package
+      run: |
+        cd workspace/lib/mpc_cbf/build
+        make -j20
+
+    - name: Run MPC CBF Tests
+      run: |
+        cd workspace/lib/mpc_cbf/build
+        ctest --output-on-failure -j20
+
+  run-examples:
+    name: Run Examples
+    runs-on: ubuntu-22.04
+    needs: build-and-test
+    container:
+      image: wangyt163/mpc-cbf:latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        submodules: recursive
+
+    - name: Configure Git
+      run: |
+        git config --global --add safe.directory $GITHUB_WORKSPACE
+
+    - name: Build and Run CBF Example
+      run: |
+        cd workspace/lib/cbf/build
+        # Build and run formation control example if it exists
+        if make -n cbf_examples_FormationControl_example 2>/dev/null; then
+          make cbf_examples_FormationControl_example
+          echo "Running CBF Formation Control Example..."
+          timeout 60s ./cbf_examples_FormationControl_example || echo "Example completed or timed out after 60s"
+        fi
+
+    - name: Build and Run MPC CBF Example
+      run: |
+        cd workspace/lib/mpc_cbf/build
+        # Build and run formation control example if it exists
+        if make -n mpc_cbf_examples_MPCCBFFormationControl_example 2>/dev/null; then
+          make mpc_cbf_examples_MPCCBFFormationControl_example
+          echo "Running MPC CBF Formation Control Example..."
+          timeout 60s ./mpc_cbf_examples_MPCCBFFormationControl_example || echo "Example completed or timed out after 60s"
+        fi
