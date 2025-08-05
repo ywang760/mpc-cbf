@@ -78,19 +78,16 @@ namespace cbf {
 
         Eigen::MatrixXd positions(current_states.size(), 3);
         for (size_t i = 0; i < current_states.size(); ++i) {
-            positions.row(i) = current_states.at(i).pos_;  // 这里应该用原始 3D pos，不强制 z=0
+            positions.row(i) = current_states.at(i).pos_;
         }
         double Rs_value = cbf_->getDmax();
         double sigma_val = std::pow(Rs_value, 4) / std::log(2.0);
         auto [lambda2, lambda2_vec] = getLambda2FromL(positions, Rs_value, sigma_val);
         logger->info("Current λ₂ value: {}", lambda2);
-        //logger->info("Calling addconnConstraint for current robot.");
         // Add connectivity constraint
         if (lambda2 > 0.1) {
             qp_generator_.addConnConstraint(state, other_robot_positions, false, 0);
-        //logger->info("Finished addconnConstraint.");
         } else {
-        //logger->info("Calling addCLFConstraint for current robot.");
             int local_slack_idx = 0;
             for (size_t i = 0; i < current_states.size(); ++i)
             {

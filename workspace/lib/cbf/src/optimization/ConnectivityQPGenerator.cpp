@@ -17,7 +17,6 @@ namespace cbf {
                                                             bool use_slack,
                                                             std::size_t slack_idx)
     {
-        // TODO: right now move them here
         // === 组装 robot_states: [self; others] ===
         const int N = 1 + other_positions.size();
         Eigen::MatrixXd robot_states(N, 6);
@@ -143,19 +142,6 @@ namespace cbf {
             T bound = -1.0 * cbf_->getCLFBound(state, neighbor_state);
             // Create a linear constraint with lower bound negative infinity
             LinearConstraint linear_constraint(coefficients, std::numeric_limits<T>::lowest(), bound);
-            
-            logger->debug("🔍 Adding CLF constraint between self at [{:.3f}, {:.3f}] and neighbor at [{:.3f}, {:.3f}]",
-                     state[0], state[1],  neighbor_state[0], neighbor_state[1]);
-            std::ostringstream oss;
-            oss << "[";
-            for (int i = 0; i < coefficients.size(); ++i) {
-                oss << coefficients[i];
-                if (i != coefficients.size() - 1)
-                    oss << ", ";
-            }
-            oss << "]";
-            logger->debug("CLF Ac = {}", oss.str());
-            logger->debug("CLF Bc = {:.6f}", bound);
             
             if (use_slack && !this->slack_variables_.empty()) {
             // Create a row vector for slack variable coefficients (all zeros except at slack_idx)

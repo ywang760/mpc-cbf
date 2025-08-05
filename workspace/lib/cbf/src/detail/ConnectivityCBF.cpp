@@ -233,15 +233,14 @@ namespace cbf
         Ac(0, 2) = 0.0;
 
         // Bc
+        // TODO: change these hard-coded values
         double beta1 = 5;
         double beta2 = 2;
         GiNaC::ex Bc = Lf2_V + beta1 * Lf_V + beta2 * V;
 
-        // 替换 d_desired -> 3.0
         GiNaC::lst replace_list;
         replace_list.append(d_desired == d_desired_val);
 
-        // 对所有表达式做 subs：
         Ac(0, 0) = Ac(0, 0).subs(replace_list);
         Ac(0, 1) = Ac(0, 1).subs(replace_list);
         Bc = Bc.subs(replace_list);
