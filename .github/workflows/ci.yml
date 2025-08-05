@@ -7,24 +7,24 @@ on:
     branches: [ main ]
 
 jobs:
-  format:
-    name: Code Formatting
-    runs-on: ubuntu-22.04
-    container:
-      image: wangyt163/mpc-cbf:latest
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
-        submodules: recursive
-        token: ${{ secrets.GITHUB_TOKEN }}
+  # format:
+  #   name: Code Formatting
+  #   runs-on: ubuntu-22.04
+  #   container:
+  #     image: wangyt163/mpc-cbf:latest
+  #   steps:
+  #   - name: Checkout code
+  #     uses: actions/checkout@v4
+  #     with:
+  #       fetch-depth: 0
+  #       submodules: recursive
+  #       token: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: Configure Git
-      run: |
-        git config --global --add safe.directory $GITHUB_WORKSPACE
-        git config --local user.email "action@github.com"
-        git config --local user.name "GitHub Action"
+  #   - name: Configure Git
+  #     run: |
+  #       git config --global --add safe.directory $GITHUB_WORKSPACE
+  #       git config --local user.email "action@github.com"
+  #       git config --local user.name "GitHub Action"
 
     # - name: Check and fix code formatting
     #   id: format-check
@@ -50,7 +50,7 @@ jobs:
   build-and-test:
     name: Build and Test
     runs-on: ubuntu-22.04
-    needs: format
+    # needs: format
     container:
       image: wangyt163/mpc-cbf:latest
     steps:
@@ -66,8 +66,11 @@ jobs:
 
     - name: Build CBF Package
       run: |
-        cd workspace/lib/cbf/build
-        make -j20
+        cd workspace/lib/cbf
+        mkdir -p build
+        cd build
+        cmake .. -G Ninja
+        ninja -j20
 
     - name: Run CBF Tests
       run: |
@@ -76,8 +79,11 @@ jobs:
 
     - name: Build MPC CBF Package
       run: |
-        cd workspace/lib/mpc_cbf/build
-        make -j20
+        cd workspace/lib/mpc_cbf
+        mkdir -p build
+        cd build
+        cmake .. -G Ninja
+        ninja -j20
 
     - name: Run MPC CBF Tests
       run: |
@@ -105,8 +111,8 @@ jobs:
       run: |
         cd workspace/lib/cbf/build
         # Build and run formation control example if it exists
-        if make -n cbf_examples_FormationControl_example 2>/dev/null; then
-          make cbf_examples_FormationControl_example
+        if ninja -t targets | grep -q "cbf_examples_FormationControl_example"; then
+          ninja cbf_examples_FormationControl_example
           echo "Running CBF Formation Control Example..."
           timeout 60s ./cbf_examples_FormationControl_example || echo "Example completed or timed out after 60s"
         fi
@@ -115,8 +121,8 @@ jobs:
       run: |
         cd workspace/lib/mpc_cbf/build
         # Build and run formation control example if it exists
-        if make -n mpc_cbf_examples_MPCCBFFormationControl_example 2>/dev/null; then
-          make mpc_cbf_examples_MPCCBFFormationControl_example
+        if ninja -t targets | grep -q "mpc_cbf_examples_MPCCBFFormationControl_example"; then
+          ninja mpc_cbf_examples_MPCCBFFormationControl_example
           echo "Running MPC CBF Formation Control Example..."
           timeout 60s ./mpc_cbf_examples_MPCCBFFormationControl_example || echo "Example completed or timed out after 60s"
         fi
