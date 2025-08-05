@@ -7,45 +7,42 @@ on:
     branches: [ main ]
 
 jobs:
-  # format:
-  #   name: Code Formatting
-  #   runs-on: ubuntu-22.04
-  #   container:
-  #     image: wangyt163/mpc-cbf:latest
-  #   steps:
-  #   - name: Checkout code
-  #     uses: actions/checkout@v4
-  #     with:
-  #       fetch-depth: 0
-  #       submodules: recursive
-  #       token: ${{ secrets.GITHUB_TOKEN }}
+  format:
+    name: Code Formatting
+    runs-on: ubuntu-22.04
+    container:
+      image: wangyt163/mpc-cbf:latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        submodules: recursive
+        token: ${{ secrets.GITHUB_TOKEN }}
 
-  #   - name: Configure Git
-  #     run: |
-  #       git config --global --add safe.directory $GITHUB_WORKSPACE
-  #       git config --local user.email "action@github.com"
-  #       git config --local user.name "GitHub Action"
+    - name: Configure Git
+      run: |
+        git config --global --add safe.directory $GITHUB_WORKSPACE
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
 
-    # - name: Check and fix code formatting
-    #   id: format-check
-    #   run: |
-    #     # Find all C++ source files
-    #     cpp_files=$(find . -name "*.cpp" -o -name "*.h" -o -name "*.hpp" | grep -E "(workspace/|src/|include/)")
-        
-    #     # Apply clang-format to all files
-    #     echo "$cpp_files" | xargs clang-format -i
-        
-    #     # Check if there are any changes
-    #     if ! git diff --quiet; then
-    #       echo "Code formatting changes applied"
-    #       git add .
-    #       git commit -m "Auto-fix code formatting with clang-format [skip ci]"
-    #       git push
-    #       echo "formatted=true" >> $GITHUB_OUTPUT
-    #     else
-    #       echo "All files are properly formatted"
-    #       echo "formatted=false" >> $GITHUB_OUTPUT
-    #     fi
+    - name: Check and fix code formatting
+      uses: jidicula/clang-format-action@v4.11.0
+      with:
+        clang-format-version: '14'
+        check-path: 'workspace/lib'
+        include-regex: '^.*\.(cpp|hpp|h|cc|cxx)$'
+        exclude-regex: '^.*/(build|\.git)/.*$'
+        inplace: true
+
+    - name: Commit formatting changes
+      if: success()
+      run: |
+        if ! git diff --quiet; then
+          git add .
+          git commit -m "Auto-fix code formatting with clang-format [skip ci]"
+          git push
+        fi
 
   build-and-test:
     name: Build and Test
@@ -112,7 +109,11 @@ jobs:
 
     - name: Build and Run CBF Example
       run: |
-        cd workspace/lib/cbf/build
+        cd workspace/lib/cbf
+        mkdir -p build
+        cd build
+        cmake .. -G Ninja
+        ninja -j20
         # Build and run formation control example if it exists
         if ninja -t targets | grep -q "cbf_examples_FormationControl_example"; then
           ninja cbf_examples_FormationControl_example
@@ -122,7 +123,11 @@ jobs:
 
     - name: Build and Run MPC CBF Example
       run: |
-        cd workspace/lib/mpc_cbf/build
+        cd workspace/lib/mpc_cbf
+        mkdir -p build
+        cd build
+        cmake .. -G Ninja
+        ninja -j20
         # Build and run formation control example if it exists
         if ninja -t targets | grep -q "mpc_cbf_examples_MPCCBFFormationControl_example"; then
           ninja mpc_cbf_examples_MPCCBFFormationControl_example
