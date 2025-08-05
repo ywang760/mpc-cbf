@@ -50,7 +50,7 @@ namespace cbf
         // Define dimensions of the state and control spaces
         STATE_VARS = 6;
         CONTROL_VARS = 3;
-        gamma = 5.0;   // More aggressive convergence rate (increased from 1.0)
+        gamma = 20.0;   // More aggressive convergence rate (increased from 1.0)
         epsilon = 0.1; // lambda2_min for connectivity CBF
 
         // System dynamics matrix (state transition matrix)
@@ -96,6 +96,10 @@ namespace cbf
         auto res = initSafetyCBF();
         Ac_safe = res.first;  // Constraint matrix
         Bc_safe = res.second; // Constraint bound
+
+        auto res_CLF = initCLFCBF();
+        Ac_CLF = res_CLF.first;  // Constraint matrix
+        Bc_CLF = res_CLF.second; // Constraint bound
 
         // Velocity constraint CBFs: Enforce maximum velocity limits
         // Setup max velocity constraint for x-direction
@@ -195,6 +199,55 @@ namespace cbf
         return std::make_pair(Ac, Bc);
     }
 
+    std::pair<GiNaC::matrix, GiNaC::ex> ConnectivityCBF::initCLFCBF()
+    {
+        GiNaC::ex dx = px - px_n;
+        GiNaC::ex dy = py - py_n;
+        GiNaC::symbol d_desired("d_desired");
+        double d_desired_val = 2.0;
+
+        GiNaC::ex dist = GiNaC::sqrt(dx * dx + dy * dy);
+        GiNaC::ex dist_error = dist - d_desired;
+        GiNaC::ex V = pow(dist_error, 2);
+
+        // Gradient of V
+        GiNaC::ex dV_dpx = GiNaC::diff(V, px);
+        GiNaC::ex dV_dpy = GiNaC::diff(V, py);
+
+        // Lf V = ∇V ⋅ f
+        GiNaC::ex Lf_V = dV_dpx * vx + dV_dpy * vy;
+
+        // ∇(Lf V)
+        GiNaC::ex dLfV_dvx = GiNaC::diff(Lf_V, vx);
+        GiNaC::ex dLfV_dvy = GiNaC::diff(Lf_V, vy);
+
+        // Lf² V
+        GiNaC::ex dLfV_dpx = GiNaC::diff(Lf_V, px);
+        GiNaC::ex dLfV_dpy = GiNaC::diff(Lf_V, py);
+        GiNaC::ex Lf2_V = dLfV_dpx * vx + dLfV_dpy * vy;
+
+        // Ac
+        GiNaC::matrix Ac(1, CONTROL_VARS);
+        Ac(0, 0) = dLfV_dvx;
+        Ac(0, 1) = dLfV_dvy;
+        Ac(0, 2) = 0.0;
+
+        // Bc
+        // TODO: change these hard-coded values
+        double beta1 = 5;
+        double beta2 = 2;
+        GiNaC::ex Bc = Lf2_V + beta1 * Lf_V + beta2 * V;
+
+        GiNaC::lst replace_list;
+        replace_list.append(d_desired == d_desired_val);
+
+        Ac(0, 0) = Ac(0, 0).subs(replace_list);
+        Ac(0, 1) = Ac(0, 1).subs(replace_list);
+        Bc = Bc.subs(replace_list);
+        return std::make_pair(Ac, Bc);
+    }
+
+
     // Initialize velocity Control Barrier Functions
     // This creates CBFs to enforce velocity limits (min or max)
     // Parameters:
@@ -257,7 +310,20 @@ namespace cbf
             GiNaC::ex val = matrix_expr[i].evalf();
             Ac(i) = GiNaC::ex_to<GiNaC::numeric>(val).to_double();
         }
+        return Ac;
+    }
 
+    Eigen::VectorXd ConnectivityCBF::getCLFConstraints(Eigen::VectorXd state, Eigen::VectorXd neighbor_state)
+    {
+        GiNaC::ex matrix_expr = matrixSubs(Ac_CLF, state, neighbor_state, *this);
+        Eigen::VectorXd Ac;
+        Ac.resize(CONTROL_VARS);
+        Ac.setZero();
+        for (int i = 0; i < CONTROL_VARS; i++)
+        {
+            GiNaC::ex val = matrix_expr[i].evalf();
+            Ac(i) = GiNaC::ex_to<GiNaC::numeric>(val).to_double();
+        }
         return Ac;
     }
 
@@ -570,7 +636,7 @@ namespace cbf
         auto [lambda2_val, eigenvec] = getLambda2FromL(robot_states.leftCols(2), dmax, sigma_val);
         eigenvec = eigenvec / eigenvec.norm();
         double h = lambda2_val - epsilon;
-        logger->debug("Step 1: λ₂ = {}, λ₂_min = {}, h = {}", lambda2_val, epsilon, h);
+        logger->info("λ₂ = {}, λ₂_min = {}, h = {}", lambda2_val, epsilon, h);
 
         // Step 2: 符号构造 ∇h (gradient of h), shape = N×2
         initSymbolLists(N);
@@ -665,6 +731,17 @@ namespace cbf
         GiNaC::ex expr = valueSubs(Bc_safe, state, neighbor_state, *this);
         double Bc = GiNaC::ex_to<GiNaC::numeric>(expr).to_double();
 
+        return Bc;
+    }
+
+    double ConnectivityCBF::getCLFBound(Eigen::VectorXd state, Eigen::VectorXd neighbor_state)
+    {
+        GiNaC::ex expr = valueSubs(Bc_CLF, state, neighbor_state, *this);
+        //std::ostringstream oss;
+        //oss << expr;
+        //logger->info("CLF Bc symbolic expression after subs: {}", oss.str());
+        double Bc = GiNaC::ex_to<GiNaC::numeric>(expr).to_double();
+        //logger->info("CLF Bc numeric value: {:.6f}", Bc);
         return Bc;
     }
 

@@ -1,7 +1,8 @@
 import argparse
 import json
 import os
-
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.animation as animation
 import matplotlib.pyplot as plt
 import numpy as np
@@ -15,7 +16,7 @@ def generate_colors(n):
     hsv = np.linspace(0, 1, n + 1)[:-1]
     return [plt.cm.hsv(h) for h in hsv]
 
-def plot_connectivity(ax, positions, max_dist, colors, label_prefix=''):
+def plot_connectivity(ax, positions, max_dist, colors, radius, label_prefix=''):
     """
     在 ax 坐标轴上绘制一次性的连通性：在 positions 中分别画出机器人位置，
     并对两两之间距离小于等于 max_dist 的机器人连线。
@@ -26,6 +27,8 @@ def plot_connectivity(ax, positions, max_dist, colors, label_prefix=''):
     for i in range(n):
         x_i, y_i = positions[i][:2]
         ax.plot(x_i, y_i, 'o', color=colors[i], label=f"{label_prefix}{i}")
+        circle = plt.Circle((x_i, y_i), radius, color=colors[i], alpha=0.2)
+        ax.add_patch(circle)
         for j in range(i + 1, n):
             x_j, y_j = positions[j][:2]
             if np.hypot(x_j - x_i, y_j - y_i) <= max_dist:
@@ -77,6 +80,7 @@ def main():
 
     # === 2. 读取配置和状态数据 ===
     cfg = load_json(config_file)
+    robot_radius = cfg["robot_params"]["collision_shape"]["radius"]
     # try to load states.json, if it doesn't exist, it will raise an error
     HAS_RESULT = False
     if os.path.exists(states_file):
@@ -89,6 +93,7 @@ def main():
     max_dist = cfg['cbf_params']['d_max']
     ts = cfg["mpc_params"]["h"]
     N = len(sf)
+    
 
     # robots 数据结构：假设 st['robots'][key]['states'] 是一个帧序列
     if HAS_RESULT:
@@ -110,12 +115,12 @@ def main():
 
     # --- 3.1 初始连通性（Static） ---
     axes[0].set_title('Initial Connectivity')
-    plot_connectivity(axes[0], so, max_dist, colors)
+    plot_connectivity(axes[0], so, max_dist, colors, robot_radius)
     axes[0].grid(True)
 
     # --- 3.2 最终连通性（Static） ---
     axes[1].set_title('Final Connectivity')
-    plot_connectivity(axes[1], sf, max_dist, colors)
+    plot_connectivity(axes[1], sf, max_dist, colors, robot_radius)
     axes[1].grid(True)
 
     # --- 3.3 轨迹（仅当有结果时） ---
@@ -126,13 +131,13 @@ def main():
 
     # 保存静态图
     # Set x and y limits based on physical limits
-    x_min, y_min = cfg["physical_limits"]["p_min"]
-    x_max, y_max = cfg["physical_limits"]["p_max"]
-    x_padding = (x_max - x_min) * 0.1
-    y_padding = (y_max - y_min) * 0.1
-    for ax in axes:
-        ax.set_xlim(x_min - x_padding, x_max + x_padding)
-        ax.set_ylim(y_min - y_padding, y_max + y_padding)
+    # x_min, y_min = cfg["physical_limits"]["p_min"]
+    # x_max, y_max = cfg["physical_limits"]["p_max"]
+    # x_padding = (x_max - x_min) * 0.1
+    # y_padding = (y_max - y_min) * 0.1
+    # for ax in axes:
+    #     ax.set_xlim(x_min - x_padding, x_max + x_padding)
+    #     ax.set_ylim(y_min - y_padding, y_max + y_padding)
     os.makedirs(os.path.dirname(output_static) or '.', exist_ok=True)
     fig.tight_layout()
     fig.savefig(output_static)
@@ -164,7 +169,8 @@ def main():
 
             # 取出当前帧每辆车的 (x, y)
             curr_positions = traj[:, frame_idx, :2]  # 形状 (N, 2)
-            # 先用 scatter 画机器人当前位置
+
+            # 1. scatter画出当前位置
             scat = ax_anim.scatter(
                 curr_positions[:, 0],
                 curr_positions[:, 1],
@@ -175,7 +181,14 @@ def main():
             )
             artists.append(scat)
 
-            # 再两两判断距离，画连通性线段
+            # 2. 每个机器人画圆
+            for i in range(N):
+                x_i, y_i = curr_positions[i]
+                circle = plt.Circle((x_i, y_i), robot_radius, color=colors[i], alpha=0.2, zorder=1)
+                ax_anim.add_patch(circle)
+                artists.append(circle)
+
+            # 3. 两两之间画连线
             for i in range(N):
                 x_i, y_i = curr_positions[i]
                 for j in range(i + 1, N):
@@ -185,7 +198,8 @@ def main():
                         artists.append(ln)
 
             return artists
-    
+
+
         # TODO: downsample the frames if T is too large
         anim = animation.FuncAnimation(
             fig,

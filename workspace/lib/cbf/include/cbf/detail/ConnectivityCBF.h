@@ -41,16 +41,17 @@ namespace cbf
         // States for the ego and neighbor agent
         GiNaC::matrix state, p_n, v_n;
         // Symbolic constraints and bounds
-        GiNaC::matrix Ac_safe, Ac_connectivity;
+        GiNaC::matrix Ac_safe, Ac_connectivity, Ac_CLF;
         GiNaC::matrix Ac_v1_max, Ac_v2_max, Ac_v3_max;
         GiNaC::matrix Ac_v1_min, Ac_v2_min, Ac_v3_min;
-        GiNaC::ex Bc_safe, Bc_connectivity;
+        GiNaC::ex Bc_safe, Bc_connectivity, Bc_CLF;
         GiNaC::ex Bc_v1_max, Bc_v2_max, Bc_v3_max;
         GiNaC::ex Bc_v1_min, Bc_v2_min, Bc_v3_min;
         // Alpha function
         std::function<GiNaC::ex(GiNaC::ex, double)> alpha;
         // Internal initialization
         std::pair<GiNaC::matrix, GiNaC::ex> initSafetyCBF();
+        std::pair<GiNaC::matrix, GiNaC::ex> initCLFCBF();
         std::pair<GiNaC::matrix, GiNaC::ex> initVelCBF(GiNaC::ex bv);
         void initSymbolLists(int N);
         // Helpers for connectivity CBF
@@ -96,6 +97,11 @@ namespace cbf
         //                             const std::vector<Eigen::VectorXd> &other_positions);
         // Alpha setter
         void setAlpha(std::function<GiNaC::ex(GiNaC::ex, double)> newAlpha);
+        double getEpsilon() const { return epsilon; }
+        Eigen::VectorXd getCLFConstraints(Eigen::VectorXd state, Eigen::VectorXd neighbor_state);
+        double getCLFBound(Eigen::VectorXd state, Eigen::VectorXd neighbor_state);
+        double getDmax() const { return dmax; }
+
     };
     // Free function
     std::pair<double, Eigen::VectorXd> getLambda2FromL(const Eigen::MatrixXd &robot_positions,

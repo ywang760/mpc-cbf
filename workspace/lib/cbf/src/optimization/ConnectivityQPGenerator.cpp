@@ -5,6 +5,7 @@
 #include <cbf/optimization/ConnectivityQPGenerator.h>
 
 namespace cbf {
+    auto logger = spdlog::default_logger();
     template <typename T, unsigned int DIM>
     ConnectivityQPGenerator<T, DIM>::ConnectivityQPGenerator(std::shared_ptr<ConnectivityCBF> cbf, int num_neighbors, bool slack_mode) 
         : CBFQPGeneratorBase<T, DIM>(num_neighbors, slack_mode), cbf_(cbf) {
@@ -16,7 +17,6 @@ namespace cbf {
                                                             bool use_slack,
                                                             std::size_t slack_idx)
     {
-        // TODO: right now move them here
         // === 组装 robot_states: [self; others] ===
         const int N = 1 + other_positions.size();
         Eigen::MatrixXd robot_states(N, 6);
@@ -130,6 +130,30 @@ namespace cbf {
             this->addLinearConstraintForControlInput(linear_constraint);
         }
     }
+
+    template <typename T, unsigned int DIM>
+    void ConnectivityQPGenerator<T, DIM>::addCLFConstraint(const Vector &state, const Vector &neighbor_state, 
+                                                            bool use_slack,
+                                                            std::size_t slack_idx)
+        {
+            // Get safety constraint coefficients from the CBF implementation
+            Vector coefficients = cbf_->getCLFConstraints(state, neighbor_state);
+            // Get the safety constraint bound from the CBF implementation
+            T bound = -1.0 * cbf_->getCLFBound(state, neighbor_state);
+            // Create a linear constraint with lower bound negative infinity
+            LinearConstraint linear_constraint(coefficients, std::numeric_limits<T>::lowest(), bound);
+            
+            if (use_slack && !this->slack_variables_.empty()) {
+            // Create a row vector for slack variable coefficients (all zeros except at slack_idx)
+            Row slack_coefficients = Row::Zero(this->slack_variables_.size());
+            slack_coefficients(slack_idx) = -1; // Negative coefficient allows constraint relaxation
+            // Add the constraint with slack variable to the QP problem
+            this->addLinearConstraintForControlInputWithSlackVariables(linear_constraint, slack_coefficients);
+            } else {
+                // Add the constraint without slack variable to the QP problem
+            this->addLinearConstraintForControlInput(linear_constraint);
+            }
+        }   
 
     // Explicit template instantiation
     template class ConnectivityQPGenerator<double, 3U>;
