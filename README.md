@@ -1,4 +1,4 @@
-# FoVMPC
+# MPC-CBF: Model Predictive Control with Control Barrier Functions
 
 ## Getting Started
 

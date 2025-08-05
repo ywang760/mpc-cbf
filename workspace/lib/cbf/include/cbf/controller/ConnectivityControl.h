@@ -28,12 +28,12 @@ namespace cbf {
          * @brief Constructor for ConnectivityControl
          * 
          * @param cbf Shared pointer to ConnectivityCBF implementation
-         * @param number_neighbors Number of neighboring agents to consider
+         * @param num_robots Number of robots
          * @param slack_mode Whether to use slack variables in constraints
          * @param slack_cost Cost coefficient for slack variables
          * @param slack_decay_rate Decay rate for slack variables
          */
-        ConnectivityControl(std::shared_ptr<ConnectivityCBF> cbf, int number_neighbors=0, bool slack_mode=false, T slack_cost=1000, T slack_decay_rate=0.2);
+        ConnectivityControl(std::shared_ptr<ConnectivityCBF> cbf, int num_robots=0, bool slack_mode=false, T slack_cost=1000, T slack_decay_rate=0.2);
         ~ConnectivityControl()=default;
 
         /**
@@ -42,7 +42,7 @@ namespace cbf {
          * @param cbf_u Output parameter for the optimized control input
          * @param desired_u Desired control input without CBF constraints
          * @param current_states Current states of all robots in the network
-         * @param ego_robot_idx Index of the ego robot for which we are computing control input
+         * @param self_idx Index of the ego robot for which we are computing control input
          * @param u_min Minimum allowable control inputs
          * @param u_max Maximum allowable control inputs
          * @return true if optimization was successful
@@ -51,20 +51,16 @@ namespace cbf {
         bool optimize(VectorDIM &cbf_u,
                       const VectorDIM &desired_u,
                       std::vector<State> current_states,
-                      size_t ego_robot_idx,
+                      size_t self_idx,
                       const VectorDIM &u_min,
                       const VectorDIM &u_max);
-
-        const std::shared_ptr<cbf::ConnectivityCBF>& getCBF() const {
-            return qp_generator_.getCBF();
-        }
-
 
     private:
         QPGenerator qp_generator_;
         bool slack_mode_;
         T slack_cost_;
         T slack_decay_rate_;
+        int num_robots_;
         std::shared_ptr<ConnectivityCBF> cbf_;
     };
 

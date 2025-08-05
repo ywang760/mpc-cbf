@@ -45,7 +45,7 @@ namespace mpc {
         qp_generator_.addPositionErrorPenaltyCost(current_state, ref_positions);
         // minimize the control effort for the curve up to specified degree
         for (size_t d = 1; d <= bezier_continuity_upto_degree_; ++d) {
-            qp_generator_.addIntegratedSquaredDerivativeCost(d, mpc_tuning_.w_u_eff_); // TODO pass in this weight from params
+            qp_generator_.addIntegratedSquaredDerivativeCost(d, mpc_tuning_.w_u_eff_);
         }
 
         // add the current state constraints
@@ -66,7 +66,7 @@ namespace mpc {
         for (size_t i = 0; i < other_robot_positions.size(); ++i) {
             const VectorDIM& other_robot_pos = other_robot_positions.at(i);
 
-            // TODO this is model specific, here the last dimension is orientation data
+            // TODO: this is model specific, here the last dimension is orientation data
             VectorDIM current_xy = current_pos; current_xy(DIM-1) = 0;
             VectorDIM other_robot_xy = other_robot_pos; other_robot_xy(DIM-1) = 0;
 
