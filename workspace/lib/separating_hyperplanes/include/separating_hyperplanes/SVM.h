@@ -5,12 +5,12 @@
 #ifndef SEPARATINGHYPERPLANES_SVM_H
 #define SEPARATINGHYPERPLANES_SVM_H
 
-#include <separating_hyperplanes/Types.h>
 #include <qpcpp/Problem.h>
 #include <qpcpp/solvers/CPLEX.h>
+#include <separating_hyperplanes/Types.h>
 
 namespace separating_hyperplanes {
-    /**
+/**
      * Computes a hard-margin SVM hyperplane separating two sets of points.
      *
      * Unlike Voronoi separating hyperplanes which simply find an equidistant
@@ -30,11 +30,10 @@ namespace separating_hyperplanes {
      * @return Optimal separating hyperplane that maximizes margin between classes
      * @throws std::invalid_argument if sets are empty or linearly inseparable
      */
-    template <typename T, unsigned int DIM>
-    Hyperplane<T, DIM> hardMarginSVM(
-            const std::vector<VectorDIM<T, DIM>>& first_set_of_points,
-            const std::vector<VectorDIM<T, DIM>>& second_set_of_points);
+template <typename T, unsigned int DIM>
+Hyperplane<T, DIM> hardMarginSVM(const std::vector<VectorDIM<T, DIM>>& first_set_of_points,
+                                 const std::vector<VectorDIM<T, DIM>>& second_set_of_points);
 
-} // separating_hyperplanes
+} // namespace separating_hyperplanes
 
 #endif //SEPARATINGHYPERPLANES_SVM_H

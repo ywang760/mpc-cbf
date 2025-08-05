@@ -1,8 +1,8 @@
 #pragma once
 
-#include <particle_filter/detail/particle_filter.h>
-#include <math/Types.h>
 #include <math/Geometry.h>
+#include <math/Types.h>
+#include <particle_filter/detail/particle_filter.h>
 #include <utility>
 
 namespace pf {
@@ -11,7 +11,7 @@ namespace pf {
  * Utility functions for particle filter applications with field of view constraints
  */
 class PFApplications {
-public:
+  public:
     /**
      * Process a particle filter update with field-of-view constraints and return state estimate
      * 
@@ -23,15 +23,11 @@ public:
      * @param weight_reduction_factor Factor to reduce weights for particles in FOV
      * @return A pair containing the state estimate vector and covariance matrix
      */
-    template<typename T, unsigned int DIM>
-    static std::pair<math::Vector<double>, math::Matrix<double>> 
-    processFovUpdate(ParticleFilter& filter, 
-                     const math::VectorDIM<T, DIM>& ego_pos,
-                     const math::VectorDIM<T, DIM>& neighbor_pos,
-                     double fov_beta, 
-                     double fov_Rs,
+    template <typename T, unsigned int DIM>
+    static std::pair<math::Vector<double>, math::Matrix<double>>
+    processFovUpdate(ParticleFilter& filter, const math::VectorDIM<T, DIM>& ego_pos,
+                     const math::VectorDIM<T, DIM>& neighbor_pos, double fov_beta, double fov_Rs,
                      double weight_reduction_factor = 10.0);
-
 };
 
 } // namespace pf
