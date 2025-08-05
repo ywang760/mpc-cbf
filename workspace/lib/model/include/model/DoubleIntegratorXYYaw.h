@@ -8,7 +8,7 @@
 #include <model/DoubleIntegrator.h>
 
 namespace model {
-    /**
+/**
      * @brief Double integrator model for x, y position and yaw angle
      *
      * State vector (6 dimensions):
@@ -24,23 +24,22 @@ namespace model {
      * - ay:   y acceleration
      * - ayaw: yaw angular acceleration
      */
-    template <typename T>
-    class DoubleIntegratorXYYaw : public DoubleIntegrator<T, 3U> {
-    public:
-        using DoubleIntegrator<T, 3U>::A_;
-        using DoubleIntegrator<T, 3U>::B_;
-        using DoubleIntegrator<T, 3U>::dim_;
-        using Matrix = math::Matrix<T>;
+template <typename T>
+class DoubleIntegratorXYYaw : public DoubleIntegrator<T, 3U> {
+  public:
+    using DoubleIntegrator<T, 3U>::A_;
+    using DoubleIntegrator<T, 3U>::B_;
+    using DoubleIntegrator<T, 3U>::dim_;
+    using Matrix = math::Matrix<T>;
 
-        /**
+    /**
          * @brief Constructor
          * @param ts Time step (seconds)
          */
-        DoubleIntegratorXYYaw(T ts);
-        ~DoubleIntegratorXYYaw()=default;
+    DoubleIntegratorXYYaw(T ts);
+    ~DoubleIntegratorXYYaw() = default;
+};
 
-    };
-
-} // model
+} // namespace model
 
 #endif //MODEL_DOUBLEINTEGRATORXYYAW_H

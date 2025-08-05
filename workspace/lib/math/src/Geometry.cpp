@@ -1,6 +1,6 @@
-#include <math/Geometry.h>
 #include <Eigen/Eigenvalues>
 #include <cmath>
+#include <math/Geometry.h>
 
 namespace math {
 
@@ -8,7 +8,7 @@ Vector<double> closestPointOnEllipse(const VectorDIM<double, 3U>& robot_pos,
                                      const Vector<double>& target_mean,
                                      const Matrix<double>& target_cov) {
     if (!std::isinf(target_cov(0, 0))) {
-        Eigen::EigenSolver<Matrix<double>> es(target_cov.block(0, 0, 3U-1, 3U-1));
+        Eigen::EigenSolver<Matrix<double>> es(target_cov.block(0, 0, 3U - 1, 3U - 1));
         Vector<double> eigenvalues = es.eigenvalues().real();
         Matrix<double> eigenvectors = es.eigenvectors().real();
 
@@ -33,14 +33,18 @@ Vector<double> closestPointOnEllipse(const VectorDIM<double, 3U>& robot_pos,
             l = 0;
         }
 
-        double theta = atan2(eigenvectors(1, m), eigenvectors(0, m)); // angle of the major axis wrt positive x-axis (ccw rotation)
+        double theta =
+            atan2(eigenvectors(1, m),
+                  eigenvectors(0, m)); // angle of the major axis wrt positive x-axis (ccw rotation)
         if (theta < 0.0) {
             theta += M_PI;
         } // angle in [0, 2pi]
 
         double slope = atan2(-target_mean(1) + robot_pos(1), -target_mean(0) + robot_pos(0));
-        double x_n = target_mean(0) + a * cos(slope - theta) * cos(theta) - b * sin(slope - theta) * sin(theta);
-        double y_n = target_mean(1) + a * cos(slope - theta) * sin(theta) + b * sin(slope - theta) * cos(theta);
+        double x_n = target_mean(0) + a * cos(slope - theta) * cos(theta) -
+                     b * sin(slope - theta) * sin(theta);
+        double y_n = target_mean(1) + a * cos(slope - theta) * sin(theta) +
+                     b * sin(slope - theta) * cos(theta);
 
         Vector<double> p_near(2);
         p_near << x_n, y_n;
@@ -52,17 +56,16 @@ Vector<double> closestPointOnEllipse(const VectorDIM<double, 3U>& robot_pos,
     }
 }
 
-bool insideFOV(const Eigen::VectorXd& robot, const Eigen::VectorXd& target, double fov, double range) {
+bool insideFOV(const Eigen::VectorXd& robot, const Eigen::VectorXd& target, double fov,
+               double range) {
     double yaw = robot(2);
 
     Eigen::Matrix3d R;
-    R << cos(yaw), sin(yaw), 0.0,
-         -sin(yaw), cos(yaw), 0.0,
-         0.0, 0.0, 1.0;
-    Eigen::VectorXd t_local = R.block<2,2>(0,0) * (target.head(2) - robot.head(2));
+    R << cos(yaw), sin(yaw), 0.0, -sin(yaw), cos(yaw), 0.0, 0.0, 0.0, 1.0;
+    Eigen::VectorXd t_local = R.block<2, 2>(0, 0) * (target.head(2) - robot.head(2));
     double dist = t_local.norm();
     double angle = abs(atan2(t_local(1), t_local(0)));
-    if (angle <= 0.5*fov && dist <= range) {
+    if (angle <= 0.5 * fov && dist <= range) {
         return true;
     } else {
         return false;

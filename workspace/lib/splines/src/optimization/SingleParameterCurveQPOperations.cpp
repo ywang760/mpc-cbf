@@ -4,5 +4,4 @@
 
 #include <splines/optimization/SingleParameterCurveQPOperations.h>
 
-namespace splines {
-} // splines
+namespace splines {} // namespace splines

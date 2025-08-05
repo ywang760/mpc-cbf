@@ -21,7 +21,7 @@ mpc::PiecewiseBezierParams<T, DIM> parsePiecewiseBezierParams(const nlohmann::js
     size_t num_pieces = config_json["bezier_params"]["num_pieces"];
     size_t num_control_points = config_json["bezier_params"]["num_control_points"];
     T piece_max_parameter = config_json["bezier_params"]["piece_max_parameter"];
-    
+
     return {num_pieces, num_control_points, piece_max_parameter};
 }
 
@@ -35,7 +35,7 @@ template <typename T>
 mpc::MPCParams<T> parseMPCParams(const nlohmann::json& config_json) {
     using Vector = math::Vector<T>;
     using VectorDIM = math::VectorDIM<T, 3>; // Assuming 3D for this implementation
-    
+
     // MPC parameters
     T h = config_json["mpc_params"]["h"];
     T Ts = config_json["mpc_params"]["Ts"];
@@ -46,32 +46,26 @@ mpc::MPCParams<T> parseMPCParams(const nlohmann::json& config_json) {
 
     // Physical limits
     Vector p_min = Vector::Zero(2);
-    p_min << config_json["physical_limits"]["p_min"][0],
-             config_json["physical_limits"]["p_min"][1];
+    p_min << config_json["physical_limits"]["p_min"][0], config_json["physical_limits"]["p_min"][1];
 
     Vector p_max = Vector::Zero(2);
-    p_max << config_json["physical_limits"]["p_max"][0],
-             config_json["physical_limits"]["p_max"][1];
+    p_max << config_json["physical_limits"]["p_max"][0], config_json["physical_limits"]["p_max"][1];
 
     VectorDIM v_min;
-    v_min << config_json["physical_limits"]["v_min"][0],
-             config_json["physical_limits"]["v_min"][1],
-             config_json["physical_limits"]["v_min"][2];
+    v_min << config_json["physical_limits"]["v_min"][0], config_json["physical_limits"]["v_min"][1],
+        config_json["physical_limits"]["v_min"][2];
 
     VectorDIM v_max;
-    v_max << config_json["physical_limits"]["v_max"][0],
-             config_json["physical_limits"]["v_max"][1],
-             config_json["physical_limits"]["v_max"][2];
+    v_max << config_json["physical_limits"]["v_max"][0], config_json["physical_limits"]["v_max"][1],
+        config_json["physical_limits"]["v_max"][2];
 
     VectorDIM a_min;
-    a_min << config_json["physical_limits"]["a_min"][0],
-             config_json["physical_limits"]["a_min"][1],
-             config_json["physical_limits"]["a_min"][2];
+    a_min << config_json["physical_limits"]["a_min"][0], config_json["physical_limits"]["a_min"][1],
+        config_json["physical_limits"]["a_min"][2];
 
     VectorDIM a_max;
-    a_max << config_json["physical_limits"]["a_max"][0],
-             config_json["physical_limits"]["a_max"][1],
-             config_json["physical_limits"]["a_max"][2];
+    a_max << config_json["physical_limits"]["a_max"][0], config_json["physical_limits"]["a_max"][1],
+        config_json["physical_limits"]["a_max"][2];
 
     return {h, Ts, k_hor, {w_pos_err, w_u_eff, spd_f}, {p_min, p_max, v_min, v_max, a_min, a_max}};
 }
@@ -84,16 +78,17 @@ mpc::MPCParams<T> parseMPCParams(const nlohmann::json& config_json) {
  * @return IMPCParams object
  */
 template <typename T, unsigned int DIM>
-typename mpc_cbf::ConnectivityIMPCCBF<T, DIM>::IMPCParams parseIMPCParams(const nlohmann::json& config_json) {
+typename mpc_cbf::ConnectivityIMPCCBF<T, DIM>::IMPCParams
+parseIMPCParams(const nlohmann::json& config_json) {
     // CBF parameters
     bool slack_mode = config_json["cbf_params"]["slack_mode"];
     T slack_cost = config_json["cbf_params"]["slack_cost"];
     T slack_decay_rate = config_json["cbf_params"]["slack_decay_rate"];
-    
+
     // TODO: move these to input json (currently hardcoded in original code)
     int cbf_horizon = 2;
     int impc_iter = 2;
-    
+
     return {cbf_horizon, impc_iter, slack_cost, slack_decay_rate, slack_mode};
 }
 
@@ -118,16 +113,16 @@ cbf::ConnectivityCBFParams<T> parseConnectivityCBFParams(const nlohmann::json& c
  * @return Shared pointer to AlignedBoxCollisionShape
  */
 template <typename T, unsigned int DIM>
-std::shared_ptr<const math::AlignedBoxCollisionShape<T, DIM>> parseCollisionShape(const nlohmann::json& config_json) {
+std::shared_ptr<const math::AlignedBoxCollisionShape<T, DIM>>
+parseCollisionShape(const nlohmann::json& config_json) {
     using VectorDIM = math::VectorDIM<T, DIM>;
     using AlignedBox = math::AlignedBox<T, DIM>;
     using AlignedBoxCollisionShape = math::AlignedBoxCollisionShape<T, DIM>;
-    
+
     VectorDIM aligned_box_collision_vec;
-    aligned_box_collision_vec
-        << config_json["robot_params"]["collision_shape"]["aligned_box"][0],
-           config_json["robot_params"]["collision_shape"]["aligned_box"][1],
-           config_json["robot_params"]["collision_shape"]["aligned_box"][2];
+    aligned_box_collision_vec << config_json["robot_params"]["collision_shape"]["aligned_box"][0],
+        config_json["robot_params"]["collision_shape"]["aligned_box"][1],
+        config_json["robot_params"]["collision_shape"]["aligned_box"][2];
     AlignedBox robot_bbox_at_zero = {-aligned_box_collision_vec, aligned_box_collision_vec};
     return std::make_shared<const AlignedBoxCollisionShape>(robot_bbox_at_zero);
 }
