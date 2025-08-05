@@ -44,6 +44,16 @@ namespace cbf {
                                bool use_slack = false);
 
         /**
+         * @brief Adds CLF connectivity constraint
+         *
+         * @param state Current state of the robot
+         * @param neighbor_state State of the target/neighboring robot
+         * @param use_slack Whether to use slack variables for this constraint
+         * @param slack_idx Index of slack variable to use (if use_slack is true)
+         */                    
+        void addCLFConstraint(const Vector &state, const Vector &neighbor_state, bool use_slack, std::size_t slack_idx);
+        
+        /**
          * @brief Adds safety constraint between agents to prevent collisions
          *
          * @param state Current state of the robot
@@ -67,14 +77,6 @@ namespace cbf {
          * @param state Current state of the robot
          */
         void addMaxVelConstraints(const Vector& state) override;
-
-        /**
-        * @brief Accessor for the internal ConnectivityCBF instance
-        * @return Shared pointer to the ConnectivityCBF object
-        */
-        const std::shared_ptr<ConnectivityCBF>& getCBF() const {
-            return cbf_;
-        }
 
 
     private:

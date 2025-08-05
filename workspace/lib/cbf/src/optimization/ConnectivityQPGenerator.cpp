@@ -4,8 +4,7 @@
 
 #include <cbf/optimization/ConnectivityQPGenerator.h>
 
-namespace cbf
-{
+namespace cbf {
     template <typename T, unsigned int DIM>
     ConnectivityQPGenerator<T, DIM>::ConnectivityQPGenerator(std::shared_ptr<ConnectivityCBF> cbf, int num_robots, bool slack_mode)
         : CBFQPGeneratorBase<T, DIM>(num_robots, slack_mode), cbf_(cbf)
@@ -48,6 +47,31 @@ namespace cbf
             this->addLinearConstraintForControlInput(linear_constraint);
         }
     }
+
+    template <typename T, unsigned int DIM>
+    void ConnectivityQPGenerator<T, DIM>::addCLFConstraint(const Vector &state, 
+                                                           const Vector &neighbor_state, 
+                                                           bool use_slack,
+                                                           std::size_t slack_idx)
+        {
+            // Get CLF constraint coefficiencts and bound
+            Vector coefficients = cbf_->getCLFConstraints(state, neighbor_state);
+            T bound = -1.0 * cbf_->getCLFBound(state, neighbor_state);
+            
+            // Create a linear constraint with lower bound negative infinity
+            LinearConstraint linear_constraint(coefficients, std::numeric_limits<T>::lowest(), bound);
+            
+            if (use_slack && !this->slack_variables_.empty()) {
+            // Create a row vector for slack variable coefficients (all zeros except at slack_idx)
+            Row slack_coefficients = Row::Zero(this->slack_variables_.size());
+            slack_coefficients(slack_idx) = -1; // Negative coefficient allows constraint relaxation
+            // Add the constraint with slack variable to the QP problem
+            this->addLinearConstraintForControlInputWithSlackVariables(linear_constraint, slack_coefficients);
+            } else {
+                // Add the constraint without slack variable to the QP problem
+            this->addLinearConstraintForControlInput(linear_constraint);
+            }
+        }   
 
     template <typename T, unsigned int DIM>
     void ConnectivityQPGenerator<T, DIM>::addSafetyConstraint(const Vector &state,

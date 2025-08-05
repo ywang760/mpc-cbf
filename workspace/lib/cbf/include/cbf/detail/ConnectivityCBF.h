@@ -51,10 +51,10 @@ namespace cbf
         // States for the ego and neighbor agent
         GiNaC::matrix state, p_n, v_n;
         // Symbolic constraints and bounds
-        GiNaC::matrix Ac_safe, Ac_conn;
+        GiNaC::matrix Ac_safe, Ac_conn, Ac_CLF;
         GiNaC::matrix Ac_v1_max, Ac_v2_max, Ac_v3_max;
         GiNaC::matrix Ac_v1_min, Ac_v2_min, Ac_v3_min;
-        GiNaC::ex Bc_safe, Bc_conn;
+        GiNaC::ex Bc_safe, Bc_conn, Bc_CLF;
         GiNaC::ex Bc_v1_max, Bc_v2_max, Bc_v3_max;
         GiNaC::ex Bc_v1_min, Bc_v2_min, Bc_v3_min;
 
@@ -64,6 +64,7 @@ namespace cbf
         std::function<GiNaC::ex(GiNaC::ex, double)> alpha;
         // Internal initialization
         std::pair<GiNaC::matrix, GiNaC::ex> initSafetyCBF();
+        std::pair<GiNaC::matrix, GiNaC::ex> initCLFCBF();
         std::pair<GiNaC::matrix, GiNaC::ex> initVelCBF(GiNaC::ex bv);
         void initSymbolLists(int N);
         // Helpers for connectivity CBF
@@ -76,11 +77,14 @@ namespace cbf
         // Safety constraints
         Eigen::VectorXd getSafetyConstraints(Eigen::VectorXd state, Eigen::VectorXd neighbor_state);
         double getSafetyBound(Eigen::VectorXd state, Eigen::VectorXd neighbor_state);
-        // Connectivity Constraints
+        // Connectivity Constraints (CBF)
         double getSigma() const;
         std::pair<double, Eigen::VectorXd> getLambda2(const Eigen::MatrixXd &robot_positions);
         Eigen::VectorXd getConnConstraints(Eigen::VectorXd state, Eigen::MatrixXd robot_states, Eigen::VectorXd eigenvec);
         double getConnBound(Eigen::VectorXd state, Eigen::MatrixXd robot_states, Eigen::VectorXd eigenvec, double h_val);
+        // Connectivity Constraints (CLF)
+        Eigen::VectorXd getCLFConstraints(Eigen::VectorXd state, Eigen::VectorXd neighbor_state);
+        double getCLFBound(Eigen::VectorXd state, Eigen::VectorXd neighbor_state);
         // Velocity constraints
         Eigen::MatrixXd getMaxVelContraints(Eigen::VectorXd state);
         Eigen::MatrixXd getMinVelContraints(Eigen::VectorXd state);
