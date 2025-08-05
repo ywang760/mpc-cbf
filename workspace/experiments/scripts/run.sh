@@ -1,19 +1,20 @@
 INPUT=(
-    # "/usr/src/mpc-cbf/workspace/experiments/config/baseline/2r/circle.json"
-    # "/usr/src/mpc-cbf/workspace/experiments/config/baseline/2r/line.json"
-    # "/usr/src/mpc-cbf/workspace/experiments/config/baseline/3r/bend.json"
-    # "/usr/src/mpc-cbf/workspace/experiments/config/baseline/3r/circle.json"
-    # "/usr/src/mpc-cbf/workspace/experiments/config/baseline/3r/cross_split.json"
-    # "/usr/src/mpc-cbf/workspace/experiments/config/baseline/3r/line.json"
-    # "/usr/src/mpc-cbf/workspace/experiments/config/baseline/3r/line2.json"
-    # "/usr/src/mpc-cbf/workspace/experiments/config/baseline/3r/line3.json"
-    # "/usr/src/mpc-cbf/workspace/experiments/config/baseline/3r/triangle.json"
-    # "/usr/src/mpc-cbf/workspace/experiments/config/baseline/5r/circle.json"
-    # "/usr/src/mpc-cbf/workspace/experiments/config/baseline/5r/expand.json"
-    # "/usr/src/mpc-cbf/workspace/experiments/config/baseline/6r/circle.json"
-    # "/usr/src/mpc-cbf/workspace/experiments/config/baseline/6r/upward.json"
-    # "/usr/src/mpc-cbf/workspace/experiments/config/baseline/8r/circle.json"
-    # "/usr/src/mpc-cbf/workspace/experiments/config/baseline/8r/diverge.json"
+    "/usr/src/mpc-cbf/workspace/experiments/config/baseline/2r/circle.json"
+    "/usr/src/mpc-cbf/workspace/experiments/config/baseline/2r/line.json"
+    "/usr/src/mpc-cbf/workspace/experiments/config/baseline/3r/bend.json"
+    "/usr/src/mpc-cbf/workspace/experiments/config/baseline/3r/circle.json"
+    "/usr/src/mpc-cbf/workspace/experiments/config/baseline/3r/cross_split.json"
+    "/usr/src/mpc-cbf/workspace/experiments/config/baseline/3r/line.json"
+    "/usr/src/mpc-cbf/workspace/experiments/config/baseline/3r/line2.json"
+    "/usr/src/mpc-cbf/workspace/experiments/config/baseline/3r/line3.json"
+    "/usr/src/mpc-cbf/workspace/experiments/config/baseline/3r/triangle.json"
+    "/usr/src/mpc-cbf/workspace/experiments/config/baseline/5r/circle.json"
+    "/usr/src/mpc-cbf/workspace/experiments/config/baseline/5r/expand.json"
+    "/usr/src/mpc-cbf/workspace/experiments/config/baseline/6r/circle.json"
+    "/usr/src/mpc-cbf/workspace/experiments/config/baseline/6r/upward.json"
+    "/usr/src/mpc-cbf/workspace/experiments/config/baseline/8r/circle.json"
+    "/usr/src/mpc-cbf/workspace/experiments/config/baseline/8r/circle2.json"
+    "/usr/src/mpc-cbf/workspace/experiments/config/baseline/8r/diverge.json"
 )
 
 DEFAULT_STATES_PATH="/usr/src/mpc-cbf/workspace/experiments/results/states.json"
@@ -62,8 +63,8 @@ for config_file in "${INPUT[@]}"; do
         --config ${config_file} \
         --states ${DEFAULT_STATES_PATH} \
         --output_dir ${VIZ_OUTPUT_DIR}\
-        --create_anim \
-        --anim_format mp4
+        # --create_anim \
+        # --anim_format mp4
         # can add the --create_anim flag if needed
 
     # Step 3: Check for collisions and success
