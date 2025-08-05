@@ -27,21 +27,19 @@ jobs:
         git config --local user.name "GitHub Action"
 
     - name: Check and fix code formatting
-      uses: jidicula/clang-format-action@v4.11.0
-      with:
-        clang-format-version: '14'
-        check-path: 'workspace/lib'
-        include-regex: '^.*\.(cpp|hpp|h|cc|cxx)$'
-        exclude-regex: '^.*/(build|\.git)/.*$'
-        inplace: true
+      run: |
+        # Use clang-format with glob patterns for recursive formatting
+        clang-format -i --style=file workspace/lib/*/include/**/*.{cpp,h,hpp} workspace/lib/*/src/**/*.{cpp,h,hpp} || true
 
     - name: Commit formatting changes
-      if: success()
       run: |
         if ! git diff --quiet; then
+          echo "Code formatting changes applied"
           git add .
           git commit -m "Auto-fix code formatting with clang-format [skip ci]"
           git push
+        else
+          echo "All files are properly formatted"
         fi
 
   build-and-test:

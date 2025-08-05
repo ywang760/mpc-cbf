@@ -1,0 +1,53 @@
+BasedOnStyle: LLVM
+ColumnLimit: 100
+
+# Indentation
+IndentWidth: 4
+TabWidth: 4
+UseTab: Never
+
+# Braces and Control Statements
+BreakBeforeBraces: Attach
+AllowShortIfStatementsOnASingleLine: true
+AllowShortFunctionsOnASingleLine: Empty
+
+# Spaces
+PointerAlignment: Left             # int* ptr;
+SpaceBeforeParens: ControlStatements
+SpaceAfterCStyleCast: true
+SpaceInEmptyParentheses: false
+
+# Wrapping and Line Breaks
+AlwaysBreakTemplateDeclarations: Yes
+AllowAllParametersOfDeclarationOnNextLine: false
+BinPackParameters: true
+BinPackArguments: true
+
+# Constructor Initializer List
+ConstructorInitializerAllOnOneLineOrOnePerLine: true
+BreakConstructorInitializersBeforeComma: false
+
+# Alignments
+AlignAfterOpenBracket: Align
+AlignOperands: true
+AlignConsecutiveAssignments: false
+AlignConsecutiveDeclarations: false
+
+# Includes
+IncludeBlocks: Preserve
+IncludeCategories:
+  - Regex:           '^<.*\.h>'
+    Priority:        1
+  - Regex:           '^"'
+    Priority:        2
+SortIncludes: true
+
+SortUsingDeclarations: true
+
+# Misc
+Cpp11BracedListStyle: true
+Standard: Latest
+FixNamespaceComments: true
+
+# Comments
+ReflowComments: false
