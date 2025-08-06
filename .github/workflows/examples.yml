@@ -1,0 +1,75 @@
+name: Example Validation
+
+on:
+  # Choose your preferred triggers:
+  push:
+    branches: [ main, update-ci ]
+    # paths: 
+    #   - 'workspace/lib/**'
+    #   - 'workspace/experiments/'
+  # schedule:
+  #   - cron: '0 2 * * *'  # Run nightly at 2 AM
+  workflow_dispatch:  # Manual trigger
+
+jobs:
+  run-all-examples:
+    name: Run All Examples
+    runs-on: ubuntu-22.04
+    container:
+      image: wangyt163/mpc-cbf:latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        submodules: recursive
+
+    - name: Configure Git
+      run: |
+        git config --global --add safe.directory $GITHUB_WORKSPACE
+
+    - name: Build packages
+      run: |
+        # Build both packages first
+        cd workspace/lib/cbf/build && make -j20
+        cd ../mpc_cbf/build && make -j20
+
+    - name: Set up Python virtual environment
+      run: |
+        python3 -m venv /tmp/mpc-cbf-venv
+        source /tmp/mpc-cbf-venv/bin/activate
+        pip install --upgrade pip
+        pip install -r .github/workflows/requirements.txt
+
+    - name: Create output directory
+      run: |
+        mkdir -p /usr/src/mpc-cbf/workspace/experiments/results/ci_plots
+
+    - name: Run CBF script
+      run: |
+        source /tmp/mpc-cbf-venv/bin/activate
+        chmod +x .github/workflows/scripts/run_cbf.sh
+        ./.github/workflows/scripts/run_cbf.sh
+
+    # TODO: add run MPCCBF script
+    
+    - name: Archive example outputs
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: example-outputs-${{ github.sha }}
+        path: |
+          **/*.png
+          **/*.pdf
+          **/*.txt
+          **/*.csv
+          **/*.log
+          **/results/
+        retention-days: 30  # Keep longer for analysis
+
+    - name: Create summary
+      if: always()
+      run: |
+        echo "## Example Validation Results" >> $GITHUB_STEP_SUMMARY
+        echo "Generated artifacts:" >> $GITHUB_STEP_SUMMARY
+        find . -name "*.png" -o -name "*.pdf" | head -20 >> $GITHUB_STEP_SUMMARY
