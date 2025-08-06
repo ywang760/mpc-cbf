@@ -1,0 +1,130 @@
+name: Example Validation
+
+on:
+  # Choose your preferred triggers:
+  push:
+    branches: [ main, update-ci ]
+    # paths: 
+    #   - 'workspace/lib/**'
+    #   - 'workspace/experiments/'
+  # schedule:
+  #   - cron: '0 2 * * *'  # Run nightly at 2 AM
+  workflow_dispatch:  # Manual trigger
+
+jobs:
+  run-all-examples:
+    name: Run All Examples
+    runs-on: ubuntu-22.04
+    container:
+      image: wangyt163/mpc-cbf:latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        submodules: recursive
+
+    - name: Configure Git
+      run: |
+        git config --global --add safe.directory $GITHUB_WORKSPACE
+
+    - name: Build CBF Package
+      run: |
+        cd workspace/lib/cbf
+        mkdir -p build
+        cd build
+        cmake .. -G Ninja
+        ninja -j20
+
+    # - name: Build MPC CBF Package
+    #   run: |
+    #     cd workspace/lib/mpc_cbf
+    #     mkdir -p build
+    #     cd build
+    #     cmake .. -G Ninja
+    #     ninja -j20
+
+    - name: Set up Python virtual environment
+      shell: bash
+      run: |
+        python3 -m venv /tmp/mpc-cbf-venv
+        source /tmp/mpc-cbf-venv/bin/activate
+        pip install --upgrade pip
+        pip install -r .github/workflows/requirements.txt
+
+    - name: Create output directory
+      run: |
+        mkdir -p $GITHUB_WORKSPACE/workspace/experiments/results/ci_plots
+
+    - name: Run CBF script
+      shell: bash
+      run: |
+        source /tmp/mpc-cbf-venv/bin/activate
+        chmod +x .github/workflows/scripts/run_cbf.sh
+        ./.github/workflows/scripts/run_cbf.sh
+
+    # TODO: add run MPCCBF script
+    
+    - name: Archive example outputs
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: example-outputs-${{ github.sha }}
+        path: |
+          workspace/experiments/results/ci_plots/
+        retention-days: 30  # Keep longer for analysis
+
+    - name: Create summary
+      if: always()
+      run: |
+        echo "## Example Validation Results" >> $GITHUB_STEP_SUMMARY
+        echo "Generated artifacts:" >> $GITHUB_STEP_SUMMARY
+        find workspace/experiments/results/ci_plots -name "*.png" -o -name "*.pdf" -o -name "*.mp4" | head -20 >> $GITHUB_STEP_SUMMARY
+
+    - name: Create issue comment with results
+      if: always()
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+          const path = require('path');
+          
+          // Count generated files
+          const plotsDir = 'workspace/experiments/results/ci_plots';
+          let fileCount = 0;
+          let fileList = '';
+          
+          try {
+            const files = fs.readdirSync(plotsDir);
+            fileCount = files.length;
+            fileList = files.slice(0, 10).map(f => `- ${f}`).join('\n');
+          } catch (error) {
+            fileList = 'No files generated or directory not found';
+          }
+          
+          const body = `## 🤖 Example Validation Results
+          
+          **Workflow Run:** [${context.runNumber}](${context.payload.repository.html_url}/actions/runs/${context.runId})
+          **Commit:** ${context.sha.substring(0, 8)}
+          **Status:** ${context.job.status || 'completed'}
+          
+          ### 📊 Generated Artifacts
+          - **Total files:** ${fileCount}
+          - **Artifact name:** example-outputs-${context.sha}
+          
+          ### 📁 Files Generated:
+          ${fileList}
+          
+          ### 🔗 Download
+          [Download artifacts from this run](${context.payload.repository.html_url}/actions/runs/${context.runId})
+          
+          ---
+          *Generated on ${new Date().toISOString()}*`;
+          
+          // Create issue comment (will comment on any open issue #1)
+          await github.rest.issues.createComment({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: 4, // Change this to your desired issue number
+            body: body
+          });
