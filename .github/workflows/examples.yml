@@ -45,6 +45,7 @@ jobs:
     #     ninja -j20
 
     - name: Set up Python virtual environment
+      shell: bash
       run: |
         python3 -m venv /tmp/mpc-cbf-venv
         source /tmp/mpc-cbf-venv/bin/activate
@@ -56,6 +57,7 @@ jobs:
         mkdir -p /usr/src/mpc-cbf/workspace/experiments/results/ci_plots
 
     - name: Run CBF script
+      shell: bash
       run: |
         source /tmp/mpc-cbf-venv/bin/activate
         chmod +x .github/workflows/scripts/run_cbf.sh
