@@ -54,7 +54,7 @@ jobs:
 
     - name: Create output directory
       run: |
-        mkdir -p /usr/src/mpc-cbf/workspace/experiments/results/ci_plots
+        mkdir -p $GITHUB_WORKSPACE/workspace/experiments/results/ci_plots
 
     - name: Run CBF script
       shell: bash
@@ -71,7 +71,7 @@ jobs:
       with:
         name: example-outputs-${{ github.sha }}
         path: |
-          /usr/src/mpc-cbf/workspace/experiments/results/ci_plots/
+          workspace/experiments/results/ci_plots/
         retention-days: 30  # Keep longer for analysis
 
     - name: Create summary
@@ -79,4 +79,52 @@ jobs:
       run: |
         echo "## Example Validation Results" >> $GITHUB_STEP_SUMMARY
         echo "Generated artifacts:" >> $GITHUB_STEP_SUMMARY
-        find . -name "*.png" -o -name "*.pdf" | head -20 >> $GITHUB_STEP_SUMMARY
+        find workspace/experiments/results/ci_plots -name "*.png" -o -name "*.pdf" -o -name "*.mp4" | head -20 >> $GITHUB_STEP_SUMMARY
+
+    - name: Create issue comment with results
+      if: always()
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+          const path = require('path');
+          
+          // Count generated files
+          const plotsDir = 'workspace/experiments/results/ci_plots';
+          let fileCount = 0;
+          let fileList = '';
+          
+          try {
+            const files = fs.readdirSync(plotsDir);
+            fileCount = files.length;
+            fileList = files.slice(0, 10).map(f => `- ${f}`).join('\n');
+          } catch (error) {
+            fileList = 'No files generated or directory not found';
+          }
+          
+          const body = `## 🤖 Example Validation Results
+          
+          **Workflow Run:** [${context.runNumber}](${context.payload.repository.html_url}/actions/runs/${context.runId})
+          **Commit:** ${context.sha.substring(0, 8)}
+          **Status:** ${context.job.status || 'completed'}
+          
+          ### 📊 Generated Artifacts
+          - **Total files:** ${fileCount}
+          - **Artifact name:** example-outputs-${context.sha}
+          
+          ### 📁 Files Generated:
+          ${fileList}
+          
+          ### 🔗 Download
+          [Download artifacts from this run](${context.payload.repository.html_url}/actions/runs/${context.runId})
+          
+          ---
+          *Generated on ${new Date().toISOString()}*`;
+          
+          // Create issue comment (will comment on any open issue #1)
+          await github.rest.issues.createComment({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: 4, // Change this to your desired issue number
+            body: body
+          });

@@ -1,30 +1,30 @@
 INPUT=(
-    "/usr/src/mpc-cbf/workspace/experiments/config/baseline/2r/circle.json"
-    # "/usr/src/mpc-cbf/workspace/experiments/config/baseline/2r/line.json"
-    # "/usr/src/mpc-cbf/workspace/experiments/config/baseline/3r/bend.json"
-    # "/usr/src/mpc-cbf/workspace/experiments/config/baseline/3r/circle.json"
-    # "/usr/src/mpc-cbf/workspace/experiments/config/baseline/3r/cross_split.json"
-    # "/usr/src/mpc-cbf/workspace/experiments/config/baseline/3r/line.json"
-    # "/usr/src/mpc-cbf/workspace/experiments/config/baseline/3r/line2.json"
-    # "/usr/src/mpc-cbf/workspace/experiments/config/baseline/3r/line3.json"
-    # "/usr/src/mpc-cbf/workspace/experiments/config/baseline/3r/triangle.json"
-    # "/usr/src/mpc-cbf/workspace/experiments/config/baseline/5r/circle.json"
-    # "/usr/src/mpc-cbf/workspace/experiments/config/baseline/5r/expand.json"
-    # "/usr/src/mpc-cbf/workspace/experiments/config/baseline/6r/circle.json"
-    # "/usr/src/mpc-cbf/workspace/experiments/config/baseline/6r/upward.json"
-    # "/usr/src/mpc-cbf/workspace/experiments/config/baseline/8r/circle.json"
-    # "/usr/src/mpc-cbf/workspace/experiments/config/baseline/8r/circle2.json"
-    # "/usr/src/mpc-cbf/workspace/experiments/config/baseline/8r/diverge.json"
+    "$GITHUB_WORKSPACE/workspace/experiments/config/baseline/2r/circle.json"
+    # "$GITHUB_WORKSPACE/workspace/experiments/config/baseline/2r/line.json"
+    # "$GITHUB_WORKSPACE/workspace/experiments/config/baseline/3r/bend.json"
+    # "$GITHUB_WORKSPACE/workspace/experiments/config/baseline/3r/circle.json"
+    # "$GITHUB_WORKSPACE/workspace/experiments/config/baseline/3r/cross_split.json"
+    # "$GITHUB_WORKSPACE/workspace/experiments/config/baseline/3r/line.json"
+    # "$GITHUB_WORKSPACE/workspace/experiments/config/baseline/3r/line2.json"
+    # "$GITHUB_WORKSPACE/workspace/experiments/config/baseline/3r/line3.json"
+    # "$GITHUB_WORKSPACE/workspace/experiments/config/baseline/3r/triangle.json"
+    # "$GITHUB_WORKSPACE/workspace/experiments/config/baseline/5r/circle.json"
+    # "$GITHUB_WORKSPACE/workspace/experiments/config/baseline/5r/expand.json"
+    # "$GITHUB_WORKSPACE/workspace/experiments/config/baseline/6r/circle.json"
+    # "$GITHUB_WORKSPACE/workspace/experiments/config/baseline/6r/upward.json"
+    # "$GITHUB_WORKSPACE/workspace/experiments/config/baseline/8r/circle.json"
+    # "$GITHUB_WORKSPACE/workspace/experiments/config/baseline/8r/circle2.json"
+    # "$GITHUB_WORKSPACE/workspace/experiments/config/baseline/8r/diverge.json"
 )
 
-DEFAULT_STATES_PATH="/usr/src/mpc-cbf/workspace/experiments/results/states.json"
-BASE_CONFIG_FILE="/usr/src/mpc-cbf/workspace/experiments/config/base_config.json"
-VIZ_OUTPUT_DIR="/usr/src/mpc-cbf/workspace/experiments/results/ci_plots"
+DEFAULT_STATES_PATH="$GITHUB_WORKSPACE/workspace/experiments/results/states.json"
+BASE_CONFIG_FILE="$GITHUB_WORKSPACE/workspace/experiments/config/base_config.json"
+VIZ_OUTPUT_DIR="$GITHUB_WORKSPACE/workspace/experiments/results/ci_plots"
 MAX_STEPS=300
 
 # Build the CBF examples once before running experiments
 echo "Building CBF Formation Control example"
-cd /usr/src/mpc-cbf/workspace/lib/cbf/build
+cd $GITHUB_WORKSPACE/workspace/lib/cbf/build
 make -j20 cbf_examples_CBFFormationControl_example
 
 # Remove the existing states.json file if it exists
@@ -46,7 +46,7 @@ for config_file in "${INPUT[@]}"; do
     
     # Step 0: Preprocesss
     echo "Step 0: Processing the configuration file"
-    python3 /usr/src/mpc-cbf/workspace/experiments/python/preprocess.py \
+    python3 $GITHUB_WORKSPACE/workspace/experiments/python/preprocess.py \
         --base_config_file ${BASE_CONFIG_FILE} \
         --task_config_file ${config_file}
 
@@ -59,7 +59,7 @@ for config_file in "${INPUT[@]}"; do
 
     # Step 2: Visualize the results
     echo "Step 2: Visualizing the results from the experiment"
-    python3 /usr/src/mpc-cbf/workspace/experiments/python/visualization/plot_results.py \
+    python3 $GITHUB_WORKSPACE/workspace/experiments/python/visualization/plot_results.py \
         --config ${config_file} \
         --states ${DEFAULT_STATES_PATH} \
         --output_dir ${VIZ_OUTPUT_DIR}\
@@ -69,7 +69,7 @@ for config_file in "${INPUT[@]}"; do
 
     # Step 3: Check for collisions and success
     echo "Step 3: Checking for collisions and success of the robot trajectories"
-    python3 /usr/src/mpc-cbf/workspace/experiments/python/metrics/collision_check.py \
+    python3 $GITHUB_WORKSPACE/workspace/experiments/python/metrics/collision_check.py \
         --config ${config_file} \
         --states ${DEFAULT_STATES_PATH}
     
