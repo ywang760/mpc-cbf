@@ -28,11 +28,21 @@ jobs:
       run: |
         git config --global --add safe.directory $GITHUB_WORKSPACE
 
-    - name: Build packages
+    - name: Build CBF Package
       run: |
-        # Build both packages first
-        cd workspace/lib/cbf/build && make -j20
-        cd ../mpc_cbf/build && make -j20
+        cd workspace/lib/cbf
+        mkdir -p build
+        cd build
+        cmake .. -G Ninja
+        ninja -j20
+
+    # - name: Build MPC CBF Package
+    #   run: |
+    #     cd workspace/lib/mpc_cbf
+    #     mkdir -p build
+    #     cd build
+    #     cmake .. -G Ninja
+    #     ninja -j20
 
     - name: Set up Python virtual environment
       run: |
@@ -59,12 +69,7 @@ jobs:
       with:
         name: example-outputs-${{ github.sha }}
         path: |
-          **/*.png
-          **/*.pdf
-          **/*.txt
-          **/*.csv
-          **/*.log
-          **/results/
+          /usr/src/mpc-cbf/workspace/experiments/results/ci_plots/
         retention-days: 30  # Keep longer for analysis
 
     - name: Create summary
