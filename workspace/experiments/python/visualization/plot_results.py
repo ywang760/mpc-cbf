@@ -1,15 +1,11 @@
 import argparse
 import json
 import os
-import warnings
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.animation as animation
 import matplotlib.pyplot as plt
 import numpy as np
-
-# Suppress matplotlib animation warnings
-warnings.filterwarnings('ignore', message='MovieWriter.*unavailable')
 
 
 def load_json(path):

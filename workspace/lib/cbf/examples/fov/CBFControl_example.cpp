@@ -245,16 +245,17 @@ int main(int argc, char* argv[]) {
             x_t_pos(2) = math::convertYawInRange(x_t_pos(2));
             Vector x_t_vel = next_state.vel_;
 
-            // Combine into full state vector
+            // Convert to State and add process noise to simulate real-world uncertainty
+            State current_state = {x_t_pos, x_t_vel};
+            current_state = math::addRandomNoise<double, DIM>(current_state, pos_std, vel_std);
+            
+            // Convert back to Vector for current_states storage
             Vector x_t(6);
-            x_t << x_t_pos, x_t_vel;
-
-            // Add process noise to simulate real-world uncertainty
-            x_t = math::addRandomNoise(x_t, pos_std, vel_std);
+            x_t << current_state.pos_, current_state.vel_;
             current_states.at(robot_idx) = x_t;
 
             // Log robot state for visualization/analysis
-            states["robots"][std::to_string(robot_idx)]["states"].push_back({x_t[0], x_t[1], x_t[2], x_t[3], x_t[4], x_t[5]});
+            states["robots"][std::to_string(robot_idx)]["states"].push_back({current_state.pos_[0], current_state.pos_[1], current_state.pos_[2], current_state.vel_[0], current_state.vel_[1], current_state.vel_[2]});
             // Print out robot state, where x_t[0] is x, x_t[1] is y, x_t[2] is yaw, x_t[3] is vx, x_t[4] is vy, x_t[5] is yaw rate
             // std::cout << "Robot " << robot_idx << " state: "
             //           << "x: " << x_t[0] << ", "

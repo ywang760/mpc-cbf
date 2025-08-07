@@ -268,12 +268,16 @@ int main(int argc, char* argv[]) {
                 Vector x_t_pos = pred_traj_ptrs.at(robot_idx)->eval(eval_t, 0);
                 x_t_pos(2) = math::convertYawInRange(x_t_pos(2));
                 Vector x_t_vel = pred_traj_ptrs.at(robot_idx)->eval(eval_t, 1);
+                State next_state = {x_t_pos, x_t_vel};
+                next_state = math::addRandomNoise<double, DIM>(next_state, pos_std, vel_std);
+                
+                // Convert back to Vector for current_states storage
                 Vector x_t(6);
-                x_t << x_t_pos, x_t_vel;
-                x_t = math::addRandomNoise(x_t, pos_std, vel_std);
-                states["robots"][std::to_string(robot_idx)]["states"].push_back(
-                    {x_t[0], x_t[1], x_t[2], x_t[3], x_t[4], x_t[5]});
+                x_t << next_state.pos_, next_state.vel_;
                 current_states.at(robot_idx) = x_t;
+                
+                states["robots"][std::to_string(robot_idx)]["states"].push_back(
+                    {next_state.pos_[0], next_state.pos_[1], next_state.pos_[2], next_state.vel_[0], next_state.vel_[1], next_state.vel_[2]});
             }
             traj_eval_ts.at(robot_idx) = eval_t;
         }
