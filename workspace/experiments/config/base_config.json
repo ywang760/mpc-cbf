@@ -6,17 +6,17 @@
         "mpc_tuning": {
             "w_pos_err": 10,
             "w_u_eff": 1,
-            "spd_f": 3
+            "spd_f": 8
         }
     },
     "physical_limits": {
         "p_min": [
-            -10,
-            -10
+            -5,
+            -5
         ],
         "p_max": [
-            10,
-            10
+            5,
+            5
         ],
         "v_min": [
             -2,
