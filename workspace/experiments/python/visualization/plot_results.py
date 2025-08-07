@@ -1,11 +1,15 @@
 import argparse
 import json
 import os
+import warnings
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.animation as animation
 import matplotlib.pyplot as plt
 import numpy as np
+
+# Suppress matplotlib animation warnings
+warnings.filterwarnings('ignore', message='MovieWriter.*unavailable')
 
 
 def load_json(path):
@@ -96,6 +100,7 @@ def main():
     
 
     # robots 数据结构：假设 st['robots'][key]['states'] 是一个帧序列
+    T = 0  # Initialize T to avoid unbound variable issues
     if HAS_RESULT:
         robots = st["robots"]
         keys = sorted(robots.keys(), key=int)  # 假设机器人 ID 是字符串数字，用 int 排序
@@ -131,13 +136,13 @@ def main():
 
     # 保存静态图
     # Set x and y limits based on physical limits
-    # x_min, y_min = cfg["physical_limits"]["p_min"]
-    # x_max, y_max = cfg["physical_limits"]["p_max"]
-    # x_padding = (x_max - x_min) * 0.1
-    # y_padding = (y_max - y_min) * 0.1
-    # for ax in axes:
-    #     ax.set_xlim(x_min - x_padding, x_max + x_padding)
-    #     ax.set_ylim(y_min - y_padding, y_max + y_padding)
+    x_min, y_min = cfg["physical_limits"]["p_min"]
+    x_max, y_max = cfg["physical_limits"]["p_max"]
+    x_padding = (x_max - x_min) * 0.1
+    y_padding = (y_max - y_min) * 0.1
+    for ax in axes:
+        ax.set_xlim(x_min - x_padding, x_max + x_padding)
+        ax.set_ylim(y_min - y_padding, y_max + y_padding)
     os.makedirs(os.path.dirname(output_static) or '.', exist_ok=True)
     fig.tight_layout()
     fig.savefig(output_static)
@@ -200,16 +205,40 @@ def main():
             return artists
 
 
-        # TODO: downsample the frames if T is too large
-        anim = animation.FuncAnimation(
-            fig,
-            update_frame,
-            frames=T,
-            init_func=init_frame,
-            blit=False,
-            interval=1000 * ts,
-            repeat=False,
-        )
+        # Downsample frames if T is too large for smooth animation
+        MAX_FRAMES = 200  # Maximum frames for reasonable animation
+        if T > MAX_FRAMES:
+            # Calculate downsampling factor
+            downsample_factor = max(1, T // MAX_FRAMES)
+            frame_indices = np.arange(0, T, downsample_factor)
+            actual_frames = len(frame_indices)
+            actual_interval = 1000 * ts * downsample_factor  # Adjust interval for downsampling
+            print(f"Downsampling animation: {T} frames -> {actual_frames} frames (factor: {downsample_factor})")
+            
+            def update_frame_downsampled(frame_idx):
+                # Use the downsampled frame index
+                actual_frame_idx = frame_indices[frame_idx]
+                return update_frame(actual_frame_idx)
+            
+            anim = animation.FuncAnimation(
+                fig,
+                update_frame_downsampled,
+                frames=actual_frames,
+                init_func=init_frame,
+                blit=False,
+                interval=actual_interval,
+                repeat=False,
+            )
+        else:
+            anim = animation.FuncAnimation(
+                fig,
+                update_frame,
+                frames=T,
+                init_func=init_frame,
+                blit=False,
+                interval=1000 * ts,
+                repeat=False,
+            )
 
         # === 5. 保存动画 ===
         os.makedirs(os.path.dirname(output_anim) or ".", exist_ok=True)
