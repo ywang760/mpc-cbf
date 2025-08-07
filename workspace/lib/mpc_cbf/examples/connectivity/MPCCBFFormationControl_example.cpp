@@ -133,8 +133,8 @@ int main(int argc, char* argv[]) {
     double sim_t = 0;
     int loop_idx = 0;
     while (sim_t < sim_runtime) {
-        if (loop_idx % 10 == 0) {
-            logger->info("Loop index: {}, Simulation time: {} seconds", loop_idx, sim_t);
+        if (loop_idx % 50 == 0) {
+            logger->info("loop_idx: {}, sim_t: {:.3f} seconds", loop_idx, sim_t);
         }
 
         for (int robot_idx = 0; robot_idx < num_robots; ++robot_idx) {
@@ -148,7 +148,7 @@ int main(int argc, char* argv[]) {
                                                           /*self_idx=*/robot_idx, ref_positions);
 
             if (!success) {
-                logger->warn("Optimization failed for robot {} at timestep {}", robot_idx, sim_t);
+                logger->warn("Optimization failed for robot {} at sim_t {:.3f}", robot_idx, sim_t);
                 if (trajs.empty()) {
                     logger->error("No previous trajectory available for robot {}", robot_idx);
                 } else {

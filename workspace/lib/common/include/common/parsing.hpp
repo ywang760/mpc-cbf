@@ -84,11 +84,9 @@ parseIMPCParams(const nlohmann::json& config_json) {
     bool slack_mode = config_json["cbf_params"]["slack_mode"];
     T slack_cost = config_json["cbf_params"]["slack_cost"];
     T slack_decay_rate = config_json["cbf_params"]["slack_decay_rate"];
-
-    // TODO: move these to input json (currently hardcoded in original code)
-    int cbf_horizon = 2;
-    int impc_iter = 2;
-
+    int cbf_horizon = config_json["cbf_params"]["cbf_horizon"];
+    int impc_iter = config_json["cbf_params"]["impc_iter"];
+    
     return {cbf_horizon, impc_iter, slack_cost, slack_decay_rate, slack_mode};
 }
 
