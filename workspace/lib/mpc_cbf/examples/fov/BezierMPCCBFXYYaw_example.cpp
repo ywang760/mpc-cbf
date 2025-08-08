@@ -61,6 +61,8 @@ int main(int argc, char* argv[]) {
     size_t num_pieces = experiment_config_json["bezier_params"]["num_pieces"];
     size_t num_control_points = experiment_config_json["bezier_params"]["num_control_points"];
     double piece_max_parameter = experiment_config_json["bezier_params"]["piece_max_parameter"];
+    uint64_t bezier_continuity_upto_degree =
+        experiment_config_json["bezier_params"]["bezier_continuity_upto_degree"];
     // mpc params
     double h = experiment_config_json["mpc_params"]["h"];
     double Ts = experiment_config_json["mpc_params"]["Ts"];

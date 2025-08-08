@@ -61,6 +61,7 @@ int main(int argc, char *argv[])
     size_t num_pieces = experiment_config_json["bezier_params"]["num_pieces"];
     size_t num_control_points = experiment_config_json["bezier_params"]["num_control_points"];
     double piece_max_parameter = experiment_config_json["bezier_params"]["piece_max_parameter"];
+    uint64_t bezier_continuity_upto_degree = 4;
 
     double h = experiment_config_json["mpc_params"]["h"];
     double Ts = experiment_config_json["mpc_params"]["h"]; // Use h for Ts as in migrated example
@@ -106,7 +107,6 @@ int main(int argc, char *argv[])
     StatePropagator exe_A0 = exe_model_ptr->get_A0(int(h / Ts));
     StatePropagator exe_Lambda = exe_model_ptr->get_lambda(int(h / Ts));
     // init MPC
-    uint64_t bezier_continuity_upto_degree = 4;
     BezierMPCParams bezier_mpc_params = {piecewise_bezier_params, mpc_params};
 
     // main loop

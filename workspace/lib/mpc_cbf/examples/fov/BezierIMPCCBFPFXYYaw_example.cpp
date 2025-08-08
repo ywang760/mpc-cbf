@@ -60,6 +60,7 @@ int main(int argc, char* argv[]) {
     size_t num_pieces = experiment_config_json["bezier_params"]["num_pieces"];
     size_t num_control_points = experiment_config_json["bezier_params"]["num_control_points"];
     double piece_max_parameter = experiment_config_json["bezier_params"]["piece_max_parameter"];
+    uint64_t bezier_continuity_upto_degree = 3;
     // mpc params
     double h = experiment_config_json["mpc_params"]["h"];
     double Ts = experiment_config_json["mpc_params"]["Ts"];
@@ -128,7 +129,6 @@ int main(int argc, char* argv[]) {
     std::shared_ptr<FovCBF> fov_cbf =
         std::make_unique<FovCBF>(fov_beta, fov_Ds, fov_Rs, v_min, v_max);
     // init bezier mpc-cbf
-    uint64_t bezier_continuity_upto_degree = 3;
     int num_neighbors = experiment_config_json["tasks"]["so"].size() - 1;
     std::cout << "neighbor size: " << num_neighbors << "\n";
     BezierMPCCBFParams bezier_mpc_cbf_params = {piecewise_bezier_params, mpc_params,
