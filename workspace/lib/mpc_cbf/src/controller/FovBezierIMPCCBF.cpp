@@ -8,9 +8,8 @@ namespace mpc_cbf {
 template <typename T, unsigned int DIM>
 FovBezierIMPCCBF<T, DIM>::FovBezierIMPCCBF(
     Params& p, std::shared_ptr<DoubleIntegrator> model_ptr, std::shared_ptr<FovCBF> fov_cbf_ptr,
-    uint64_t bezier_continuity_upto_degree,
     std::shared_ptr<const CollisionShape> collision_shape_ptr, int num_neighbors)
-    : bezier_continuity_upto_degree_(bezier_continuity_upto_degree),
+    : bezier_continuity_upto_degree_(p.mpc_cbf_params.piecewise_bezier_params.bezier_continuity_upto_degree_),
       collision_shape_ptr_(collision_shape_ptr) {
     // impc params
     impc_iter_ = p.impc_params.impc_iter_;

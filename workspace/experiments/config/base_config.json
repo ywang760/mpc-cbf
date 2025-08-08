@@ -68,6 +68,7 @@
     "bezier_params": {
         "num_pieces": 3,
         "num_control_points": 4,
-        "piece_max_parameter": 0.5
+        "piece_max_parameter": 0.5,
+        "bezier_continuity_upto_degree": 3
     }
 }

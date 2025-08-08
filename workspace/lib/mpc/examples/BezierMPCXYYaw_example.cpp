@@ -92,7 +92,7 @@ int main(int argc, char *argv[])
     std::shared_ptr<const AlignedBoxCollisionShape> aligned_box_collision_shape_ptr =
         std::make_shared<const AlignedBoxCollisionShape>(robot_bbox_at_zero);
 
-    PiecewiseBezierParams piecewise_bezier_params = {num_pieces, num_control_points, piece_max_parameter};
+    PiecewiseBezierParams piecewise_bezier_params = {num_pieces, num_control_points, piece_max_parameter, bezier_continuity_upto_degree};
     MPCParams mpc_params = {h, Ts, k_hor, {w_pos_err, w_u_eff, spd_f}, {p_min, p_max, a_min, a_max}};
 
     std::string JSON_FILENAME = option_parse["write_filename"].as<std::string>();
@@ -156,7 +156,7 @@ int main(int argc, char *argv[])
             Vector ref_positions = target_positions.at(robot_idx).replicate(k_hor, 1);
 
             // Solve MPC optimization problem
-            BezierMPC bezier_mpc(bezier_mpc_params, pred_model_ptr, bezier_continuity_upto_degree, aligned_box_collision_shape_ptr);
+            BezierMPC bezier_mpc(bezier_mpc_params, pred_model_ptr, aligned_box_collision_shape_ptr);
             bool success = bezier_mpc.optimize(traj, current_state, other_robot_positions, ref_positions);
 
             if (!success)

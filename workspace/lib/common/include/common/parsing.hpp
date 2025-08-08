@@ -21,8 +21,9 @@ mpc::PiecewiseBezierParams<T, DIM> parsePiecewiseBezierParams(const nlohmann::js
     size_t num_pieces = config_json["bezier_params"]["num_pieces"];
     size_t num_control_points = config_json["bezier_params"]["num_control_points"];
     T piece_max_parameter = config_json["bezier_params"]["piece_max_parameter"];
-
-    return {num_pieces, num_control_points, piece_max_parameter};
+    uint64_t bezier_continuity_upto_degree = config_json["bezier_params"]["bezier_continuity_upto_degree"];
+    
+    return {num_pieces, num_control_points, piece_max_parameter, bezier_continuity_upto_degree};
 }
 
 /**

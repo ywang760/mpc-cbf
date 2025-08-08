@@ -111,7 +111,7 @@ int main(int argc, char* argv[]) {
 
     // create params
     PiecewiseBezierParams piecewise_bezier_params = {num_pieces, num_control_points,
-                                                     piece_max_parameter};
+                                                     piece_max_parameter, bezier_continuity_upto_degree};
     MPCParams mpc_params = {
         h, Ts, k_hor, {w_pos_err, w_u_eff, spd_f}, {p_min, p_max, v_min, v_max, a_min, a_max}};
     FoVCBFParams fov_cbf_params = {fov_beta, fov_Ds, fov_Rs};
@@ -142,7 +142,7 @@ int main(int argc, char* argv[]) {
     IMPCParams impc_params = {cbf_horizon, impc_iter, slack_cost, slack_decay_rate, slack_mode};
     IMPCCBFParams impc_cbf_params = {bezier_mpc_cbf_params, impc_params};
     FovBezierIMPCCBF bezier_impc_cbf(impc_cbf_params, pred_model_ptr, fov_cbf,
-                                     bezier_continuity_upto_degree, aligned_box_collision_shape_ptr,
+                                     aligned_box_collision_shape_ptr,
                                      num_neighbors);
 
     // main loop

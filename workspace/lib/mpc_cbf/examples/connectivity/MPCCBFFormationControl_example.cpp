@@ -94,9 +94,7 @@ int main(int argc, char* argv[]) {
     // init connectivity mpc-cbf
     size_t num_robots = experiment_config_json["tasks"]["so"].size();
     size_t num_neighbors = num_robots - 1;
-    uint64_t bezier_continuity_upto_degree = 3;
     ConnectivityIMPCCBF connectivity_impc_cbf(impc_cbf_params, pred_model_ptr, connectivity_cbf,
-                                              bezier_continuity_upto_degree,
                                               aligned_box_collision_shape_ptr, num_neighbors);
 
     // load the tasks

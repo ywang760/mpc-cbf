@@ -33,7 +33,7 @@ class BezierMPCCBF {
     using SolveStatus = qpcpp::SolveStatus;
 
     BezierMPCCBF(Params& p, std::shared_ptr<DoubleIntegrator> model_ptr,
-                 std::shared_ptr<FovCBF> fov_cbf_ptr, uint64_t bezier_continuity_upto_degree,
+                 std::shared_ptr<FovCBF> fov_cbf_ptr,
                  std::shared_ptr<const CollisionShape> collision_shape_ptr);
     ~BezierMPCCBF() = default;
 

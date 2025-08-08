@@ -106,7 +106,7 @@ int main(int argc, char* argv[]) {
         std::make_shared<const AlignedBoxCollisionShape>(robot_bbox_at_zero);
     // create params
     PiecewiseBezierParams piecewise_bezier_params = {num_pieces, num_control_points,
-                                                     piece_max_parameter};
+                                                     piece_max_parameter, bezier_continuity_upto_degree};
     MPCParams mpc_params = {
         h, Ts, k_hor, {w_pos_err, w_u_eff, spd_f}, {p_min, p_max, v_min, v_max, a_min, a_max}};
     FoVCBFParams fov_cbf_params = {fov_beta, fov_Ds, fov_Rs};
@@ -166,7 +166,6 @@ int main(int argc, char* argv[]) {
                 other_robot_positions.push_back(current_states.at(j).pos_);
             }
             BezierMPCCBF bezier_mpc_cbf(bezier_mpc_cbf_params, pred_model_ptr, fov_cbf,
-                                        bezier_continuity_upto_degree,
                                         aligned_box_collision_shape_ptr);
 
             Vector ref_positions(DIM * k_hor);

@@ -172,7 +172,7 @@ public:
 //        std::cout << "init quaternion: " << q.x() << "," << q.y() << "," << q.z() << "," << q.w() << "\n";
 
         // create params
-        PiecewiseBezierParams piecewise_bezier_params = {num_pieces, num_control_points, piece_max_parameter};
+        PiecewiseBezierParams piecewise_bezier_params = {num_pieces, num_control_points, piece_max_parameter, bezier_continuity_upto_degree};
         MPCParams mpc_params = {h_, Ts_, k_hor_, {w_pos_err, w_u_eff, spd_f}, {p_min, p_max, v_min, v_max, a_min, a_max}};
         FoVCBFParams fov_cbf_params = {fov_beta, fov_Ds, fov_Rs};
 
@@ -221,7 +221,7 @@ public:
         BezierMPCCBFParams bezier_mpc_cbf_params = {piecewise_bezier_params, mpc_params, fov_cbf_params};
         IMPCParams impc_params = {cbf_horizon, impc_iter, slack_cost, slack_decay_rate, slack_mode};
         IMPCCBFParams impc_cbf_params = {bezier_mpc_cbf_params, impc_params};
-        bezier_impc_cbf_ptr_ = std::make_unique<BezierIMPCCBF>(impc_cbf_params, pred_model_ptr, fov_cbf, bezier_continuity_upto_degree, aligned_box_collision_shape_ptr, NUM_TARGETS);
+        bezier_impc_cbf_ptr_ = std::make_unique<BezierIMPCCBF>(impc_cbf_params, pred_model_ptr, fov_cbf, aligned_box_collision_shape_ptr, NUM_TARGETS);
         std::cout << "successfully init the control core..." << "\n";
 
         last_request_ = ros::Time::now();
