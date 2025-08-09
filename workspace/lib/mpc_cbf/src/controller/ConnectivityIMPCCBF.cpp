@@ -10,20 +10,18 @@ ConnectivityIMPCCBF<T, DIM>::ConnectivityIMPCCBF(
     Params& p, std::shared_ptr<DoubleIntegrator> model_ptr,
     std::shared_ptr<ConnectivityCBF> connectivity_cbf_ptr,
     std::shared_ptr<const CollisionShape> collision_shape_ptr, int num_neighbors)
-    : bezier_continuity_upto_degree_(p.mpc_cbf_params.piecewise_bezier_params.bezier_continuity_upto_degree_),
-      collision_shape_ptr_(collision_shape_ptr) {
+    : bezier_continuity_upto_degree_(
+          p.mpc_cbf_params.piecewise_bezier_params.bezier_continuity_upto_degree_),
+      collision_shape_ptr_(collision_shape_ptr),
+      qp_generator_(std::make_unique<ConnectivityMPCCBFQPOperations>(p.mpc_cbf_params, model_ptr,
+                                                                     connectivity_cbf_ptr),
+                    num_neighbors, p.impc_params.slack_mode_) {
     // impc params
     impc_iter_ = p.impc_params.impc_iter_;
     cbf_horizon_ = p.impc_params.cbf_horizon_;
     slack_cost_ = p.impc_params.slack_cost_;
     slack_decay_rate_ = p.impc_params.slack_decay_rate_;
     slack_mode_ = p.impc_params.slack_mode_;
-    // Initiate the qp_generator
-    std::unique_ptr<ConnectivityMPCCBFQPOperations> connectivity_mpc_cbf_operations_ptr =
-        std::make_unique<ConnectivityMPCCBFQPOperations>(p.mpc_cbf_params, model_ptr,
-                                                         connectivity_cbf_ptr);
-    qp_generator_.addPiecewise(std::move(connectivity_mpc_cbf_operations_ptr), num_neighbors,
-                               slack_mode_);
 
     // load mpc tuning params
     mpc_tuning_ = p.mpc_cbf_params.mpc_params.tuning_;
@@ -160,62 +158,36 @@ bool ConnectivityIMPCCBF<T, DIM>::optimize(
         }
 
         // connectivity cbf constraints
-        // if (iter == 0) {
-        //     // TODO: currently all slack_value are set as 0
-        //     // Set to different values for priority scheduling
-        //     T slack_value = 0;
-        //     for (size_t i = 0; i < num_neighbors; ++i) {
-        //         if (!slack_mode_) {
-        //             qp_generator_.addSafetyCBFConstraint(state, other_robot_states[i], slack_value);
-        //         } else {
-        //             qp_generator_.addSafetyCBFConstraintWithSlackVariables(
-        //                 state, other_robot_states[i], i);
-        //         }
-        //     }
-
-        //     // Add connectivity constraint once per iteration
-        //     if (!slack_mode_) {
-        //         qp_generator_.addConnectivityConstraint(robot_states, self_idx, slack_value);
-        //     } else {
-        //         qp_generator_.addConnectivityConstraintWithSlackVariables(robot_states, self_idx,
-        //                                                                   0);
-        //     }
-        // } else if (iter > 0 && success) {
-        //     // pred the robot's position in the horizon, use for the CBF
-        //     // constraints
-        //     std::vector<State> pred_states;
-        //     pred_states.reserve(cbf_horizon_);
-        //     for (size_t k = 0; k < cbf_horizon_; ++k) {
-        //         State pred_state;
-        //         pred_state.pos_ = result_curves.back().eval(h_samples_(k), 0);
-        //         pred_state.vel_ = result_curves.back().eval(h_samples_(k), 1);
-        //         pred_states.push_back(pred_state);
-        //     }
-
-        //     // Create slack values once per neighbor (not growing with horizon)
-        //     // TODO: currently all slack_values are set as 0
-        //     // Set to different values for priority scheduling
-        //     const std::vector<T> slack_values(cbf_horizon_, 0);
-
-        //     for (size_t i = 0; i < num_neighbors; ++i) {
-        //         if (!slack_mode_) {
-        //             qp_generator_.addPredSafetyCBFConstraints(pred_states, other_robot_states[i],
-        //                                                       slack_values);
-        //         } else {
-        //             qp_generator_.addPredSafetyCBFConstraintsWithSlackVariables(
-        //                 pred_states, other_robot_states[i], i);
-        //         }
-        //     }
-
-        //     // Add predicted connectivity constraints once per iteration
-        //     if (!slack_mode_) {
-        //         qp_generator_.addPredConnectivityConstraints(pred_states, robot_states, self_idx,
-        //                                                      slack_values);
-        //     } else {
-        //         qp_generator_.addPredConnectivityConstraintsWithSlackVariables(
-        //             pred_states, robot_states, self_idx, 0);
-        //     }
-        // }
+        if (iter == 0) {
+            // TODO: currently all slack_value are set as 0
+            // Set to different values for priority scheduling
+            T slack_value = 0;
+            for (size_t i = 0; i < num_neighbors; ++i) {
+                qp_generator_.addSafetyCBFConstraint(state, other_robot_states[i], i, slack_value);
+            }
+            // TODO: conditionally check for clf or cbf constraint
+            qp_generator_.addConnectivityConstraint(robot_states, self_idx, slack_value);
+        } else if (iter > 0 && success) {
+            // pred the robot's position in the horizon, use for the CBF
+            // constraints
+            std::vector<State> pred_states;
+            pred_states.reserve(cbf_horizon_);
+            for (size_t k = 0; k < cbf_horizon_; ++k) {
+                State pred_state;
+                pred_state.pos_ = result_curves.back().eval(h_samples_(k), 0);
+                pred_state.vel_ = result_curves.back().eval(h_samples_(k), 1);
+                pred_states.push_back(pred_state);
+            }
+            // Create slack values once per neighbor (not growing with horizon)
+            // TODO: currently all slack_values are set as 0
+            // Set to different values for priority scheduling
+            const std::vector<T> slack_values(cbf_horizon_, 0);
+            for (size_t i = 0; i < num_neighbors; ++i) {
+                qp_generator_.addPredSafetyCBFConstraints(pred_states, other_robot_states[i], i);
+            }
+            qp_generator_.addPredConnectivityConstraints(pred_states, robot_states, self_idx,
+                                                         slack_values);
+        }
 
         // dynamics constraints
         qp_generator_.piecewise_mpc_qp_generator_ptr()->addEvalBoundConstraints(2, a_min_, a_max_);
