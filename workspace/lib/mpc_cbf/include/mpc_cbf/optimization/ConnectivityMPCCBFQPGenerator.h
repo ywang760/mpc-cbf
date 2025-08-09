@@ -24,8 +24,9 @@ class ConnectivityMPCCBFQPGenerator : public MPCCBFQPGeneratorBase<T, DIM> {
     using typename Base::Vector;
 
     // Constructor
-    ConnectivityMPCCBFQPGenerator(std::unique_ptr<ConnectivityMPCCBFQPOperations>&& piecewise_mpc_cbf_operations_ptr,
-                                  int num_neighbors, bool slack_mode);
+    ConnectivityMPCCBFQPGenerator(
+        std::unique_ptr<ConnectivityMPCCBFQPOperations>&& piecewise_mpc_cbf_operations_ptr,
+        int num_neighbors, bool slack_mode);
 
     // Connectivity-specific constraint methods
     void addSafetyCBFConstraint(const Vector& current_state, const Vector& neighbor_state,

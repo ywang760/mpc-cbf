@@ -21,8 +21,9 @@ mpc::PiecewiseBezierParams<T, DIM> parsePiecewiseBezierParams(const nlohmann::js
     size_t num_pieces = config_json["bezier_params"]["num_pieces"];
     size_t num_control_points = config_json["bezier_params"]["num_control_points"];
     T piece_max_parameter = config_json["bezier_params"]["piece_max_parameter"];
-    uint64_t bezier_continuity_upto_degree = config_json["bezier_params"]["bezier_continuity_upto_degree"];
-    
+    uint64_t bezier_continuity_upto_degree =
+        config_json["bezier_params"]["bezier_continuity_upto_degree"];
+
     return {num_pieces, num_control_points, piece_max_parameter, bezier_continuity_upto_degree};
 }
 
@@ -87,7 +88,7 @@ parseIMPCParams(const nlohmann::json& config_json) {
     T slack_decay_rate = config_json["cbf_params"]["slack_decay_rate"];
     int cbf_horizon = config_json["cbf_params"]["cbf_horizon"];
     int impc_iter = config_json["cbf_params"]["impc_iter"];
-    
+
     return {cbf_horizon, impc_iter, slack_cost, slack_decay_rate, slack_mode};
 }
 

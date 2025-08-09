@@ -5,7 +5,7 @@
 #include <random>
 
 namespace math {
-    /**
+/**
      * Template function to add random Gaussian noise to state
      * @tparam T Scalar type (double or float)
      * @tparam DIM Dimension of the state space
