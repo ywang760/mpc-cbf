@@ -64,6 +64,25 @@ void ConnectivityMPCCBFQPGenerator<T, DIM>::addConnectivityConstraint(
 }
 
 template <typename T, unsigned int DIM>
+void ConnectivityMPCCBFQPGenerator<T, DIM>::addCLFConstraint(const Vector& current_state,
+                                                              const Vector& neighbor_state,
+                                                              std::size_t neighbor_idx,
+                                                              T slack_value) {
+    LinearConstraint linear_constraint = piecewise_mpc_cbf_operations_ptr_->clfConstraint(
+        current_state, neighbor_state, slack_value);
+
+    if (this->slack_mode_) {
+        Row slack_coefficients = Row::Zero(this->slack_variables_.size());
+        slack_coefficients(neighbor_idx) = -1.0;
+
+        this->addLinearConstraintForPiecewiseWithSlackVariables(linear_constraint,
+                                                                slack_coefficients);
+    } else {
+        this->piecewise_mpc_qp_generator_ptr_->addLinearConstraintForPiecewise(linear_constraint);
+    }
+}
+
+template <typename T, unsigned int DIM>
 void ConnectivityMPCCBFQPGenerator<T, DIM>::addPredSafetyCBFConstraints(
     const std::vector<State>& pred_states, const Vector& neighbor_state, std::size_t neighbor_idx) {
     std::vector<LinearConstraint> linear_constraints =
@@ -108,6 +127,33 @@ void ConnectivityMPCCBFQPGenerator<T, DIM>::addPredConnectivityConstraints(
                 linear_constraints.at(i));
         }
     }
+}
+
+template <typename T, unsigned int DIM>
+void ConnectivityMPCCBFQPGenerator<T, DIM>::addPredCLFConstraints(
+    const std::vector<State>& pred_states, const Vector& neighbor_state, std::size_t neighbor_idx) {
+    std::vector<LinearConstraint> linear_constraints =
+        piecewise_mpc_cbf_operations_ptr_->predCLFConstraints(pred_states, neighbor_state);
+
+    if (this->slack_mode_) {
+        Row slack_coefficients = Row::Zero(this->slack_variables_.size());
+        slack_coefficients(neighbor_idx) = -1.0;
+
+        for (const auto& constraint : linear_constraints) {
+            this->addLinearConstraintForPiecewiseWithSlackVariables(constraint, slack_coefficients);
+        }
+    } else {
+        for (size_t i = 0; i < linear_constraints.size(); ++i) {
+            this->piecewise_mpc_qp_generator_ptr_->addLinearConstraintForPiecewise(
+                linear_constraints.at(i));
+        }
+    }
+}
+
+template <typename T, unsigned int DIM>
+std::shared_ptr<typename ConnectivityMPCCBFQPGenerator<T, DIM>::ConnectivityMPCCBFQPOperations::ConnectivityCBF>
+ConnectivityMPCCBFQPGenerator<T, DIM>::connectivityCBF() const {
+    return piecewise_mpc_cbf_operations_ptr_->connectivityCBF();
 }
 
 // Explicit template instantiation
