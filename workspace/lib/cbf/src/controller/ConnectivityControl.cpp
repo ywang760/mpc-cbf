@@ -51,12 +51,7 @@ bool ConnectivityControl<T, DIM>::optimize(VectorDIM& cbf_u, const VectorDIM& de
         Vector neighbor_state(2 * DIM);
         neighbor_state << current_states.at(i + (i >= self_idx ? 1 : 0)).pos_,
             current_states.at(i + (i >= self_idx ? 1 : 0)).vel_;
-
-        if (!slack_mode_) {
-            qp_generator_.addSafetyConstraint(state, neighbor_state);
-        } else {
-            qp_generator_.addSafetyConstraint(state, neighbor_state, true, i);
-        }
+        qp_generator_.addSafetyConstraint(state, neighbor_state, i);
     }
 
     // Add velocity and acceleration constraints
@@ -72,24 +67,17 @@ bool ConnectivityControl<T, DIM>::optimize(VectorDIM& cbf_u, const VectorDIM& de
     const auto robot_positions =
         robot_states.leftCols(2); // Extract only the position columns (x, y)
     auto [lambda2, eigenvec] = cbf_->getLambda2(robot_positions);
-
     // TODO: this 0.1 threshold is arbitrary
     if (lambda2 > 0.1) {
-        if (slack_mode_) {
-            qp_generator_.addConnConstraint(state, robot_states, self_idx, true);
-        } else {
-            qp_generator_.addConnConstraint(state, robot_states, self_idx);
-        }
+        qp_generator_.addConnConstraint(state, robot_states, self_idx);
     } else {
         int local_slack_idx = 0;
         for (size_t i = 0; i < num_robots_ - 1; ++i) {
             Vector neighbor_state(2 * DIM);
             neighbor_state << current_states.at(i + (i >= self_idx ? 1 : 0)).pos_,
                 current_states.at(i + (i >= self_idx ? 1 : 0)).vel_;
-            if (!slack_mode_) {
-                qp_generator_.addCLFConstraint(state, neighbor_state, false, 0);
-            } else {
-                qp_generator_.addCLFConstraint(state, neighbor_state, true, local_slack_idx);
+            qp_generator_.addCLFConstraint(state, neighbor_state, local_slack_idx);
+            if (slack_mode_) {
                 ++local_slack_idx;
             }
         }

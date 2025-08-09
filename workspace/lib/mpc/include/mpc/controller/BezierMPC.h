@@ -36,7 +36,6 @@ class BezierMPC {
     using CollisionShape = math::CollisionShape<T, DIM>;
 
     BezierMPC(Params& p, std::shared_ptr<DoubleIntegrator> model_ptr,
-              uint64_t bezier_continuity_upto_degree,
               std::shared_ptr<const CollisionShape> collision_shape_ptr);
     ~BezierMPC() = default;
 

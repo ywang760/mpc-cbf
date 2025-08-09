@@ -8,9 +8,8 @@ namespace mpc_cbf {
 template <typename T, unsigned int DIM>
 BezierMPCCBF<T, DIM>::BezierMPCCBF(Params& p, std::shared_ptr<DoubleIntegrator> model_ptr,
                                    std::shared_ptr<FovCBF> fov_cbf_ptr,
-                                   uint64_t bezier_continuity_upto_degree,
                                    std::shared_ptr<const CollisionShape> collision_shape_ptr)
-    : bezier_continuity_upto_degree_(bezier_continuity_upto_degree),
+    : bezier_continuity_upto_degree_(p.piecewise_bezier_params.bezier_continuity_upto_degree_),
       collision_shape_ptr_(collision_shape_ptr) {
     // Initiate the qp_generator
     std::unique_ptr<PiecewiseBezierMPCCBFQPOperations> piecewise_mpc_cbf_operations_ptr =

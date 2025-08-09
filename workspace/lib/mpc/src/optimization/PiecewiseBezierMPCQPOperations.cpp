@@ -82,9 +82,8 @@ PiecewiseBezierMPCQPOperations<T, DIM>::positionErrorPenaltyCost(const State& cu
     // compute the linear term
     Vector x0 = Vector::Zero(2 * DIM);
     x0 << current_state.pos_, current_state.vel_; // [6,1]
-    Matrix linear_term_coef = (A0_.pos_ * x0).transpose() * Q_pe;
-    linear_term_coef += -1.0 * ref_positions.transpose() *
-                        Q_pe; // TODO for some reason, I have to use -1 here. Need to figure it out.
+    Matrix linear_term_coef = 2.0 * (A0_.pos_ * x0).transpose() * Q_pe;
+    linear_term_coef += -2.0 * ref_positions.transpose() * Q_pe;
     linear_term = (linear_term_coef * Phi_pred).transpose();
 
     return CostAddition(quadratic_term, linear_term, 0);

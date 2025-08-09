@@ -60,20 +60,6 @@ class CBFQPGeneratorBase {
     void addSlackCost(const std::vector<T>& slack_weights);
 
     /**
-         * @brief Adds safety constraint between agents to prevent collisions
-         *
-         * This is a generic interface that will be implemented by derived classes
-         * based on their specific barrier function formulations.
-         *
-         * @param state Current state of the robot
-         * @param neighbor_state State of the target/neighboring robot
-         * @param use_slack Whether to use slack variables for this constraint
-         * @param slack_idx Index of slack variable to use (if use_slack is true)
-         */
-    virtual void addSafetyConstraint(const Vector& state, const Vector& neighbor_state,
-                                     bool use_slack = false, std::size_t slack_idx = 0) = 0;
-
-    /**
          * @brief Adds minimum velocity constraints
          *
          * This is a generic interface that will be implemented by derived classes
@@ -159,6 +145,7 @@ class CBFQPGeneratorBase {
 
     qpcpp::Problem<T> problem_;                  ///< The QP problem being constructed
     std::vector<qpcpp::Variable<T>*> variables_; ///< Control input variables
+    bool slack_mode_; ///< Whether to use slack variables for constraint relaxation
     std::vector<qpcpp::Variable<T>*>
         slack_variables_; ///< Slack variables for constraint relaxation
 };

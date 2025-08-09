@@ -53,7 +53,6 @@ class ConnectivityIMPCCBF {
 
     ConnectivityIMPCCBF(Params& p, std::shared_ptr<DoubleIntegrator> model_ptr,
                         std::shared_ptr<ConnectivityCBF> connectivity_cbf_ptr,
-                        uint64_t bezier_continuity_upto_degree,
                         std::shared_ptr<const CollisionShape> collision_shape_ptr,
                         int num_neighbors = 0);
     ~ConnectivityIMPCCBF() = default;

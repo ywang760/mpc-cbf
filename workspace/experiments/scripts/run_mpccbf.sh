@@ -24,7 +24,7 @@ SIM_RUNTIME=20.0
 # Build the MPC CBF examples once before running experiments
 echo "Building MPC CBF Formation Control example"
 cd /usr/src/mpc-cbf/workspace/lib/mpc_cbf/build
-make -j20 mpc_cbf_examples_MPCCBFFormationControl_example
+ninja -j20 mpc_cbf_examples_MPCCBFFormationControl_example
 
 # Remove the existing states.json file if it exists
 if [ -f ${DEFAULT_STATES_PATH} ]; then
@@ -59,7 +59,8 @@ for config_file in "${INPUT[@]}"; do
     python3 /usr/src/mpc-cbf/workspace/experiments/python/visualization/plot_results.py \
         --config ${config_file} \
         --states ${DEFAULT_STATES_PATH} \
-        --output_dir ${VIZ_OUTPUT_DIR}
+        --output_dir ${VIZ_OUTPUT_DIR} \
+        --create_anim
         # can add the --create_anim flag if needed
 
     # Step 3: Check for collisions and success

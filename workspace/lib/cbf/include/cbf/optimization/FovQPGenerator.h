@@ -42,7 +42,7 @@ class FovQPGenerator : public CBFQPGeneratorBase<T, DIM> {
          * @param slack_idx Index of slack variable to use (if use_slack is true)
          */
     void addSafetyConstraint(const Vector& state, const Vector& target_state,
-                             bool use_slack = false, std::size_t slack_idx = 0) override;
+                             bool use_slack = false, std::size_t slack_idx = 0);
 
     /**
          * @brief Adds field-of-view left border constraint

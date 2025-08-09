@@ -94,9 +94,7 @@ int main(int argc, char* argv[]) {
     // init connectivity mpc-cbf
     size_t num_robots = experiment_config_json["tasks"]["so"].size();
     size_t num_neighbors = num_robots - 1;
-    uint64_t bezier_continuity_upto_degree = 3;
     ConnectivityIMPCCBF connectivity_impc_cbf(impc_cbf_params, pred_model_ptr, connectivity_cbf,
-                                              bezier_continuity_upto_degree,
                                               aligned_box_collision_shape_ptr, num_neighbors);
 
     // load the tasks
@@ -133,8 +131,8 @@ int main(int argc, char* argv[]) {
     double sim_t = 0;
     int loop_idx = 0;
     while (sim_t < sim_runtime) {
-        if (loop_idx % 10 == 0) {
-            logger->info("Loop index: {}, Simulation time: {} seconds", loop_idx, sim_t);
+        if (loop_idx % 50 == 0) {
+            logger->info("loop_idx: {}, sim_t: {:.3f} seconds", loop_idx, sim_t);
         }
 
         for (int robot_idx = 0; robot_idx < num_robots; ++robot_idx) {
@@ -148,7 +146,7 @@ int main(int argc, char* argv[]) {
                                                           /*self_idx=*/robot_idx, ref_positions);
 
             if (!success) {
-                logger->warn("Optimization failed for robot {} at timestep {}", robot_idx, sim_t);
+                logger->warn("Optimization failed for robot {} at sim_t {:.3f}", robot_idx, sim_t);
                 if (trajs.empty()) {
                     logger->error("No previous trajectory available for robot {}", robot_idx);
                 } else {

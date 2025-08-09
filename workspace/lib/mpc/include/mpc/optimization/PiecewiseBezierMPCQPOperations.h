@@ -17,6 +17,7 @@ template <typename T, unsigned int DIM>
 struct PiecewiseBezierParams {
     size_t num_pieces_, num_control_points_;
     T piece_max_parameter_;
+    uint64_t bezier_continuity_upto_degree_;
 };
 
 // params for MPC
