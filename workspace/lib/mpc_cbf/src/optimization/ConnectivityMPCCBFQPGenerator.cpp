@@ -65,9 +65,9 @@ void ConnectivityMPCCBFQPGenerator<T, DIM>::addConnectivityConstraint(
 
 template <typename T, unsigned int DIM>
 void ConnectivityMPCCBFQPGenerator<T, DIM>::addCLFConstraint(const Vector& current_state,
-                                                              const Vector& neighbor_state,
-                                                              std::size_t neighbor_idx,
-                                                              T slack_value) {
+                                                             const Vector& neighbor_state,
+                                                             std::size_t neighbor_idx,
+                                                             T slack_value) {
     LinearConstraint linear_constraint = piecewise_mpc_cbf_operations_ptr_->clfConstraint(
         current_state, neighbor_state, slack_value);
 
@@ -151,7 +151,8 @@ void ConnectivityMPCCBFQPGenerator<T, DIM>::addPredCLFConstraints(
 }
 
 template <typename T, unsigned int DIM>
-std::shared_ptr<typename ConnectivityMPCCBFQPGenerator<T, DIM>::ConnectivityMPCCBFQPOperations::ConnectivityCBF>
+std::shared_ptr<
+    typename ConnectivityMPCCBFQPGenerator<T, DIM>::ConnectivityMPCCBFQPOperations::ConnectivityCBF>
 ConnectivityMPCCBFQPGenerator<T, DIM>::connectivityCBF() const {
     return piecewise_mpc_cbf_operations_ptr_->connectivityCBF();
 }

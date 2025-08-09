@@ -42,11 +42,12 @@ class ConnectivityMPCCBFQPGenerator : public MPCCBFQPGeneratorBase<T, DIM> {
     void addPredConnectivityConstraints(const std::vector<State>& pred_states,
                                         const Eigen::MatrixXd& robot_states, size_t self_idx,
                                         const std::vector<T>& slack_values);
-    void addPredCLFConstraints(const std::vector<State>& pred_states,
-                               const Vector& neighbor_state, std::size_t neighbor_idx);
+    void addPredCLFConstraints(const std::vector<State>& pred_states, const Vector& neighbor_state,
+                               std::size_t neighbor_idx);
 
     // Accessor for connectivity CBF
-    std::shared_ptr<typename ConnectivityMPCCBFQPOperations::ConnectivityCBF> connectivityCBF() const;
+    std::shared_ptr<typename ConnectivityMPCCBFQPOperations::ConnectivityCBF>
+    connectivityCBF() const;
 
   private:
     std::unique_ptr<ConnectivityMPCCBFQPOperations> piecewise_mpc_cbf_operations_ptr_;

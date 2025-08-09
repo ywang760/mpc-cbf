@@ -152,8 +152,8 @@ ConnectivityMPCCBFQPOperations<T, DIM>::predConnectivityConstraints(
 
 template <typename T, unsigned int DIM>
 std::vector<typename ConnectivityMPCCBFQPOperations<T, DIM>::LinearConstraint>
-ConnectivityMPCCBFQPOperations<T, DIM>::predCLFConstraints(
-    const std::vector<State>& pred_states, const Vector& neighbor_state) {
+ConnectivityMPCCBFQPOperations<T, DIM>::predCLFConstraints(const std::vector<State>& pred_states,
+                                                           const Vector& neighbor_state) {
     std::vector<LinearConstraint> linear_constraints;
     for (size_t k = 0; k < pred_states.size(); ++k) {
         const State& pred_state = pred_states.at(k);

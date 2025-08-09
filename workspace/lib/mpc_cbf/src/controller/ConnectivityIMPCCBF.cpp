@@ -165,11 +165,12 @@ bool ConnectivityIMPCCBF<T, DIM>::optimize(
             for (size_t i = 0; i < num_neighbors; ++i) {
                 qp_generator_.addSafetyCBFConstraint(state, other_robot_states[i], i, slack_value);
             }
-            
+
             // Evaluate lambda2 and conditionally add connectivity or CLF constraints
-            const auto robot_positions = robot_states.leftCols(2); // Extract only position columns (x, y)
+            const auto robot_positions =
+                robot_states.leftCols(2); // Extract only position columns (x, y)
             auto [lambda2, eigenvec] = qp_generator_.connectivityCBF()->getLambda2(robot_positions);
-            
+
             // TODO: this 0.1 threshold is arbitrary - should be configurable
             if (lambda2 > 0.1) {
                 // Use single connectivity constraint when graph is well-connected
@@ -198,11 +199,12 @@ bool ConnectivityIMPCCBF<T, DIM>::optimize(
             for (size_t i = 0; i < num_neighbors; ++i) {
                 qp_generator_.addPredSafetyCBFConstraints(pred_states, other_robot_states[i], i);
             }
-            
+
             // Evaluate lambda2 and conditionally add predicted connectivity or CLF constraints
-            const auto robot_positions = robot_states.leftCols(2); // Extract only position columns (x, y)
+            const auto robot_positions =
+                robot_states.leftCols(2); // Extract only position columns (x, y)
             auto [lambda2, eigenvec] = qp_generator_.connectivityCBF()->getLambda2(robot_positions);
-            
+
             // TODO: this 0.1 threshold is arbitrary - should be configurable
             if (lambda2 > 0.1) {
                 // Use single connectivity constraint when graph is well-connected
