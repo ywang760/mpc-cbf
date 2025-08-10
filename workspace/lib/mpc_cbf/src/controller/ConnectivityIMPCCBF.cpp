@@ -33,7 +33,6 @@ ConnectivityIMPCCBF<T, DIM>::ConnectivityIMPCCBF(
     const T h = p.mpc_cbf_params.mpc_params.h_;
     const T Ts = p.mpc_cbf_params.mpc_params.Ts_;
 
-
     // control sequence U control point coefficient
     const int u_interp = static_cast<int>(h / Ts);
     ts_samples_ = Vector::LinSpaced(u_interp, 0, h - Ts);
