@@ -5,7 +5,7 @@
         "k_hor": 16,
         "mpc_tuning": {
             "w_pos_err": 10,
-            "w_u_eff": 20,
+            "w_u_eff": 10,
             "spd_f": 8
         }
     },
@@ -61,7 +61,7 @@
         "d_max": 4.0,
         "cbf_horizon": 2,
         "impc_iter": 2,
-        "slack_mode": true,
+        "slack_mode": false,
         "slack_cost": 50000,
         "slack_decay_rate": 0.1
     },

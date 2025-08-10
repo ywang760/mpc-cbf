@@ -164,38 +164,62 @@ int main(int argc, char* argv[]) {
             }
 
             // log down the prediction
-            double t = 0;
-            while (t <= pred_horizon) {
-                VectorDIM pred_pos;
-                double pred_t = traj_eval_ts.at(robot_idx) + t;
-                if (pred_t > pred_traj_ptrs.at(robot_idx)->max_parameter()) {
-                    pred_t = pred_traj_ptrs.at(robot_idx)->max_parameter();
+            if (pred_traj_ptrs.at(robot_idx) != nullptr) {
+                double t = 0;
+                while (t <= pred_horizon) {
+                    VectorDIM pred_pos;
+                    double pred_t = traj_eval_ts.at(robot_idx) + t;
+                    if (pred_t > pred_traj_ptrs.at(robot_idx)->max_parameter()) {
+                        pred_t = pred_traj_ptrs.at(robot_idx)->max_parameter();
+                    }
+                    pred_pos = pred_traj_ptrs.at(robot_idx)->eval(pred_t, 0);
+                    states["robots"][std::to_string(robot_idx)]["pred_curve"][loop_idx][0].push_back(
+                        {pred_pos(0), pred_pos(1), pred_pos(2)});
+                    t += 0.05;
                 }
-                pred_pos = pred_traj_ptrs.at(robot_idx)->eval(pred_t, 0);
+            } else {
+                // No trajectory available - log current position as fallback
+                logger->warn("No trajectory available for robot {} at sim_t {:.3f}, using current position", robot_idx, sim_t);
+                VectorDIM current_pos = current_states.at(robot_idx).pos_;
                 states["robots"][std::to_string(robot_idx)]["pred_curve"][loop_idx][0].push_back(
-                    {pred_pos(0), pred_pos(1), pred_pos(2)});
-                t += 0.05;
+                    {current_pos(0), current_pos(1), current_pos(2)});
             }
 
             // log down the trajectory
-            double eval_t = 0;
-            for (int t_idx = 1; t_idx <= int(mpc_params.h_ / mpc_params.Ts_); ++t_idx) {
-                eval_t = traj_eval_ts.at(robot_idx) + mpc_params.Ts_ * t_idx;
-                if (eval_t > pred_traj_ptrs.at(robot_idx)->max_parameter()) {
-                    eval_t = pred_traj_ptrs.at(robot_idx)->max_parameter();
+            if (pred_traj_ptrs.at(robot_idx) != nullptr) {
+                double eval_t = 0;
+                for (int t_idx = 1; t_idx <= int(mpc_params.h_ / mpc_params.Ts_); ++t_idx) {
+                    eval_t = traj_eval_ts.at(robot_idx) + mpc_params.Ts_ * t_idx;
+                    if (eval_t > pred_traj_ptrs.at(robot_idx)->max_parameter()) {
+                        eval_t = pred_traj_ptrs.at(robot_idx)->max_parameter();
+                    }
+
+                    Vector x_t_pos = pred_traj_ptrs.at(robot_idx)->eval(eval_t, 0);
+                    Vector x_t_vel = pred_traj_ptrs.at(robot_idx)->eval(eval_t, 1);
+                    State next_state = {x_t_pos, x_t_vel};
+                    next_state = math::addRandomNoise<double, DIM>(next_state, pos_std, vel_std);
+                    current_states.at(robot_idx) = next_state;
+
+                    states["robots"][std::to_string(robot_idx)]["states"].push_back(
+                        {next_state.pos_(0), next_state.pos_(1), next_state.pos_(2), next_state.vel_(0),
+                         next_state.vel_(1), next_state.vel_(2)});
                 }
+                traj_eval_ts.at(robot_idx) = eval_t;
+            } else {
+                // No trajectory available - keep robot stationary with small noise
+                logger->warn("Robot {} has no trajectory, keeping stationary at sim_t {:.3f}", robot_idx, sim_t);
+                for (int t_idx = 1; t_idx <= int(mpc_params.h_ / mpc_params.Ts_); ++t_idx) {
+                    State next_state = current_states.at(robot_idx); // Keep current position
+                    next_state.vel_.setZero(); // Set velocity to zero
+                    next_state = math::addRandomNoise<double, DIM>(next_state, pos_std, vel_std);
+                    current_states.at(robot_idx) = next_state;
 
-                Vector x_t_pos = pred_traj_ptrs.at(robot_idx)->eval(eval_t, 0);
-                Vector x_t_vel = pred_traj_ptrs.at(robot_idx)->eval(eval_t, 1);
-                State next_state = {x_t_pos, x_t_vel};
-                next_state = math::addRandomNoise<double, DIM>(next_state, pos_std, vel_std);
-                current_states.at(robot_idx) = next_state;
-
-                states["robots"][std::to_string(robot_idx)]["states"].push_back(
-                    {next_state.pos_(0), next_state.pos_(1), next_state.pos_(2), next_state.vel_(0),
-                     next_state.vel_(1), next_state.vel_(2)});
+                    states["robots"][std::to_string(robot_idx)]["states"].push_back(
+                        {next_state.pos_(0), next_state.pos_(1), next_state.pos_(2), next_state.vel_(0),
+                         next_state.vel_(1), next_state.vel_(2)});
+                }
+                // Keep eval time unchanged when no trajectory
             }
-            traj_eval_ts.at(robot_idx) = eval_t;
         }
         sim_t += mpc_params.h_;
         loop_idx += 1;
