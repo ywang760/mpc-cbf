@@ -97,8 +97,7 @@ add_library(mpc_cbf_controller_ConnectivityIMPCCBF SHARED src/controller/Connect
 target_include_directories(mpc_cbf_controller_ConnectivityIMPCCBF PUBLIC include)
 target_link_libraries(mpc_cbf_controller_ConnectivityIMPCCBF PUBLIC
         mpc_cbf_optimization_ConnectivityMPCCBFQPGenerator
-        qpcpp_solvers_CPLEX
-        separating_hyperplanes_Voronoi)
+        qpcpp_solvers_CPLEX)
 
 # add examples
 # FoV Example using MPC CBF (commented out - needs refactoring)

@@ -32,8 +32,7 @@ ConnectivityIMPCCBF<T, DIM>::ConnectivityIMPCCBF(
 
     const T h = p.mpc_cbf_params.mpc_params.h_;
     const T Ts = p.mpc_cbf_params.mpc_params.Ts_;
-    assert(Ts <= h);
-    assert(std::abs(h - static_cast<int>(h / Ts) * Ts) < 1e-10);
+
 
     // control sequence U control point coefficient
     const int u_interp = static_cast<int>(h / Ts);
@@ -127,34 +126,10 @@ bool ConnectivityIMPCCBF<T, DIM>::optimize(
 
         // add the continuity between pieces
         for (size_t piece_index = 0; piece_index < num_pieces - 1; ++piece_index) {
-            for (size_t d = 0; d < bezier_continuity_upto_degree_; ++d) {
+            for (size_t d = 0; d <= bezier_continuity_upto_degree_; ++d) {
                 qp_generator_.piecewise_mpc_qp_generator_ptr()->addContinuityConstraint(piece_index,
                                                                                         d);
             }
-        }
-
-        // add the collision avoidance constraints
-        AlignedBox robot_bbox_at_zero = collision_shape_ptr_->boundingBox(VectorDIM::Zero());
-        for (size_t i = 0; i < num_neighbors; ++i) {
-            // Extract position from other_robot_states
-            const VectorDIM other_robot_pos = other_robot_states[i].head(DIM);
-
-            // TODO: this is model specific, here the last dimension is
-            // orientation data
-            VectorDIM current_xy = current_pos;
-            current_xy(DIM - 1) = 0;
-            VectorDIM other_robot_xy = other_robot_pos;
-            other_robot_xy(DIM - 1) = 0;
-
-            Hyperplane hyperplane =
-                separating_hyperplanes::voronoi<T, DIM>(current_xy, other_robot_xy);
-            // shifted hyperplane
-            Hyperplane shifted_hyperplane =
-                math::shiftHyperplane<T, DIM>(hyperplane, robot_bbox_at_zero);
-            qp_generator_.piecewise_mpc_qp_generator_ptr()->addHyperplaneConstraintForPiece(
-                0,
-                shifted_hyperplane); // add the collision avoidance
-                                     // constraint on the first segment
         }
 
         // connectivity cbf constraints
@@ -167,20 +142,20 @@ bool ConnectivityIMPCCBF<T, DIM>::optimize(
             }
 
             // Evaluate lambda2 and conditionally add connectivity or CLF constraints
-            const auto robot_positions =
-                robot_states.leftCols(2); // Extract only position columns (x, y)
-            auto [lambda2, eigenvec] = qp_generator_.connectivityCBF()->getLambda2(robot_positions);
+            // const auto robot_positions =
+            //     robot_states.leftCols(2); // Extract only position columns (x, y)
+            // auto [lambda2, eigenvec] = qp_generator_.connectivityCBF()->getLambda2(robot_positions);
 
-            // TODO: this 0.1 threshold is arbitrary - should be configurable
-            if (lambda2 > 0.1) {
-                // Use single connectivity constraint when graph is well-connected
-                qp_generator_.addConnectivityConstraint(robot_states, self_idx, slack_value);
-            } else {
-                // Use pairwise CLF constraints when graph connectivity is poor
-                for (size_t i = 0; i < num_neighbors; ++i) {
-                    qp_generator_.addCLFConstraint(state, other_robot_states[i], i, slack_value);
-                }
-            }
+            // // TODO: this 0.1 threshold is arbitrary - should be configurable
+            // if (lambda2 > 0.1) {
+            //     // Use single connectivity constraint when graph is well-connected
+            //     qp_generator_.addConnectivityConstraint(robot_states, self_idx, slack_value);
+            // } else {
+            //     // Use pairwise CLF constraints when graph connectivity is poor
+            //     for (size_t i = 0; i < num_neighbors; ++i) {
+            //         qp_generator_.addCLFConstraint(state, other_robot_states[i], i, slack_value);
+            //     }
+            // }
         } else if (iter > 0 && success) {
             // pred the robot's position in the horizon, use for the CBF
             // constraints
@@ -201,21 +176,21 @@ bool ConnectivityIMPCCBF<T, DIM>::optimize(
             }
 
             // Evaluate lambda2 and conditionally add predicted connectivity or CLF constraints
-            const auto robot_positions =
-                robot_states.leftCols(2); // Extract only position columns (x, y)
-            auto [lambda2, eigenvec] = qp_generator_.connectivityCBF()->getLambda2(robot_positions);
+            // const auto robot_positions =
+            //     robot_states.leftCols(2); // Extract only position columns (x, y)
+            // auto [lambda2, eigenvec] = qp_generator_.connectivityCBF()->getLambda2(robot_positions);
 
-            // TODO: this 0.1 threshold is arbitrary - should be configurable
-            if (lambda2 > 0.1) {
-                // Use single connectivity constraint when graph is well-connected
-                qp_generator_.addPredConnectivityConstraints(pred_states, robot_states, self_idx,
-                                                             slack_values);
-            } else {
-                // Use pairwise CLF constraints when graph connectivity is poor
-                for (size_t i = 0; i < num_neighbors; ++i) {
-                    qp_generator_.addPredCLFConstraints(pred_states, other_robot_states[i], i);
-                }
-            }
+            // // TODO: this 0.1 threshold is arbitrary - should be configurable
+            // if (lambda2 > 0.1) {
+            //     // Use single connectivity constraint when graph is well-connected
+            //     qp_generator_.addPredConnectivityConstraints(pred_states, robot_states, self_idx,
+            //                                                  slack_values);
+            // } else {
+            //     // Use pairwise CLF constraints when graph connectivity is poor
+            //     for (size_t i = 0; i < num_neighbors; ++i) {
+            //         qp_generator_.addPredCLFConstraints(pred_states, other_robot_states[i], i);
+            //     }
+            // }
         }
 
         // dynamics constraints

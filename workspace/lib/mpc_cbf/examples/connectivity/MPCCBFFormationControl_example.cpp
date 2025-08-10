@@ -72,6 +72,8 @@ int main(int argc, char* argv[]) {
         common::parseConnectivityCBFParams<double>(experiment_config_json);
     std::shared_ptr<const AlignedBoxCollisionShape> aligned_box_collision_shape_ptr =
         common::parseCollisionShape<double, DIM>(experiment_config_json);
+    common::validateCrossParameterRelationships<double, DIM>(mpc_params, piecewise_bezier_params,
+                                                             impc_params);
 
     // Assemble connectivity cbf params
     ConnectivityMPCCBFParams connectivity_mpc_cbf_params = {piecewise_bezier_params, mpc_params,

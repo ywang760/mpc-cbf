@@ -11,7 +11,6 @@
 #include <numeric>
 #include <qpcpp/Problem.h>
 #include <qpcpp/solvers/CPLEX.h>
-#include <separating_hyperplanes/Voronoi.h>
 
 namespace mpc_cbf {
 template <typename T, unsigned int DIM>
@@ -30,8 +29,7 @@ class ConnectivityIMPCCBF {
     using SingleParameterPiecewiseCurve = splines::SingleParameterPiecewiseCurve<T, DIM>;
     using VectorDIM = math::VectorDIM<T, DIM>;
     using Vector = math::Vector<T>;
-    using AlignedBox = math::AlignedBox<T, DIM>;
-    using Hyperplane = math::Hyperplane<T, DIM>;
+
     using Matrix = math::Matrix<T>;
     using CollisionShape = math::CollisionShape<T, DIM>;
     using Problem = qpcpp::Problem<T>;
