@@ -7,7 +7,19 @@
 namespace cbf {
 template <typename T, unsigned int DIM>
 FovQPGenerator<T, DIM>::FovQPGenerator(std::shared_ptr<FovCBF> cbf, int num_robots, bool slack_mode)
-    : CBFQPGeneratorBase<T, DIM>(num_robots, slack_mode), cbf_(cbf) {}
+    : CBFQPGeneratorBase<T, DIM>(), cbf_(cbf) {
+
+    // Add slack variables to the problem if in slack mode
+    // Slack variables allow constraints to be violated by paying a penalty in the cost function
+    slack_mode_ = slack_mode;
+    if (slack_mode) {
+        for (size_t i = 0; i < num_robots; ++i) {
+            qpcpp::Variable<T>* variable_ptr = this->problem().addVariable(
+                0, std::numeric_limits<T>::max()); // slack variables are non-negative
+            this->slack_variables_.push_back(variable_ptr);
+        }
+    }
+}
 
 template <typename T, unsigned int DIM>
 void FovQPGenerator<T, DIM>::addSafetyConstraint(const Vector& state, const Vector& target_state,
@@ -28,8 +40,8 @@ void FovQPGenerator<T, DIM>::addSafetyConstraint(const Vector& state, const Vect
         slack_coefficients(slack_idx) = -1; // Negative coefficient allows constraint relaxation
 
         // Add the constraint with slack variable to the QP problem
-        this->addLinearConstraintForControlInputWithSlackVariables(linear_constraint,
-                                                                   slack_coefficients);
+        this->addLinearConstraintForControlInputWithSlackVariables(
+            linear_constraint, slack_coefficients, this->slack_variables_);
     } else {
         // Add the constraint without slack variable to the QP problem
         this->addLinearConstraintForControlInput(linear_constraint);
@@ -56,8 +68,8 @@ void FovQPGenerator<T, DIM>::addLeftBorderConstraint(const Vector& state,
         slack_coefficients(slack_idx) = -1; // Negative coefficient allows constraint relaxation
 
         // Add the constraint with slack variable to the QP problem
-        this->addLinearConstraintForControlInputWithSlackVariables(linear_constraint,
-                                                                   slack_coefficients);
+        this->addLinearConstraintForControlInputWithSlackVariables(
+            linear_constraint, slack_coefficients, this->slack_variables_);
     } else {
         // Add the constraint without slack variable to the QP problem
         this->addLinearConstraintForControlInput(linear_constraint);
@@ -84,8 +96,8 @@ void FovQPGenerator<T, DIM>::addRightBorderConstraint(const Vector& state,
         slack_coefficients(slack_idx) = -1; // Negative coefficient allows constraint relaxation
 
         // Add the constraint with slack variable to the QP problem
-        this->addLinearConstraintForControlInputWithSlackVariables(linear_constraint,
-                                                                   slack_coefficients);
+        this->addLinearConstraintForControlInputWithSlackVariables(
+            linear_constraint, slack_coefficients, this->slack_variables_);
     } else {
         // Add the constraint without slack variable to the QP problem
         this->addLinearConstraintForControlInput(linear_constraint);
@@ -111,8 +123,8 @@ void FovQPGenerator<T, DIM>::addRangeConstraint(const Vector& state, const Vecto
         slack_coefficients(slack_idx) = -1; // Negative coefficient allows constraint relaxation
 
         // Add the constraint with slack variable to the QP problem
-        this->addLinearConstraintForControlInputWithSlackVariables(linear_constraint,
-                                                                   slack_coefficients);
+        this->addLinearConstraintForControlInputWithSlackVariables(
+            linear_constraint, slack_coefficients, this->slack_variables_);
     } else {
         // Add the constraint without slack variable to the QP problem
         this->addLinearConstraintForControlInput(linear_constraint);

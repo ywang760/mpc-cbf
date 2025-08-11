@@ -91,6 +91,8 @@ class FovQPGenerator : public CBFQPGeneratorBase<T, DIM> {
          */
     void addMaxVelConstraints(const Vector& state) override;
 
+    bool slack_mode_;
+
   private:
     std::shared_ptr<FovCBF> cbf_; ///< Pointer to the Field of View CBF implementation
 

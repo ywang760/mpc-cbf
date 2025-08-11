@@ -41,9 +41,15 @@ Configuration parameters for the MPC-CBF Formation Control system. Each paramete
         "d_max": 4.0,                     // Max connectivity distance - robots must connect when farther  
         "cbf_horizon": 2,                 // CBF prediction horizon - must be ≤ k_hor
         "impc_iter": 2,                   // Iterative MPC-CBF iterations - more = better constraints but slower
-        "slack_mode": true,               // Allow constraint violations with penalty
-        "slack_cost": 50000,              // Cost penalty for constraint violations - higher = stricter
-        "slack_decay_rate": 0.1           // Slack decay rate ∈ (0,1] - lower = longer violation tolerance
+        "slack_config": {                 // Separate slack controls for different constraint types
+            "safety_slack": true,         // Allow safety constraint violations (collision avoidance)
+            "clf_slack": false,           // Allow CLF constraint violations (formation performance)  
+            "connectivity_slack": true,   // Allow connectivity constraint violations (d_min/d_max)
+            "safety_slack_cost": 100000,  // Slack cost for safety violations - high cost to avoid collisions
+            "clf_slack_cost": 50000,      // Slack cost for CLF violations
+            "connectivity_slack_cost": 25000, // Slack cost for connectivity violations - formation flexibility
+            "slack_decay_rate": 0.1       // Slack decay rate ∈ (0,1] - lower = longer violation tolerance
+        }
     },
     "bezier_params": {                    // Piecewise Bezier trajectory representation
         "num_pieces": 3,                  // Number of Bezier pieces - increase if k_hor parameter error occurs
@@ -66,4 +72,4 @@ Configuration parameters for the MPC-CBF Formation Control system. Each paramete
 
 **🔧 Formation too tight/loose:** Adjust `d_min`/`d_max` connectivity distances
 
-**🔧 Constraint violations:** Increase `slack_cost`, disable `slack_mode`, or increase `cbf_horizon` for stricter safety
+**🔧 Constraint violations:** Increase specific `slack_cost` values, disable relevant slack types, or increase `cbf_horizon` for stricter safety

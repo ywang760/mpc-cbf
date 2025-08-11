@@ -28,13 +28,12 @@ class ConnectivityControl {
          * @brief Constructor for ConnectivityControl
          * 
          * @param cbf Shared pointer to ConnectivityCBF implementation
-         * @param num_robots Number of robots
-         * @param slack_mode Whether to use slack variables in constraints
-         * @param slack_cost Cost coefficient for slack variables
-         * @param slack_decay_rate Decay rate for slack variables
+         * @param slack_config Configuration for different types of slack variables
+         * @param num_neighbors Number of neighboring robots (for slack variable sizing)
          */
-    ConnectivityControl(std::shared_ptr<ConnectivityCBF> cbf, int num_robots = 0,
-                        bool slack_mode = false, T slack_cost = 1000, T slack_decay_rate = 0.2);
+    ConnectivityControl(std::shared_ptr<ConnectivityCBF> cbf, 
+                        const SlackConfig& slack_config = SlackConfig{}, 
+                        size_t num_neighbors = 0);
     ~ConnectivityControl() = default;
 
     /**
@@ -54,10 +53,8 @@ class ConnectivityControl {
 
   private:
     QPGenerator qp_generator_;
-    bool slack_mode_;
-    T slack_cost_;
-    T slack_decay_rate_;
-    int num_robots_;
+    SlackConfig slack_config_;
+    size_t num_neighbors_;
     std::shared_ptr<ConnectivityCBF> cbf_;
 };
 

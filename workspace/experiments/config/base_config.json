@@ -61,6 +61,15 @@
         "d_max": 4.0,
         "cbf_horizon": 2,
         "impc_iter": 2,
+        "slack_config": {
+            "safety_slack": true,
+            "clf_slack": true,
+            "connectivity_slack": false,
+            "safety_slack_cost": 100000,
+            "clf_slack_cost": 50000,
+            "connectivity_slack_cost": 25000,
+            "slack_decay_rate": 0.1
+        },
         "slack_mode": false,
         "slack_cost": 50000,
         "slack_decay_rate": 0.1

@@ -85,15 +85,36 @@ int main(int argc, char *argv[])
     // TODO: change the model to DoubleIntegratorXY (no yaw)
     std::shared_ptr<DoubleIntegratorXYYaw> pred_model_ptr = std::make_shared<DoubleIntegratorXYYaw>(Ts);
 
-    // init cbf
+    // Parse CBF parameters directly
     double d_min = experiment_config_json["cbf_params"]["d_min"];
     double d_max = experiment_config_json["cbf_params"]["d_max"];
-    std::shared_ptr<ConnectivityCBF> connectivity_cbf = std::make_shared<ConnectivityCBF>(d_min, d_max, v_min, v_max);
-
-    // cbf controller setting
-    bool slack_mode = experiment_config_json["cbf_params"]["slack_mode"];
-    double slack_cost = experiment_config_json["cbf_params"]["slack_cost"];
-    double slack_decay_rate = experiment_config_json["cbf_params"]["slack_decay_rate"];
+    
+    // Parse slack configuration - support both old and new format
+    cbf::SlackConfig slack_config;
+    
+    if (experiment_config_json["cbf_params"].contains("slack_config")) {
+        // New format with separate slack controls
+        const auto& slack_json = experiment_config_json["cbf_params"]["slack_config"];
+        slack_config.safety_slack = slack_json.value("safety_slack", false);
+        slack_config.clf_slack = slack_json.value("clf_slack", false);
+        slack_config.connectivity_slack = slack_json.value("connectivity_slack", false);
+        slack_config.safety_slack_cost = slack_json.value("safety_slack_cost", 100000.0);
+        slack_config.clf_slack_cost = slack_json.value("clf_slack_cost", 50000.0);
+        slack_config.connectivity_slack_cost = slack_json.value("connectivity_slack_cost", 25000.0);
+        slack_config.slack_decay_rate = slack_json.value("slack_decay_rate", 0.1);
+    } else if (experiment_config_json["cbf_params"].contains("slack_mode")) {
+        // Backward compatibility with old format
+        bool slack_mode = experiment_config_json["cbf_params"]["slack_mode"];
+        if (slack_mode) {
+            // Default behavior: enable safety and connectivity slack
+            slack_config.safety_slack = true;
+            slack_config.connectivity_slack = true;
+            // Use default costs
+        }
+    }
+    
+    cbf::ConnectivityCBFParams<double> cbf_params{d_min, d_max, slack_config};
+    std::shared_ptr<ConnectivityCBF> connectivity_cbf = std::make_shared<ConnectivityCBF>(cbf_params.dmin_, cbf_params.dmax_, v_min, v_max);
 
     // load the tasks
     std::vector<State> current_states;
@@ -161,8 +182,9 @@ int main(int argc, char *argv[])
             //     ref_acc
             // );
 
-            // Apply CBF to modify control for safety and connectivity
-            ConnectivityControl connectivity_control(connectivity_cbf, num_robots, slack_mode, slack_cost, slack_decay_rate);
+            // Apply CBF to modify control for safety and connectivity  
+            size_t num_neighbors = num_robots - 1; // Exclude self from neighbor count
+            ConnectivityControl connectivity_control(connectivity_cbf, cbf_params.slack_config_, num_neighbors);
             VectorDIM cbf_u;
             bool success = connectivity_control.optimize(cbf_u, desired_u, current_states, robot_idx, a_min, a_max);
             if (!success)

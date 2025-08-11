@@ -144,7 +144,50 @@ template <typename T>
 cbf::ConnectivityCBFParams<T> parseConnectivityCBFParams(const nlohmann::json& config_json) {
     T d_min = config_json["cbf_params"]["d_min"];
     T d_max = config_json["cbf_params"]["d_max"];
-    return {d_min, d_max};
+    
+    // Parse slack configuration - support both old and new format
+    cbf::SlackConfig slack_config;
+    
+    if (config_json["cbf_params"].contains("slack_config")) {
+        // New format with separate slack controls
+        const auto& slack_json = config_json["cbf_params"]["slack_config"];
+        slack_config.safety_slack = slack_json.value("safety_slack", false);
+        slack_config.clf_slack = slack_json.value("clf_slack", false);
+        slack_config.connectivity_slack = slack_json.value("connectivity_slack", false);
+        slack_config.safety_slack_cost = slack_json.value("safety_slack_cost", 100000.0);
+        slack_config.clf_slack_cost = slack_json.value("clf_slack_cost", 50000.0);
+        slack_config.connectivity_slack_cost = slack_json.value("connectivity_slack_cost", 25000.0);
+        slack_config.slack_decay_rate = slack_json.value("slack_decay_rate", 0.1);
+        
+        // Validate slack configuration
+        if (slack_config.slack_decay_rate <= 0.0 || slack_config.slack_decay_rate > 1.0) {
+            throw std::invalid_argument("slack_decay_rate must be in (0,1], got: " + std::to_string(slack_config.slack_decay_rate));
+        }
+        if (slack_config.safety_slack && slack_config.safety_slack_cost <= 0.0) {
+            throw std::invalid_argument("safety_slack_cost must be positive when safety_slack is enabled");
+        }
+        if (slack_config.clf_slack && slack_config.clf_slack_cost <= 0.0) {
+            throw std::invalid_argument("clf_slack_cost must be positive when clf_slack is enabled");
+        }
+        if (slack_config.connectivity_slack && slack_config.connectivity_slack_cost <= 0.0) {
+            throw std::invalid_argument("connectivity_slack_cost must be positive when connectivity_slack is enabled");
+        }
+    } else if (config_json["cbf_params"].contains("slack_mode")) {
+        // Backward compatibility with old format
+        bool old_slack_mode = config_json["cbf_params"]["slack_mode"];
+        if (old_slack_mode) {
+            // Enable all slack types for backward compatibility
+            slack_config.safety_slack = true;
+            slack_config.clf_slack = true;
+            slack_config.connectivity_slack = true;
+            slack_config.safety_slack_cost = config_json["cbf_params"].value("slack_cost", 50000.0);
+            slack_config.clf_slack_cost = config_json["cbf_params"].value("slack_cost", 50000.0);
+            slack_config.connectivity_slack_cost = config_json["cbf_params"].value("slack_cost", 50000.0);
+            slack_config.slack_decay_rate = config_json["cbf_params"].value("slack_decay_rate", 0.1);
+        }
+    }
+    
+    return {d_min, d_max, slack_config};
 }
 
 /**

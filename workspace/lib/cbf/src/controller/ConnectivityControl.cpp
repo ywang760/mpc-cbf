@@ -9,13 +9,11 @@ auto logger = common::initializeLogging();
 
 template <typename T, unsigned int DIM>
 ConnectivityControl<T, DIM>::ConnectivityControl(std::shared_ptr<ConnectivityCBF> cbf,
-                                                 int num_robots, bool slack_mode, T slack_cost,
-                                                 T slack_decay_rate)
-    : qp_generator_(cbf, num_robots, slack_mode),
-      slack_mode_(slack_mode),
-      slack_cost_(slack_cost),
-      slack_decay_rate_(slack_decay_rate),
-      num_robots_(num_robots),
+                                                 const SlackConfig& slack_config,
+                                                 size_t num_neighbors)
+    : qp_generator_(cbf, slack_config, num_neighbors),
+      slack_config_(slack_config),
+      num_neighbors_(num_neighbors),
       cbf_(cbf) {}
 
 template <typename T, unsigned int DIM>
@@ -27,27 +25,36 @@ bool ConnectivityControl<T, DIM>::optimize(VectorDIM& cbf_u, const VectorDIM& de
     Vector state(2 * DIM);
     state << current_state.pos_, current_state.vel_;
 
-    // if slack_mode, compute the slack weights
-    std::vector<double> slack_weights(num_robots_);
-    if (slack_mode_) {
-        // Define slack weights with decay
-        T w_init = slack_cost_;
-        T decay_factor = slack_decay_rate_;
-        for (size_t i = 0; i < num_robots_; ++i) {
-            slack_weights.at(i) = w_init * pow(decay_factor, i);
-        }
-    }
-
-    // add cost
+    // Add cost terms
     qp_generator_.addDesiredControlCost(desired_u);
-    if (slack_mode_) {
-        qp_generator_.addSlackCost(slack_weights);
+    
+    // Add separate slack costs based on configuration
+    if (slack_config_.safety_slack) {
+        std::vector<T> safety_costs(num_neighbors_, slack_config_.safety_slack_cost);
+        // Apply decay over horizon if needed
+        for (size_t i = 0; i < safety_costs.size(); ++i) {
+            safety_costs[i] *= pow(slack_config_.slack_decay_rate, i);
+        }
+        qp_generator_.addSlackCost(safety_costs, qp_generator_.safety_slack_variables_);
+    }
+    
+    if (slack_config_.clf_slack) {
+        std::vector<T> clf_costs(num_neighbors_, slack_config_.clf_slack_cost);
+        for (size_t i = 0; i < clf_costs.size(); ++i) {
+            clf_costs[i] *= pow(slack_config_.slack_decay_rate, i);
+        }
+        qp_generator_.addSlackCost(clf_costs, qp_generator_.clf_slack_variables_);
+    }
+    
+    if (slack_config_.connectivity_slack) {
+        std::vector<T> connectivity_costs = {slack_config_.connectivity_slack_cost};
+        qp_generator_.addSlackCost(connectivity_costs, qp_generator_.connectivity_slack_variables_);
     }
 
     // add constraints
 
     // Add safety constraints
-    for (size_t i = 0; i < num_robots_ - 1; ++i) {
+    for (size_t i = 0; i < num_neighbors_; ++i) {
         Vector neighbor_state(2 * DIM);
         neighbor_state << current_states.at(i + (i >= self_idx ? 1 : 0)).pos_,
             current_states.at(i + (i >= self_idx ? 1 : 0)).vel_;
@@ -71,15 +78,12 @@ bool ConnectivityControl<T, DIM>::optimize(VectorDIM& cbf_u, const VectorDIM& de
     if (lambda2 > 0.1) {
         qp_generator_.addConnConstraint(state, robot_states, self_idx);
     } else {
-        int local_slack_idx = 0;
-        for (size_t i = 0; i < num_robots_ - 1; ++i) {
+        // Add CLF constraints with proper indexing
+        for (size_t i = 0; i < num_neighbors_; ++i) {
             Vector neighbor_state(2 * DIM);
             neighbor_state << current_states.at(i + (i >= self_idx ? 1 : 0)).pos_,
                 current_states.at(i + (i >= self_idx ? 1 : 0)).vel_;
-            qp_generator_.addCLFConstraint(state, neighbor_state, local_slack_idx);
-            if (slack_mode_) {
-                ++local_slack_idx;
-            }
+            qp_generator_.addCLFConstraint(state, neighbor_state, i);
         }
     }
 

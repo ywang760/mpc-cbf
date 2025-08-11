@@ -28,12 +28,9 @@ class CBFQPGeneratorBase {
     using Matrix = math::Matrix<T>;
 
     /**
-         * @brief Constructor with number of robots and slack mode
-         *
-         * @param num_robots Number of robots (used for slack variables)
-         * @param slack_mode If true, add slack variables to allow constraint relaxation
+         * @brief Constructor for base QP generator
          */
-    explicit CBFQPGeneratorBase(int num_robots = 0, bool slack_mode = false);
+    explicit CBFQPGeneratorBase();
 
     /**
          * @brief Virtual destructor
@@ -56,8 +53,10 @@ class CBFQPGeneratorBase {
          * @brief Adds cost terms for slack variables to penalize constraint violations
          *
          * @param slack_weights Weights for each slack variable in the cost function
+         * @param slack_variables Vector of slack variables to apply costs to (defaults to member slack_variables_)
          */
-    void addSlackCost(const std::vector<T>& slack_weights);
+    void addSlackCost(const std::vector<T>& slack_weights,
+                      const std::vector<qpcpp::Variable<T>*>& slack_variables = {});
 
     /**
          * @brief Adds minimum velocity constraints
@@ -115,8 +114,10 @@ class CBFQPGeneratorBase {
          * @brief Adds cost terms for slack variables
          *
          * @param cost_addition The cost terms to add (quadratic, linear, constant)
+         * @param slack_variables Vector of slack variables to apply costs to
          */
-    void addCostAdditionForSlackVariables(const CostAddition& cost_addition);
+    void addCostAdditionForSlackVariables(const CostAddition& cost_addition,
+                                          const std::vector<qpcpp::Variable<T>*>& slack_variables);
 
     /**
          * @brief Adds linear constraint for control input variables
@@ -131,9 +132,9 @@ class CBFQPGeneratorBase {
          * @param linear_constraint The constraint for control input variables
          * @param slack_coefficients Coefficients for slack variables in the constraint
          */
-    void
-    addLinearConstraintForControlInputWithSlackVariables(const LinearConstraint& linear_constraint,
-                                                         const Row& slack_coefficients);
+    void addLinearConstraintForControlInputWithSlackVariables(
+        const LinearConstraint& linear_constraint, const Row& slack_coefficients,
+        const std::vector<qpcpp::Variable<T>*>& slack_variable);
 
     /**
          * @brief Adds bounds on decision variables
