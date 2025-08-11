@@ -148,13 +148,15 @@ int main(int argc, char* argv[]) {
                                                           /*self_idx=*/robot_idx, ref_positions);
 
             if (!success) {
-                logger->warn("Optimization failed for robot {} at sim_t {:.3f}", robot_idx, sim_t);
+                logger->error("Optimization failed for robot {} at sim_t {:.3f}", robot_idx, sim_t);
                 if (trajs.empty()) {
-                    logger->error("No previous trajectory available for robot {}", robot_idx);
+                    // logger->warn("No previous trajectory available for robot {}", robot_idx);
                 } else {
                     logger->warn("Returning the last successful trajectory for robot {}",
                                  robot_idx);
                 }
+            } else {
+                logger->info("Optimization succeeded for robot {} at sim_t {:.3f}", robot_idx, sim_t);
             }
 
             if (!trajs.empty()) {

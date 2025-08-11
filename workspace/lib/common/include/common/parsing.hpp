@@ -110,12 +110,59 @@ mpc::MPCParams<T> parseMPCParams(const nlohmann::json& config_json) {
 template <typename T, unsigned int DIM>
 typename mpc_cbf::ConnectivityIMPCCBF<T, DIM>::IMPCParams
 parseIMPCParams(const nlohmann::json& config_json) {
-    // CBF parameters
-    bool slack_mode = config_json["cbf_params"]["slack_mode"];
-    T slack_cost = config_json["cbf_params"]["slack_cost"];
-    T slack_decay_rate = config_json["cbf_params"]["slack_decay_rate"];
     int cbf_horizon = config_json["cbf_params"]["cbf_horizon"];
     int impc_iter = config_json["cbf_params"]["impc_iter"];
+    
+    // Parse slack configuration - support both old and new format
+    cbf::SlackConfig slack_config;
+    
+    if (config_json["cbf_params"].contains("slack_config")) {
+        // New format with separate slack controls
+        const auto& slack_json = config_json["cbf_params"]["slack_config"];
+        slack_config.safety_slack = slack_json.value("safety_slack", false);
+        slack_config.clf_slack = slack_json.value("clf_slack", false);
+        slack_config.connectivity_slack = slack_json.value("connectivity_slack", false);
+        slack_config.safety_slack_cost = slack_json.value("safety_slack_cost", 100000.0);
+        slack_config.clf_slack_cost = slack_json.value("clf_slack_cost", 50000.0);
+        slack_config.connectivity_slack_cost = slack_json.value("connectivity_slack_cost", 25000.0);
+        slack_config.slack_decay_rate = slack_json.value("slack_decay_rate", 0.1);
+        
+        // Validate slack configuration
+        if (slack_config.slack_decay_rate <= 0.0 || slack_config.slack_decay_rate > 1.0) {
+            throw std::invalid_argument("slack_decay_rate must be in (0,1], got: " + std::to_string(slack_config.slack_decay_rate));
+        }
+        if (slack_config.safety_slack && slack_config.safety_slack_cost <= 0.0) {
+            throw std::invalid_argument("safety_slack_cost must be positive when safety_slack is enabled");
+        }
+        if (slack_config.clf_slack && slack_config.clf_slack_cost <= 0.0) {
+            throw std::invalid_argument("clf_slack_cost must be positive when clf_slack is enabled");
+        }
+        if (slack_config.connectivity_slack && slack_config.connectivity_slack_cost <= 0.0) {
+            throw std::invalid_argument("connectivity_slack_cost must be positive when connectivity_slack is enabled");
+        }
+    } else {
+        // Backward compatibility with old format
+        bool slack_mode = config_json["cbf_params"].value("slack_mode", false);
+        if (slack_mode) {
+            // Enable all slack types for backward compatibility
+            slack_config.safety_slack = true;
+            slack_config.clf_slack = true;
+            slack_config.connectivity_slack = true;
+            T slack_cost = config_json["cbf_params"].value("slack_cost", static_cast<T>(50000.0));
+            slack_config.safety_slack_cost = slack_cost;
+            slack_config.clf_slack_cost = slack_cost;
+            slack_config.connectivity_slack_cost = slack_cost;
+            slack_config.slack_decay_rate = config_json["cbf_params"].value("slack_decay_rate", static_cast<T>(0.1));
+            
+            // Validate backward compatibility parameters
+            if (slack_cost <= 0) {
+                throw std::invalid_argument("Slack cost must be positive when slack_mode is enabled");
+            }
+            if (slack_config.slack_decay_rate <= 0 || slack_config.slack_decay_rate > 1) {
+                throw std::invalid_argument("Slack decay rate must be in (0,1] when slack_mode is enabled");
+            }
+        }
+    }
 
     // Validation: IMPC parameter constraints
     if (cbf_horizon < 1) {
@@ -124,14 +171,8 @@ parseIMPCParams(const nlohmann::json& config_json) {
     if (impc_iter < 1) {
         throw std::invalid_argument("IMPC iterations must be at least 1");
     }
-    if (slack_mode && slack_cost <= 0) {
-        throw std::invalid_argument("Slack cost must be positive when slack_mode is enabled");
-    }
-    if (slack_mode && (slack_decay_rate <= 0 || slack_decay_rate > 1)) {
-        throw std::invalid_argument("Slack decay rate must be in (0,1] when slack_mode is enabled");
-    }
 
-    return {cbf_horizon, impc_iter, slack_cost, slack_decay_rate, slack_mode};
+    return {cbf_horizon, impc_iter, slack_config};
 }
 
 /**

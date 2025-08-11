@@ -5,6 +5,7 @@
 #ifndef MPC_CBF_CONNECTIVITYIMPCCBF_H
 #define MPC_CBF_CONNECTIVITYIMPCCBF_H
 
+#include <cbf/detail/ConnectivityCBF.h>
 #include <math/Helpers.h>
 #include <math/collision_shapes/CollisionShape.h>
 #include <mpc_cbf/optimization/ConnectivityMPCCBFQPGenerator.h>
@@ -39,9 +40,7 @@ class ConnectivityIMPCCBF {
     struct IMPCParams {
         int cbf_horizon_;
         int impc_iter_;
-        T slack_cost_;
-        T slack_decay_rate_;
-        bool slack_mode_;
+        cbf::SlackConfig slack_config_;
     };
 
     struct Params {
@@ -80,9 +79,7 @@ class ConnectivityIMPCCBF {
     std::shared_ptr<const CollisionShape> collision_shape_ptr_;
     int impc_iter_;
     int cbf_horizon_;
-    T slack_cost_;
-    T slack_decay_rate_;
-    bool slack_mode_;
+    cbf::SlackConfig slack_config_;
 };
 
 } // namespace mpc_cbf

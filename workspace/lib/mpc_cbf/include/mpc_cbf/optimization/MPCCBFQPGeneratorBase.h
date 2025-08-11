@@ -28,15 +28,18 @@ class MPCCBFQPGeneratorBase {
 
     // Common interface
     Problem& problem();
-    void addSlackCost(const std::vector<double>& slack_weights);
+    void addSlackCost(const std::vector<double>& slack_weights,
+                      const std::vector<qpcpp::Variable<T>*>& specific_slack_variables = {});
     std::shared_ptr<PiecewiseBezierMPCQPGenerator> piecewise_mpc_qp_generator_ptr();
 
     // Common slack variable management
     void addSlackVariables(int num_neighbors);
-    void addCostAdditionForSlackVariables(const CostAddition& cost_addition);
+    void addCostAdditionForSlackVariables(const CostAddition& cost_addition,
+                                          const std::vector<qpcpp::Variable<T>*>& specific_slack_variables = {});
     void
     addLinearConstraintForPiecewiseWithSlackVariables(const LinearConstraint& linear_constraint,
-                                                      const Row& slack_coefficients);
+                                                      const Row& slack_coefficients,
+                                                      const std::vector<qpcpp::Variable<T>*>& specific_slack_variables = {});
 
   protected:
     // Constructor for derived classes
