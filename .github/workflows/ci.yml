@@ -19,6 +19,7 @@ jobs:
         fetch-depth: 0
         submodules: recursive
         token: ${{ secrets.GITHUB_TOKEN }}
+        ref: ${{ github.head_ref || github.ref }}
 
     - name: Configure Git
       run: |

@@ -8,22 +8,20 @@ namespace mpc_cbf {
 template <typename T, unsigned int DIM>
 ConnectivityIMPCCBF<T, DIM>::ConnectivityIMPCCBF(
     Params& p, std::shared_ptr<DoubleIntegrator> model_ptr,
-    std::shared_ptr<ConnectivityCBF> connectivity_cbf_ptr, uint64_t bezier_continuity_upto_degree,
+    std::shared_ptr<ConnectivityCBF> connectivity_cbf_ptr,
     std::shared_ptr<const CollisionShape> collision_shape_ptr, int num_neighbors)
-    : bezier_continuity_upto_degree_(bezier_continuity_upto_degree),
-      collision_shape_ptr_(collision_shape_ptr) {
+    : bezier_continuity_upto_degree_(
+          p.mpc_cbf_params.piecewise_bezier_params.bezier_continuity_upto_degree_),
+      collision_shape_ptr_(collision_shape_ptr),
+      qp_generator_(std::make_unique<ConnectivityMPCCBFQPOperations>(p.mpc_cbf_params, model_ptr,
+                                                                     connectivity_cbf_ptr),
+                    num_neighbors, p.impc_params.slack_mode_) {
     // impc params
     impc_iter_ = p.impc_params.impc_iter_;
     cbf_horizon_ = p.impc_params.cbf_horizon_;
     slack_cost_ = p.impc_params.slack_cost_;
     slack_decay_rate_ = p.impc_params.slack_decay_rate_;
     slack_mode_ = p.impc_params.slack_mode_;
-    // Initiate the qp_generator
-    std::unique_ptr<ConnectivityMPCCBFQPOperations> connectivity_mpc_cbf_operations_ptr =
-        std::make_unique<ConnectivityMPCCBFQPOperations>(p.mpc_cbf_params, model_ptr,
-                                                         connectivity_cbf_ptr);
-    qp_generator_.addPiecewise(std::move(connectivity_mpc_cbf_operations_ptr), num_neighbors,
-                               slack_mode_);
 
     // load mpc tuning params
     mpc_tuning_ = p.mpc_cbf_params.mpc_params.tuning_;
@@ -34,8 +32,6 @@ ConnectivityIMPCCBF<T, DIM>::ConnectivityIMPCCBF(
 
     const T h = p.mpc_cbf_params.mpc_params.h_;
     const T Ts = p.mpc_cbf_params.mpc_params.Ts_;
-    assert(Ts <= h);
-    assert(std::abs(h - static_cast<int>(h / Ts) * Ts) < 1e-10);
 
     // control sequence U control point coefficient
     const int u_interp = static_cast<int>(h / Ts);
@@ -129,34 +125,10 @@ bool ConnectivityIMPCCBF<T, DIM>::optimize(
 
         // add the continuity between pieces
         for (size_t piece_index = 0; piece_index < num_pieces - 1; ++piece_index) {
-            for (size_t d = 0; d < bezier_continuity_upto_degree_; ++d) {
+            for (size_t d = 0; d <= bezier_continuity_upto_degree_; ++d) {
                 qp_generator_.piecewise_mpc_qp_generator_ptr()->addContinuityConstraint(piece_index,
                                                                                         d);
             }
-        }
-
-        // add the collision avoidance constraints
-        AlignedBox robot_bbox_at_zero = collision_shape_ptr_->boundingBox(VectorDIM::Zero());
-        for (size_t i = 0; i < num_neighbors; ++i) {
-            // Extract position from other_robot_states
-            const VectorDIM other_robot_pos = other_robot_states[i].head(DIM);
-
-            // TODO: this is model specific, here the last dimension is
-            // orientation data
-            VectorDIM current_xy = current_pos;
-            current_xy(DIM - 1) = 0;
-            VectorDIM other_robot_xy = other_robot_pos;
-            other_robot_xy(DIM - 1) = 0;
-
-            Hyperplane hyperplane =
-                separating_hyperplanes::voronoi<T, DIM>(current_xy, other_robot_xy);
-            // shifted hyperplane
-            Hyperplane shifted_hyperplane =
-                math::shiftHyperplane<T, DIM>(hyperplane, robot_bbox_at_zero);
-            qp_generator_.piecewise_mpc_qp_generator_ptr()->addHyperplaneConstraintForPiece(
-                0,
-                shifted_hyperplane); // add the collision avoidance
-                                     // constraint on the first segment
         }
 
         // connectivity cbf constraints
@@ -165,21 +137,24 @@ bool ConnectivityIMPCCBF<T, DIM>::optimize(
             // Set to different values for priority scheduling
             T slack_value = 0;
             for (size_t i = 0; i < num_neighbors; ++i) {
-                if (!slack_mode_) {
-                    qp_generator_.addSafetyCBFConstraint(state, other_robot_states[i], slack_value);
-                } else {
-                    qp_generator_.addSafetyCBFConstraintWithSlackVariables(
-                        state, other_robot_states[i], i);
-                }
+                qp_generator_.addSafetyCBFConstraint(state, other_robot_states[i], i, slack_value);
             }
 
-            // Add connectivity constraint once per iteration
-            if (!slack_mode_) {
-                qp_generator_.addConnectivityConstraint(robot_states, self_idx, slack_value);
-            } else {
-                qp_generator_.addConnectivityConstraintWithSlackVariables(robot_states, self_idx,
-                                                                          0);
-            }
+            // Evaluate lambda2 and conditionally add connectivity or CLF constraints
+            // const auto robot_positions =
+            //     robot_states.leftCols(2); // Extract only position columns (x, y)
+            // auto [lambda2, eigenvec] = qp_generator_.connectivityCBF()->getLambda2(robot_positions);
+
+            // // TODO: this 0.1 threshold is arbitrary - should be configurable
+            // if (lambda2 > 0.1) {
+            //     // Use single connectivity constraint when graph is well-connected
+            //     qp_generator_.addConnectivityConstraint(robot_states, self_idx, slack_value);
+            // } else {
+            //     // Use pairwise CLF constraints when graph connectivity is poor
+            //     for (size_t i = 0; i < num_neighbors; ++i) {
+            //         qp_generator_.addCLFConstraint(state, other_robot_states[i], i, slack_value);
+            //     }
+            // }
         } else if (iter > 0 && success) {
             // pred the robot's position in the horizon, use for the CBF
             // constraints
@@ -191,30 +166,30 @@ bool ConnectivityIMPCCBF<T, DIM>::optimize(
                 pred_state.vel_ = result_curves.back().eval(h_samples_(k), 1);
                 pred_states.push_back(pred_state);
             }
-
             // Create slack values once per neighbor (not growing with horizon)
             // TODO: currently all slack_values are set as 0
             // Set to different values for priority scheduling
             const std::vector<T> slack_values(cbf_horizon_, 0);
-
             for (size_t i = 0; i < num_neighbors; ++i) {
-                if (!slack_mode_) {
-                    qp_generator_.addPredSafetyCBFConstraints(pred_states, other_robot_states[i],
-                                                              slack_values);
-                } else {
-                    qp_generator_.addPredSafetyCBFConstraintsWithSlackVariables(
-                        pred_states, other_robot_states[i], i);
-                }
+                qp_generator_.addPredSafetyCBFConstraints(pred_states, other_robot_states[i], i);
             }
 
-            // Add predicted connectivity constraints once per iteration
-            if (!slack_mode_) {
-                qp_generator_.addPredConnectivityConstraints(pred_states, robot_states, self_idx,
-                                                             slack_values);
-            } else {
-                qp_generator_.addPredConnectivityConstraintsWithSlackVariables(
-                    pred_states, robot_states, self_idx, 0);
-            }
+            // Evaluate lambda2 and conditionally add predicted connectivity or CLF constraints
+            // const auto robot_positions =
+            //     robot_states.leftCols(2); // Extract only position columns (x, y)
+            // auto [lambda2, eigenvec] = qp_generator_.connectivityCBF()->getLambda2(robot_positions);
+
+            // // TODO: this 0.1 threshold is arbitrary - should be configurable
+            // if (lambda2 > 0.1) {
+            //     // Use single connectivity constraint when graph is well-connected
+            //     qp_generator_.addPredConnectivityConstraints(pred_states, robot_states, self_idx,
+            //                                                  slack_values);
+            // } else {
+            //     // Use pairwise CLF constraints when graph connectivity is poor
+            //     for (size_t i = 0; i < num_neighbors; ++i) {
+            //         qp_generator_.addPredCLFConstraints(pred_states, other_robot_states[i], i);
+            //     }
+            // }
         }
 
         // dynamics constraints

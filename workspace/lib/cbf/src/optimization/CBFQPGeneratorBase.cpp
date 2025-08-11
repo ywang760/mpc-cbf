@@ -17,6 +17,7 @@ CBFQPGeneratorBase<T, DIM>::CBFQPGeneratorBase(int num_robots, bool slack_mode) 
 
     // Add slack variables to the problem if in slack mode
     // Slack variables allow constraints to be violated by paying a penalty in the cost function
+    slack_mode_ = slack_mode;
     if (slack_mode) {
         for (size_t i = 0; i < num_robots; ++i) {
             qpcpp::Variable<T>* variable_ptr = problem().addVariable(

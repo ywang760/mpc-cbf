@@ -17,8 +17,8 @@ int main() {
     using Matrix = math::Matrix<double>;
     using json = nlohmann::json;
 
-    double ts = 0.01; // TODO: change the time step
-    int K = 500; // TODO: change the time horizon
+    double ts = 0.01;
+    int K = 500;
 
     std::shared_ptr<DoubleIntegratorXYYaw> model_xyyaw_ptr = std::make_shared<DoubleIntegratorXYYaw>(ts);
     StatePropagator A0 = model_xyyaw_ptr->get_A0(K);

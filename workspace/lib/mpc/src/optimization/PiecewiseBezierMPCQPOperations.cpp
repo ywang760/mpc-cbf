@@ -30,7 +30,8 @@ PiecewiseBezierMPCQPOperations<T, DIM>::PiecewiseBezierMPCQPOperations(
     A0_ = model_ptr_->get_A0(k_hor_);         // A0.pos_: [3K, 6], A0.vel_: [3K, 6],
     Lambda_ = model_ptr_->get_lambda(k_hor_); // Lambda_.pos_: [3K, 3K], Lambda_.vel_: [3K, 3K]
     // control sequence U control point coefficient
-    h_samples_ = Vector::LinSpaced(k_hor_, 0, (k_hor_ - 1) * h_);
+    h_samples_ =
+        Vector::LinSpaced(k_hor_, 0, (k_hor_ - 1) * h_); // [0, h_, 2h_, ..., (k_hor_-1)*h_]
     U_basis_ = evalSamplingBasisMatrix(
         h_samples_,
         2); // [3K, num_piece*dim*num_control_pts] here since the control is acc, derivative degree is 2
@@ -82,9 +83,8 @@ PiecewiseBezierMPCQPOperations<T, DIM>::positionErrorPenaltyCost(const State& cu
     // compute the linear term
     Vector x0 = Vector::Zero(2 * DIM);
     x0 << current_state.pos_, current_state.vel_; // [6,1]
-    Matrix linear_term_coef = (A0_.pos_ * x0).transpose() * Q_pe;
-    linear_term_coef += -1.0 * ref_positions.transpose() *
-                        Q_pe; // TODO for some reason, I have to use -1 here. Need to figure it out.
+    Matrix linear_term_coef = 2.0 * (A0_.pos_ * x0).transpose() * Q_pe;
+    linear_term_coef += -2.0 * ref_positions.transpose() * Q_pe;
     linear_term = (linear_term_coef * Phi_pred).transpose();
 
     return CostAddition(quadratic_term, linear_term, 0);

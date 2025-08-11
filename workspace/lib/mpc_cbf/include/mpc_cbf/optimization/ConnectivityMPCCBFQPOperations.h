@@ -40,6 +40,8 @@ class ConnectivityMPCCBFQPOperations : public MPCCBFQPOperationsBase<T, DIM> {
                                          T slack_value = 0);
     LinearConstraint connectivityConstraint(const Eigen::MatrixXd& robot_states, size_t self_idx,
                                             T slack_value = 0);
+    LinearConstraint clfConstraint(const Vector& current_state, const Vector& neighbor_state,
+                                   T slack_value = 0);
 
     // Predicted constraints
     std::vector<LinearConstraint> predSafetyCBFConstraints(const std::vector<State>& pred_states,
@@ -47,9 +49,12 @@ class ConnectivityMPCCBFQPOperations : public MPCCBFQPOperationsBase<T, DIM> {
     std::vector<LinearConstraint> predConnectivityConstraints(const std::vector<State>& pred_states,
                                                               const Eigen::MatrixXd& robot_states,
                                                               size_t self_idx);
+    std::vector<LinearConstraint> predCLFConstraints(const std::vector<State>& pred_states,
+                                                     const Vector& neighbor_state);
 
     // Accessors
     std::unique_ptr<PiecewiseBezierMPCQPOperations> piecewise_mpc_operations_ptr();
+    std::shared_ptr<ConnectivityCBF> connectivityCBF() const;
 
   private:
     std::shared_ptr<ConnectivityCBF> connectivity_cbf_ptr_;

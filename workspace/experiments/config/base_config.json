@@ -5,18 +5,18 @@
         "k_hor": 16,
         "mpc_tuning": {
             "w_pos_err": 10,
-            "w_u_eff": 1,
-            "spd_f": 3
+            "w_u_eff": 10,
+            "spd_f": 8
         }
     },
     "physical_limits": {
         "p_min": [
-            -10,
-            -10
+            -5,
+            -5
         ],
         "p_max": [
-            10,
-            10
+            5,
+            5
         ],
         "v_min": [
             -2,
@@ -58,14 +58,17 @@
     },
     "cbf_params": {
         "d_min": 2.0,
-        "d_max": 8.0,
-        "slack_mode": true,
-        "slack_cost": 100000,
+        "d_max": 4.0,
+        "cbf_horizon": 2,
+        "impc_iter": 2,
+        "slack_mode": false,
+        "slack_cost": 50000,
         "slack_decay_rate": 0.1
     },
     "bezier_params": {
         "num_pieces": 3,
         "num_control_points": 4,
-        "piece_max_parameter": 0.5
+        "piece_max_parameter": 0.5,
+        "bezier_continuity_upto_degree": 3
     }
 }

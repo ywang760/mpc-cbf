@@ -61,6 +61,7 @@ int main(int argc, char *argv[])
     size_t num_pieces = experiment_config_json["bezier_params"]["num_pieces"];
     size_t num_control_points = experiment_config_json["bezier_params"]["num_control_points"];
     double piece_max_parameter = experiment_config_json["bezier_params"]["piece_max_parameter"];
+    uint64_t bezier_continuity_upto_degree = 4;
 
     double h = experiment_config_json["mpc_params"]["h"];
     double Ts = experiment_config_json["mpc_params"]["h"]; // Use h for Ts as in migrated example
@@ -92,7 +93,7 @@ int main(int argc, char *argv[])
     std::shared_ptr<const AlignedBoxCollisionShape> aligned_box_collision_shape_ptr =
         std::make_shared<const AlignedBoxCollisionShape>(robot_bbox_at_zero);
 
-    PiecewiseBezierParams piecewise_bezier_params = {num_pieces, num_control_points, piece_max_parameter};
+    PiecewiseBezierParams piecewise_bezier_params = {num_pieces, num_control_points, piece_max_parameter, bezier_continuity_upto_degree};
     MPCParams mpc_params = {h, Ts, k_hor, {w_pos_err, w_u_eff, spd_f}, {p_min, p_max, a_min, a_max}};
 
     std::string JSON_FILENAME = option_parse["write_filename"].as<std::string>();
@@ -106,7 +107,6 @@ int main(int argc, char *argv[])
     StatePropagator exe_A0 = exe_model_ptr->get_A0(int(h / Ts));
     StatePropagator exe_Lambda = exe_model_ptr->get_lambda(int(h / Ts));
     // init MPC
-    uint64_t bezier_continuity_upto_degree = 4;
     BezierMPCParams bezier_mpc_params = {piecewise_bezier_params, mpc_params};
 
     // main loop
@@ -156,7 +156,7 @@ int main(int argc, char *argv[])
             Vector ref_positions = target_positions.at(robot_idx).replicate(k_hor, 1);
 
             // Solve MPC optimization problem
-            BezierMPC bezier_mpc(bezier_mpc_params, pred_model_ptr, bezier_continuity_upto_degree, aligned_box_collision_shape_ptr);
+            BezierMPC bezier_mpc(bezier_mpc_params, pred_model_ptr, aligned_box_collision_shape_ptr);
             bool success = bezier_mpc.optimize(traj, current_state, other_robot_positions, ref_positions);
 
             if (!success)
