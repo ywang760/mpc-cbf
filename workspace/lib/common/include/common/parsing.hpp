@@ -1,6 +1,6 @@
 #pragma once
 
-#include <cbf/detail/ConnectivityCBF.h>
+#include <mpc_cbf/detail/ConnectivityCBF.h>
 #include <math/Geometry.h>
 #include <math/collision_shapes/AlignedBoxCollisionShape.h>
 #include <mpc/optimization/PiecewiseBezierMPCQPOperations.h>
@@ -141,7 +141,7 @@ parseIMPCParams(const nlohmann::json& config_json) {
  * @return ConnectivityCBFParams object
  */
 template <typename T>
-cbf::ConnectivityCBFParams<T> parseConnectivityCBFParams(const nlohmann::json& config_json) {
+mpc_cbf::ConnectivityCBFParams<T> parseConnectivityCBFParams(const nlohmann::json& config_json) {
     T d_min = config_json["cbf_params"]["d_min"];
     T d_max = config_json["cbf_params"]["d_max"];
     return {d_min, d_max};

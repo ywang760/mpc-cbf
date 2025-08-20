@@ -22,6 +22,7 @@ class ConnectivityMPCCBFQPGenerator : public MPCCBFQPGeneratorBase<T, DIM> {
     using typename Base::Row;
     using typename Base::State;
     using typename Base::Vector;
+    using typename Base::VectorDIM;
 
     // Constructor
     ConnectivityMPCCBFQPGenerator(
@@ -31,8 +32,8 @@ class ConnectivityMPCCBFQPGenerator : public MPCCBFQPGeneratorBase<T, DIM> {
     // Connectivity-specific constraint methods
     void addSafetyCBFConstraint(const Vector& current_state, const Vector& neighbor_state,
                                 std::size_t neighbor_idx, T slack_value = 0);
-    void addConnectivityConstraint(const Eigen::MatrixXd& robot_states, size_t self_idx,
-                                   T slack_value = 0);
+    void addConnectivityConstraint(const Vector& x_self, const std::vector<VectorDIM>& other_positions,
+                                  T slack_value = 0);
     void addCLFConstraint(const Vector& current_state, const Vector& neighbor_state,
                           std::size_t neighbor_idx, T slack_value = 0);
 
@@ -40,8 +41,8 @@ class ConnectivityMPCCBFQPGenerator : public MPCCBFQPGeneratorBase<T, DIM> {
     void addPredSafetyCBFConstraints(const std::vector<State>& pred_states,
                                      const Vector& neighbor_state, std::size_t neighbor_idx);
     void addPredConnectivityConstraints(const std::vector<State>& pred_states,
-                                        const Eigen::MatrixXd& robot_states, size_t self_idx,
-                                        const std::vector<T>& slack_values);
+                                      const std::vector<VectorDIM>& other_positions,
+                                      T slack_value = 0);
     void addPredCLFConstraints(const std::vector<State>& pred_states, const Vector& neighbor_state,
                                std::size_t neighbor_idx);
 

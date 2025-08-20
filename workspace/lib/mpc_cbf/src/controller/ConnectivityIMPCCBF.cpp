@@ -54,19 +54,39 @@ bool ConnectivityIMPCCBF<T, DIM>::optimize(
     const VectorDIM& current_pos = current_state.pos_;
     const VectorDIM& current_vel = current_state.vel_;
 
+    // // Create robot_states matrix with all robot states (including self)
+    // Eigen::MatrixXd robot_states(current_states.size(), 2 * DIM);
+    // std::vector<Vector> other_robot_states; // Full state vectors for CBF (excluding self)
+    // for (size_t i = 0; i < current_states.size(); ++i) {
+    //     Vector robot_state(2 * DIM);
+    //     robot_state << current_states[i].pos_, current_states[i].vel_;
+    //     robot_states.row(i) = robot_state.transpose();
+
+    //     if (i != self_idx) {
+    //         other_robot_states.push_back(robot_state);
+    //     }
+    // }
+    // Vector state(2 * DIM);
+    // state << current_pos, current_vel;
+
     // Create robot_states matrix with all robot states (including self)
     Eigen::MatrixXd robot_states(current_states.size(), 2 * DIM);
-    std::vector<Vector> other_robot_states; // Full state vectors for CBF (excluding self)
+    // A) 全状态（给 Safety/CLF 用，排除自己）
+    std::vector<Vector> other_robot_states;
+    other_robot_states.reserve(current_states.size() - 1);
+    // B) 位置（给 Connectivity 用，排除自己）
+    std::vector<VectorDIM> other_positions;
+    other_positions.reserve(current_states.size() - 1);
     for (size_t i = 0; i < current_states.size(); ++i) {
         Vector robot_state(2 * DIM);
         robot_state << current_states[i].pos_, current_states[i].vel_;
         robot_states.row(i) = robot_state.transpose();
 
         if (i != self_idx) {
-            other_robot_states.push_back(robot_state);
+            other_robot_states.push_back(robot_state);                    // 全状态
+            other_positions.push_back(robot_state.template head<DIM>());  // 仅位置（定长）
         }
     }
-
     Vector state(2 * DIM);
     state << current_pos, current_vel;
 
@@ -81,7 +101,7 @@ bool ConnectivityIMPCCBF<T, DIM>::optimize(
         std::vector<T> distances(num_neighbors);
         for (size_t i = 0; i < num_neighbors; ++i) {
             // Use spatial dimensions only (ignore orientation) from other_robot_states
-            constexpr size_t spatial_dims = 2; // FIXME: adapt to 3D
+            constexpr size_t spatial_dims = 3; // FIXME: adapt to 3D
             VectorDIM other_robot_pos = other_robot_states[i].head(DIM);
             distances[i] =
                 (other_robot_pos.head(spatial_dims) - current_pos.head(spatial_dims)).norm();
@@ -136,25 +156,25 @@ bool ConnectivityIMPCCBF<T, DIM>::optimize(
             // TODO: currently all slack_value are set as 0
             // Set to different values for priority scheduling
             T slack_value = 0;
-            for (size_t i = 0; i < num_neighbors; ++i) {
-                qp_generator_.addSafetyCBFConstraint(state, other_robot_states[i], i, slack_value);
-            }
-
-            // Evaluate lambda2 and conditionally add connectivity or CLF constraints
-            // const auto robot_positions =
-            //     robot_states.leftCols(2); // Extract only position columns (x, y)
-            // auto [lambda2, eigenvec] = qp_generator_.connectivityCBF()->getLambda2(robot_positions);
-
-            // // TODO: this 0.1 threshold is arbitrary - should be configurable
-            // if (lambda2 > 0.1) {
-            //     // Use single connectivity constraint when graph is well-connected
-            //     qp_generator_.addConnectivityConstraint(robot_states, self_idx, slack_value);
-            // } else {
-            //     // Use pairwise CLF constraints when graph connectivity is poor
-            //     for (size_t i = 0; i < num_neighbors; ++i) {
-            //         qp_generator_.addCLFConstraint(state, other_robot_states[i], i, slack_value);
-            //     }
+            // for (size_t i = 0; i < num_neighbors; ++i) {
+            //     qp_generator_.addSafetyCBFConstraint(state, other_robot_states[i], i, slack_value);
             // }
+
+            //Evaluate lambda2 and conditionally add connectivity or CLF constraints
+            const auto robot_positions = robot_states.leftCols(DIM); // Extract only position columns (x, y)
+            const double Rs = qp_generator_.connectivityCBF()->getDmax();            
+            const double sigma = std::pow(Rs, 4) / std::log(2.0);                    
+            auto [lambda2, eigenvec] = mpc_cbf::getLambda2FromL(robot_positions, Rs, sigma);
+            // TODO: this 0.1 threshold is arbitrary - should be configurable
+            if (lambda2 > 0.1) {
+                // Use single connectivity constraint when graph is well-connected
+            qp_generator_.addConnectivityConstraint(state, other_positions, 0);
+            } else {
+                // Use pairwise CLF constraints when graph connectivity is poor
+                for (size_t i = 0; i < num_neighbors; ++i) {
+                    qp_generator_.addCLFConstraint(state, other_robot_states[i], i, slack_value);
+                }
+            }
         } else if (iter > 0 && success) {
             // pred the robot's position in the horizon, use for the CBF
             // constraints
@@ -169,27 +189,26 @@ bool ConnectivityIMPCCBF<T, DIM>::optimize(
             // Create slack values once per neighbor (not growing with horizon)
             // TODO: currently all slack_values are set as 0
             // Set to different values for priority scheduling
-            const std::vector<T> slack_values(cbf_horizon_, 0);
-            for (size_t i = 0; i < num_neighbors; ++i) {
-                qp_generator_.addPredSafetyCBFConstraints(pred_states, other_robot_states[i], i);
-            }
+            // const std::vector<T> slack_values(cbf_horizon_, 0);
+            // for (size_t i = 0; i < num_neighbors; ++i) {
+            //     qp_generator_.addPredSafetyCBFConstraints(pred_states, other_robot_states[i], i);
+            // }
 
             // Evaluate lambda2 and conditionally add predicted connectivity or CLF constraints
-            // const auto robot_positions =
-            //     robot_states.leftCols(2); // Extract only position columns (x, y)
-            // auto [lambda2, eigenvec] = qp_generator_.connectivityCBF()->getLambda2(robot_positions);
-
-            // // TODO: this 0.1 threshold is arbitrary - should be configurable
-            // if (lambda2 > 0.1) {
-            //     // Use single connectivity constraint when graph is well-connected
-            //     qp_generator_.addPredConnectivityConstraints(pred_states, robot_states, self_idx,
-            //                                                  slack_values);
-            // } else {
-            //     // Use pairwise CLF constraints when graph connectivity is poor
-            //     for (size_t i = 0; i < num_neighbors; ++i) {
-            //         qp_generator_.addPredCLFConstraints(pred_states, other_robot_states[i], i);
-            //     }
-            // }
+            const auto robot_positions = robot_states.leftCols(2); // Extract only position columns (x, y)
+            const double Rs = qp_generator_.connectivityCBF()->getDmax();            
+            const double sigma = std::pow(Rs, 4) / std::log(2.0);                    
+            auto [lambda2, eigenvec] = mpc_cbf::getLambda2FromL(robot_positions, Rs, sigma);
+            // TODO: this 0.1 threshold is arbitrary - should be configurable
+            if (lambda2 > 0.1) {
+                // Use single connectivity constraint when graph is well-connected
+                qp_generator_.addPredConnectivityConstraints(pred_states, other_positions, 0);
+            } else {
+                // Use pairwise CLF constraints when graph connectivity is poor
+                for (size_t i = 0; i < num_neighbors; ++i) {
+                    qp_generator_.addPredCLFConstraints(pred_states, other_robot_states[i], i);
+                }
+            }
         }
 
         // dynamics constraints

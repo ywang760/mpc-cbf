@@ -22,9 +22,15 @@ VIZ_OUTPUT_DIR="/usr/src/mpc-cbf/workspace/experiments/results/mpccbf_viz"
 SIM_RUNTIME=20.0
 
 # Build the MPC CBF examples once before running experiments
-echo "Building MPC CBF Formation Control example"
-cd /usr/src/mpc-cbf/workspace/lib/mpc_cbf/build
-ninja -j20 mpc_cbf_examples_MPCCBFFormationControl_example
+echo "Building MPC CBF Formation Control example (Make)"
+SRC_DIR="/usr/src/mpc-cbf/workspace/lib/mpc_cbf"
+BUILD_DIR="${SRC_DIR}/build"
+# 如果 build 目录不存在就先 cmake
+if [ ! -d "$BUILD_DIR" ]; then
+  cmake -S "$SRC_DIR" -B "$BUILD_DIR" -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release
+fi
+# 增量编译
+make -C "$BUILD_DIR" -j"$(nproc)"
 
 # Remove the existing states.json file if it exists
 if [ -f ${DEFAULT_STATES_PATH} ]; then
@@ -49,19 +55,10 @@ for config_file in "${INPUT[@]}"; do
 
     # Step 1: Run the experiment
     echo "Step 1: Running the MPC CBF Formation Control example with configuration"
-    ./mpc_cbf_examples_MPCCBFFormationControl_example \
-        --config_file ${config_file} \
-        --write_filename ${DEFAULT_STATES_PATH} \
-        --sim_runtime ${SIM_RUNTIME}
-
-    # Step 2: Visualize the results
-    echo "Step 2: Visualizing the results from the experiment"
-    python3 /usr/src/mpc-cbf/workspace/experiments/python/visualization/plot_results.py \
-        --config ${config_file} \
-        --states ${DEFAULT_STATES_PATH} \
-        --output_dir ${VIZ_OUTPUT_DIR} \
-        --create_anim
-        # can add the --create_anim flag if needed
+    /usr/src/mpc-cbf/workspace/lib/mpc_cbf/build/mpc_cbf_examples_MPCCBFFormationControl_example \
+        --config_file "${config_file}" \
+        --write_filename "${DEFAULT_STATES_PATH}" \
+        --sim_runtime "${SIM_RUNTIME}"
 
     # Step 3: Check for collisions and success
     echo "Step 3: Checking for collisions and success of the robot trajectories"
@@ -71,6 +68,15 @@ for config_file in "${INPUT[@]}"; do
     
     echo "Completed processing: $(basename ${config_file})"
     echo ""
+    
+    # Step 2: Visualize the results
+    echo "Step 2: Visualizing the results from the experiment"
+    python3 /usr/src/mpc-cbf/workspace/experiments/python/visualization/plot_results.py \
+        --config ${config_file} \
+        --states ${DEFAULT_STATES_PATH} \
+        --output_dir ${VIZ_OUTPUT_DIR} \
+        --create_anim
+        # can add the --create_anim flag if needed
 done
 
 cd /usr/src/mpc-cbf/workspace/experiments/scripts

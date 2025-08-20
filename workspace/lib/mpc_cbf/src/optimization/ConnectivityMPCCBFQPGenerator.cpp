@@ -46,21 +46,22 @@ void ConnectivityMPCCBFQPGenerator<T, DIM>::addSafetyCBFConstraint(const Vector&
 
 template <typename T, unsigned int DIM>
 void ConnectivityMPCCBFQPGenerator<T, DIM>::addConnectivityConstraint(
-    const Eigen::MatrixXd& robot_states, size_t self_idx, T slack_value) {
+    const Vector& x_self,
+    const std::vector<VectorDIM>& other_positions,
+    T slack_value) {
     LinearConstraint linear_constraint = piecewise_mpc_cbf_operations_ptr_->connectivityConstraint(
-        robot_states, self_idx, slack_value);
+        x_self, other_positions, slack_value);
 
-    if (this->slack_mode_) {
-        // Create slack coefficient vector (only the self_idx-th slack
-        // variable has coefficient -1)
-        Row slack_coefficients = Row::Zero(this->slack_variables_.size());
-        slack_coefficients(self_idx) = -1.0;
+    // if (this->slack_mode_) {
+    //     // Create slack coefficient vector (only the self_idx-th slack
+    //     // variable has coefficient -1)
+    //     Row slack_coefficients = Row::Zero(this->slack_variables_.size());
+    //     slack_coefficients(self_idx) = -1.0;
 
-        this->addLinearConstraintForPiecewiseWithSlackVariables(linear_constraint,
-                                                                slack_coefficients);
-    } else {
+    //     this->addLinearConstraintForPiecewiseWithSlackVariables(linear_constraint, slack_coefficients);
+    // } else {
         this->piecewise_mpc_qp_generator_ptr_->addLinearConstraintForPiecewise(linear_constraint);
-    }
+    //}
 }
 
 template <typename T, unsigned int DIM>
@@ -107,26 +108,25 @@ void ConnectivityMPCCBFQPGenerator<T, DIM>::addPredSafetyCBFConstraints(
 
 template <typename T, unsigned int DIM>
 void ConnectivityMPCCBFQPGenerator<T, DIM>::addPredConnectivityConstraints(
-    const std::vector<State>& pred_states, const Eigen::MatrixXd& robot_states, size_t self_idx,
-    const std::vector<T>& slack_values) {
+    const std::vector<State>& pred_states, const std::vector<VectorDIM>& other_positions,
+    T slack_value) {
     std::vector<LinearConstraint> linear_constraints =
-        piecewise_mpc_cbf_operations_ptr_->predConnectivityConstraints(pred_states, robot_states,
-                                                                       self_idx);
-    if (this->slack_mode_) {
-        // Create slack coefficient vector (only the self_idx-th slack
-        // variable has coefficient -1)
-        Row slack_coefficients = Row::Zero(this->slack_variables_.size());
-        slack_coefficients(self_idx) = -1.0;
-        for (size_t i = 0; i < linear_constraints.size(); ++i) {
-            this->addLinearConstraintForPiecewiseWithSlackVariables(linear_constraints.at(i),
-                                                                    slack_coefficients);
-        }
-    } else {
+        piecewise_mpc_cbf_operations_ptr_->predConnectivityConstraints(pred_states, other_positions);
+    // if (this->slack_mode_) {
+    //     // Create slack coefficient vector (only the self_idx-th slack
+    //     // variable has coefficient -1)
+    //     Row slack_coefficients = Row::Zero(this->slack_variables_.size());
+    //     slack_coefficients(self_idx) = -1.0;
+    //     for (size_t i = 0; i < linear_constraints.size(); ++i) {
+    //         this->addLinearConstraintForPiecewiseWithSlackVariables(linear_constraints.at(i),
+    //                                                                 slack_coefficients);
+    //     }
+    // } else {
         for (size_t i = 0; i < linear_constraints.size(); ++i) {
             this->piecewise_mpc_qp_generator_ptr_->addLinearConstraintForPiecewise(
                 linear_constraints.at(i));
         }
-    }
+    //}
 }
 
 template <typename T, unsigned int DIM>

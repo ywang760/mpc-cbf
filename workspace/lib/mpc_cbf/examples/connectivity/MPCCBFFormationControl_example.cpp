@@ -2,7 +2,7 @@
 // Created by Yutong on 8/1/2025
 //
 
-#include <cbf/detail/ConnectivityCBF.h>
+#include <mpc_cbf/detail/ConnectivityCBF.h>
 #include <math/Geometry.h>
 #include <math/Random.h>
 #include <math/collision_shapes/AlignedBoxCollisionShape.h>
@@ -17,7 +17,7 @@
 
 int main(int argc, char* argv[]) {
     constexpr unsigned int DIM = 3U;
-    using ConnectivityCBF = cbf::ConnectivityCBF;
+    using ConnectivityCBF = mpc_cbf::ConnectivityCBF;
     using DoubleIntegratorXYYaw = model::DoubleIntegratorXYYaw<double>;
     using ConnectivityIMPCCBF = mpc_cbf::ConnectivityIMPCCBF<double, DIM>;
     using State = model::State<double, DIM>;
@@ -29,7 +29,7 @@ int main(int argc, char* argv[]) {
 
     using PiecewiseBezierParams = mpc::PiecewiseBezierParams<double, DIM>;
     using MPCParams = mpc::MPCParams<double>;
-    using ConnectivityCBFParams = cbf::ConnectivityCBFParams<double>;
+    using ConnectivityCBFParams = mpc_cbf::ConnectivityCBFParams<double>;
     using ConnectivityMPCCBFParams = mpc_cbf::ConnectivityMPCCBFQPOperations<double, DIM>::Params;
     using IMPCParams = mpc_cbf::ConnectivityIMPCCBF<double, DIM>::IMPCParams;
     using IMPCCBFParams = mpc_cbf::ConnectivityIMPCCBF<double, DIM>::Params;

@@ -61,13 +61,23 @@ target_link_libraries(mpc_cbf_optimization_FovMPCCBFQPGenerator PUBLIC
         mpc_optimization_PiecewiseBezierMPCQPGenerator
         cbf_detail_FovCBF)
 
+# 本地版本的 ConnectivityCBF 实现
+add_library(mpc_cbf_detail_ConnectivityCBF SHARED src/detail/ConnectivityCBF.cpp)
+target_include_directories(mpc_cbf_detail_ConnectivityCBF PUBLIC include)
+target_link_libraries(mpc_cbf_detail_ConnectivityCBF PUBLIC
+    ginac
+    cln
+    math_Helpers
+    common_Logging
+)
+
 # Connectivity-specific implementation
 add_library(mpc_cbf_optimization_ConnectivityMPCCBFQPOperations SHARED src/optimization/ConnectivityMPCCBFQPOperations.cpp)
 target_include_directories(mpc_cbf_optimization_ConnectivityMPCCBFQPOperations PUBLIC include)
 target_link_libraries(mpc_cbf_optimization_ConnectivityMPCCBFQPOperations PUBLIC
         mpc_cbf_optimization_MPCCBFQPOperationsBase
         mpc_optimization_PiecewiseBeizerMPCQPOperations
-        cbf_detail_ConnectivityCBF)
+        mpc_cbf_detail_ConnectivityCBF)
 
 add_library(mpc_cbf_optimization_ConnectivityMPCCBFQPGenerator SHARED src/optimization/ConnectivityMPCCBFQPGenerator.cpp)
 target_include_directories(mpc_cbf_optimization_ConnectivityMPCCBFQPGenerator PUBLIC include)
@@ -76,7 +86,7 @@ target_link_libraries(mpc_cbf_optimization_ConnectivityMPCCBFQPGenerator PUBLIC
         mpc_cbf_optimization_ConnectivityMPCCBFQPOperations
         mpc_optimization_PiecewiseBeizerMPCQPOperations
         mpc_optimization_PiecewiseBezierMPCQPGenerator
-        cbf_detail_ConnectivityCBF)
+        mpc_cbf_detail_ConnectivityCBF)
 
 # Controllers
 # MPC CBF controller (commented out - needs refactoring)
@@ -136,3 +146,8 @@ target_link_libraries(mpc_cbf_examples_MPCCBFFormationControl_example PUBLIC
         cxxopts
         common_Logging
         spdlog::spdlog_header_only)
+
+target_include_directories(mpc_cbf_detail_ConnectivityCBF PUBLIC
+    include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../math/include
+)
