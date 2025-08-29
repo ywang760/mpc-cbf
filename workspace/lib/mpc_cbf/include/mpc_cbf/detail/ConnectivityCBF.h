@@ -87,6 +87,7 @@ struct ConnectivityCBFParams {
         //     int self_idx,
         //     double Rs_val,
         //     double sigma_val);
+        std::vector<std::vector<GiNaC::symbol>> Hij_masks_;
 
     public:
         using Vector3d = math::VectorDIM<double, 3>;
@@ -115,11 +116,14 @@ struct ConnectivityCBFParams {
         Eigen::VectorXd getCLFConstraints(Eigen::VectorXd state, Eigen::VectorXd neighbor_state);
         double getCLFBound(Eigen::VectorXd state, Eigen::VectorXd neighbor_state);
         double getDmax() const { return dmax; }
-
+        const std::vector<std::vector<GiNaC::symbol>>& HijMasks() const { return Hij_masks_; }
+        void initMaskSymbols(int N);
     };
     // Free function
     std::pair<double, Eigen::VectorXd> getLambda2FromL(const Eigen::MatrixXd &robot_positions,
                                                        double Rs_value,
                                                        double sigma_value);
+    
+    
 } // namespace mpc_cbf
 #endif // CONNECTIVITY_CBF_H

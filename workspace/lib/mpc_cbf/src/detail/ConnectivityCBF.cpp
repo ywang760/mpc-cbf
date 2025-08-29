@@ -474,6 +474,16 @@ namespace mpc_cbf
         }
     }
 
+    void ConnectivityCBF::initMaskSymbols(int N) {
+        Hij_masks_.assign(N, std::vector<GiNaC::symbol>());
+        for (int i=0;i<N;++i) {
+            Hij_masks_[i].reserve(N);
+            for (int j=0;j<N;++j) {
+                Hij_masks_[i].emplace_back(GiNaC::symbol("Hij_"+std::to_string(i)+"_"+std::to_string(j)));
+            }
+        }
+    }
+
     // Symbolically compute the gradient of the barrier function with respect to state variables
     // Parameters:
     //   N: Number of agents
@@ -483,37 +493,49 @@ namespace mpc_cbf
     GiNaC::matrix ConnectivityCBF::compute_dh_dx(int N, const GiNaC::ex &Rs, const GiNaC::ex &sigma)
     {
         initSymbolLists(N);
-        GiNaC::matrix grad(N, 3); // TODO: for 3d: this needs to be N x 3 (figure out a way to generalize this)
-        for (int i = 0; i < N; ++i)
+        initMaskSymbols(N);
+        GiNaC::matrix grad(N, 3);
+
+    for (int i = 0; i < N; ++i)
+    {
+        GiNaC::ex dLdx = 0, dLdy = 0, dLdz = 0;
+        for (int j = 0; j < N; ++j)
         {
-            GiNaC::ex dLdx = 0, dLdy = 0, dLdz = 0;
-            for (int j = 0; j < N; ++j)
-            {
-                if (i == j)
-                    continue;
-                GiNaC::ex dx = px_list[i] - px_list[j];
-                GiNaC::ex dy = py_list[i] - py_list[j];
-                GiNaC::ex dz = pz_list[i] - pz_list[j];
-                GiNaC::ex dij2 = dx * dx + dy * dy + dz * dz; // Squared distance between agents i and j
-                GiNaC::ex diff = GiNaC::pow(Rs, 2) - dij2; // TODO: here check diff is positive?
-                GiNaC::ex Aij = GiNaC::exp(GiNaC::pow(diff, 2) / sigma) - 1;
+            if (i == j) continue;
 
-                // Explicit closed-form expressions for the derivatives
-                GiNaC::ex dAij_dx = -4 * (Aij + 1) * diff / sigma * dx;
-                GiNaC::ex dAij_dy = -4 * (Aij + 1) * diff / sigma * dy;
-                GiNaC::ex dAij_dz = -4 * (Aij + 1) * diff / sigma * dz;
+            GiNaC::ex dx = px_list[i] - px_list[j];
+            GiNaC::ex dy = py_list[i] - py_list[j];
+            GiNaC::ex dz = pz_list[i] - pz_list[j];
 
-                // Calculate each component in the gradient (formula (12) in the paper)
-                GiNaC::ex vdiff2 = GiNaC::pow(eigenvec_list[i] - eigenvec_list[j], 2);
-                dLdx += dAij_dx * vdiff2;
-                dLdy += dAij_dy * vdiff2;
-                dLdz += dAij_dz * vdiff2;
-            }
-            grad(i, 0) = dLdx;
-            grad(i, 1) = dLdy;
-            grad(i, 2) = dLdz;
+            GiNaC::ex dij2 = dx*dx + dy*dy + dz*dz;
+            GiNaC::ex diff = GiNaC::pow(Rs, 2) - dij2;
+
+            // 原核（不含截断）
+            GiNaC::ex Acore = GiNaC::exp(GiNaC::pow(diff, 2) / sigma) - 1;
+
+            // 只对 Acore 求导（不对掩码求导）
+            GiNaC::ex dAcore_dx = -4 * (Acore + 1) * diff / sigma * dx;
+            GiNaC::ex dAcore_dy = -4 * (Acore + 1) * diff / sigma * dy;
+            GiNaC::ex dAcore_dz = -4 * (Acore + 1) * diff / sigma * dz;
+
+            // 掩码符号（常数处理）
+            GiNaC::symbol Hij = Hij_masks_[i][j];
+
+            // “只截断不求导”：d(Acore*Hij) ≈ (dAcore)*Hij
+            GiNaC::ex dAij_dx = dAcore_dx * Hij;
+            GiNaC::ex dAij_dy = dAcore_dy * Hij;
+            GiNaC::ex dAij_dz = dAcore_dz * Hij;
+
+            GiNaC::ex vdiff2 = GiNaC::pow(eigenvec_list[i] - eigenvec_list[j], 2);
+            dLdx += dAij_dx * vdiff2;
+            dLdy += dAij_dy * vdiff2;
+            dLdz += dAij_dz * vdiff2;
         }
-        return grad;
+        grad(i, 0) = dLdx;
+        grad(i, 1) = dLdy;
+        grad(i, 2) = dLdz;
+    }
+    return grad;
     }
 
     // Compute the second derivative (Hessian) of the barrier function with respect to state variables
@@ -674,7 +696,8 @@ namespace mpc_cbf
 
         // Step 2: 符号构造 ∇h (gradient of h), shape = N×3
         initSymbolLists(N);
-        GiNaC::matrix dh_dx_sym = compute_dh_dx(N, dmax, sigma_val);                                 // shape Nx2
+        initMaskSymbols(N);
+        GiNaC::matrix dh_dx_sym = compute_dh_dx(N, dmax, sigma_val);                                 // shape Nx3
         GiNaC::matrix dh_dx_ginac = matrixSubsMatrix(dh_dx_sym, robot_states.leftCols(3), eigenvec, x_self.head<3>(), *this); // N×2 数值表达式, robot_states.leftCols(2) 只取 px, py
         logger->debug("Step 2: ∇h evaluated\n{}", dh_dx_ginac);
         Eigen::VectorXd dh_dx = Eigen::VectorXd::Zero(STATE_VARS);

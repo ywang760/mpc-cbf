@@ -1,7 +1,7 @@
 //
 // Created by yutong on 8/4/25.
 //
-
+#include <spdlog/spdlog.h>
 #include <mpc_cbf/optimization/ConnectivityMPCCBFQPGenerator.h>
 
 namespace mpc_cbf {
@@ -16,7 +16,8 @@ ConnectivityMPCCBFQPGenerator<T, DIM>::ConnectivityMPCCBFQPGenerator(
     // setup the fields for ConnectivityMPCCBFQPGenerator
     piecewise_mpc_cbf_operations_ptr_ = std::move(piecewise_mpc_cbf_operations_ptr);
     slack_mode_ = slack_mode;
-    // add slack variable to the problem
+    spdlog::info("[QPGen] slack_mode = {}", slack_mode_);
+    // add slack variable to the problems
     if (slack_mode_) {
         this->addSlackVariables(num_neighbors);
     }

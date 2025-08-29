@@ -67,6 +67,33 @@ namespace mpc_cbf {
         substitutions[cbf.px] = self_position(0);
         substitutions[cbf.py] = self_position(1);
         substitutions[cbf.pz] = self_position(2);
+        // 3) NEW: Hij 掩码（平滑 Heaviside，只截断不求导）
+        {
+            const int N     = robot_positions.rows();
+            const double Rs = cbf.getDmax();                    // 若 dmax 非 public，则改成 cbf.getDmax()
+            const double Rs2 = Rs * Rs;
+            // 建议取与 Rs^2 同量纲的平滑宽度：eps = 1e-3 * Rs^2（可按需要调 1e-3~1e-2）
+            const double eps = 1e-3 * Rs2;
+
+            for (int i = 0; i < N; ++i)
+            {
+                for (int j = 0; j < N; ++j)
+                {
+                    if (i == j) continue;
+                    const double dx = robot_positions(i,0) - robot_positions(j,0);
+                    const double dy = robot_positions(i,1) - robot_positions(j,1);
+                    const double dz = robot_positions(i,2) - robot_positions(j,2);
+                    const double d2   = dx*dx + dy*dy + dz*dz;
+                    const double diff = Rs2 - d2;
+
+                    // 平滑 Heaviside：H = 0.5 * (1 + tanh(diff/eps))
+                    const double Hij_val = 0.5 * (1.0 + std::tanh(diff / eps));
+
+                    // 只截断不求导：在符号里 Hij 当常数，这里只做数值替换
+                    substitutions[cbf.Hij_masks_[i][j]] = Hij_val;
+                }
+            }
+        }
         // 对整个矩阵统一替换
         GiNaC::matrix result = GiNaC::ex_to<GiNaC::matrix>(expr_matrix.subs(substitutions));
         return result;
