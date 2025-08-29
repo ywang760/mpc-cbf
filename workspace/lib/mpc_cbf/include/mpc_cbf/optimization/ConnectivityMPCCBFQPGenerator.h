@@ -49,6 +49,18 @@ class ConnectivityMPCCBFQPGenerator : public MPCCBFQPGeneratorBase<T, DIM> {
     // Accessor for connectivity CBF
     std::shared_ptr<typename ConnectivityMPCCBFQPOperations::ConnectivityCBF>
     connectivityCBF() const;
+    const Vector& debugLastConn_ac() const { return piecewise_mpc_cbf_operations_ptr_->debugLastConn_ac(); }
+    T              debugLastConn_bc() const { return piecewise_mpc_cbf_operations_ptr_->debugLastConn_bc(); }
+    const Vector& debugLastCLF_a()   const { return piecewise_mpc_cbf_operations_ptr_->debugLastCLF_a(); }
+    T              debugLastCLF_b()   const { return piecewise_mpc_cbf_operations_ptr_->debugLastCLF_b(); }
+    // Safety 调试透传（返回 Ops 中缓存的最近一次 a / b）
+    const Vector& debugLastSafety_a() const {
+        return piecewise_mpc_cbf_operations_ptr_->debugLastSafety_a();
+    }
+    T debugLastSafety_b() const {
+        return piecewise_mpc_cbf_operations_ptr_->debugLastSafety_b();
+    }
+                                    
 
   private:
     std::unique_ptr<ConnectivityMPCCBFQPOperations> piecewise_mpc_cbf_operations_ptr_;

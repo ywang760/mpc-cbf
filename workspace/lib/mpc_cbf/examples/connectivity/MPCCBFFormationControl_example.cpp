@@ -95,6 +95,11 @@ int main(int argc, char* argv[]) {
 
     // init connectivity mpc-cbf
     size_t num_robots = experiment_config_json["tasks"]["so"].size();
+    // 统计量
+    size_t total_opt_calls = 0;                 // 总的 optimize() 调用次数
+    size_t total_qp_fail   = 0;                 // 总的 QP 失败次数
+    std::vector<size_t> robot_qp_fail(num_robots, 0);  // 各机器人 QP 失败次数
+
     size_t num_neighbors = num_robots - 1;
     ConnectivityIMPCCBF connectivity_impc_cbf(impc_cbf_params, pred_model_ptr, connectivity_cbf,
                                               aligned_box_collision_shape_ptr, num_neighbors);
@@ -146,6 +151,7 @@ int main(int argc, char* argv[]) {
             std::vector<SingleParameterPiecewiseCurve> trajs;
             bool success = connectivity_impc_cbf.optimize(trajs, /*current_states=*/current_states,
                                                           /*self_idx=*/robot_idx, ref_positions);
+            total_opt_calls++;
 
             if (!success) {
                 logger->warn("Optimization failed for robot {} at sim_t {:.3f}", robot_idx, sim_t);
@@ -155,6 +161,8 @@ int main(int argc, char* argv[]) {
                     logger->warn("Returning the last successful trajectory for robot {}",
                                  robot_idx);
                 }
+                total_qp_fail++;
+                robot_qp_fail[robot_idx]++;
             }
 
             if (!trajs.empty()) {
@@ -229,5 +237,34 @@ int main(int argc, char* argv[]) {
     logger->info("Writing states to JSON file: {}", JSON_FILENAME);
     std::ofstream o(JSON_FILENAME, std::ofstream::trunc);
     o << std::setw(4) << states << std::endl;
+
+    logger->info("==== IMPCCBF Fail Summary ====");
+    logger->info("Total QP fails:      {}", connectivity_impc_cbf.failTotal());
+    logger->info("Connectivity fails:  {}", connectivity_impc_cbf.failConn());
+    logger->info("CLF fails:           {}", connectivity_impc_cbf.failCLF());
+    logger->info("Safety fails:         {}", connectivity_impc_cbf.failSafety());
+
+    logger->info("==== Dump first 5 failing constraints (end of run) ====");
+
+    auto dump_samples = [&](const char* tag,
+                            const std::vector<std::pair<Vector, double>>& S) {
+        if (S.empty()) {
+            logger->info("{}: (none)", tag);
+            return;
+        }
+        logger->info("---- {}: {} row(s) collected ----", tag, S.size());
+        const Eigen::IOFormat oneLine(Eigen::StreamPrecision, Eigen::DontAlignCols,
+                                    " ", " ", "", "", "", "");
+        for (size_t i = 0; i < S.size(); ++i) {
+            const auto& [a, b] = S[i];
+            std::ostringstream oss;
+            oss << a.transpose().format(oneLine);
+            logger->info("#{}  a = [{}]   b = {:.6g}", i, oss.str(), b);
+        }
+    };
+
+    dump_samples("CONNECTIVITY FAIL (ac/bc)", connectivity_impc_cbf.samples_conn());
+    dump_samples("CLF FAIL (a/b)",            connectivity_impc_cbf.samples_clf());
+    dump_samples("SAFETY FAIL (a/b)",         connectivity_impc_cbf.samples_safety());
     return 0;
 }

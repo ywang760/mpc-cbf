@@ -4,336 +4,398 @@ import numpy as np
 import os
 import colorsys
 import matplotlib
-import matplotlib.animation as animation
-matplotlib.use("Agg")  # 纯离屏渲染
+matplotlib.use("Agg")  # 纯离屏渲染（服务器/无显示环境）
 import matplotlib.pyplot as plt
-from matplotlib.collections import LineCollection
 from matplotlib.patches import Circle
-from mpl_toolkits.mplot3d import Axes3D, art3d
-from matplotlib.patches import Circle
+from mpl_toolkits.mplot3d import art3d
+import matplotlib.animation as animation
+
 
 # ======================
 # Utils
 # ======================
-def generate_rgb_colors(num_colors):
+def generate_rgb_colors(num_colors: int):
+    """生成区分度较高的 RGB 颜色组。"""
     output = []
     num_colors += 1  # avoid hsv=0
     for index in range(1, num_colors):
         output.append(colorsys.hsv_to_rgb(index / num_colors, 0.75, 0.75))
     return np.asarray(output)
 
-def load_json(path):
+def _darker(color, factor=0.7):
+    """把颜色加深：factor 越小越深 (0~1)。"""
+    return tuple(np.clip(np.array(color[:3]) * factor, 0, 1))
+
+def load_json(path: str):
     with open(path, "r") as f:
         return json.load(f)
 
-def _build_connectivity_segments(pts_xy, d_connect, color_mode="const"):
-    """
-    根据距离阈值 d_connect 生成连线段。
-    color_mode: "const" | "dist_alpha" | "dist_gray"
-    """
-    N = pts_xy.shape[0]
-    segments, colors = [], []
-    for i in range(N):
-        for j in range(i + 1, N):
-            dx, dy = pts_xy[j] - pts_xy[i]
-            dist = np.hypot(dx, dy)
-            if d_connect is not None and dist <= d_connect:
-                segments.append([pts_xy[i], pts_xy[j]])
-                if color_mode == "dist_alpha":
-                    a = max(0.2, 1.0 - dist / max(d_connect, 1e-9))
-                    colors.append((0.3, 0.3, 0.3, a))
-                elif color_mode == "dist_gray":
-                    g = 0.2 + 0.8 * (dist / max(d_connect, 1e-9))
-                    g = np.clip(g, 0.2, 1.0)
-                    colors.append((g, g, g, 0.9))
-    if color_mode == "const":
-        return segments, None
-    return segments, (np.array(colors) if len(colors) else None)
+# 可选：等比例 3D 轴（未默认启用）
+def _set_axes_equal(ax):
+    """让 3D 坐标轴比例一致（避免被压扁）。"""
+    x_limits = ax.get_xlim3d()
+    y_limits = ax.get_ylim3d()
+    z_limits = ax.get_zlim3d()
+    x_range = abs(x_limits[1] - x_limits[0]); x_mid = np.mean(x_limits)
+    y_range = abs(y_limits[1] - y_limits[0]); y_mid = np.mean(y_limits)
+    z_range = abs(z_limits[1] - z_limits[0]); z_mid = np.mean(z_limits)
+    r = 0.5 * max([x_range, y_range, z_range])
+    ax.set_xlim3d([x_mid - r, x_mid + r])
+    ax.set_ylim3d([y_mid - r, y_mid + r])
+    ax.set_zlim3d([z_mid - r, z_mid + r])
+
+def _compute_bounds(xyz, cfg, pad=1.0, include_so_sf=True, disk_radius=None):
+    """返回 x/y/z 的 [min, max]，包含整个轨迹，可选叠加 so/sf 与圆盘半径。"""
+    x_all = xyz[:, :, 0]; y_all = xyz[:, :, 1]; z_all = xyz[:, :, 2]
+    xmin, xmax = np.min(x_all), np.max(x_all)
+    ymin, ymax = np.min(y_all), np.max(y_all)
+    zmin, zmax = np.min(z_all), np.max(z_all)
+
+    if include_so_sf:
+        try:
+            so = np.array(cfg["tasks"]["so"], dtype=float)
+            sf = np.array(cfg["tasks"]["sf"], dtype=float)
+            xmin = min(xmin, so[:,0].min(), sf[:,0].min())
+            xmax = max(xmax, so[:,0].max(), sf[:,0].max())
+            ymin = min(ymin, so[:,1].min(), sf[:,1].min())
+            ymax = max(ymax, so[:,1].max(), sf[:,1].max())
+            zmin = min(zmin, so[:,2].min(), sf[:,2].min())
+            zmax = max(zmax, so[:,2].max(), sf[:,2].max())
+        except Exception:
+            pass
+
+    # 圆盘半径留出边距
+    rpad = float(disk_radius) if (disk_radius is not None) else 0.0
+    xmin -= (pad + rpad); xmax += (pad + rpad)
+    ymin -= (pad + rpad); ymax += (pad + rpad)
+    if zmin == zmax:
+        zmin -= 1.0; zmax += 1.0
+    zmin -= pad; zmax += pad
+    return [xmin, xmax], [ymin, ymax], [zmin, zmax]
 
 
 # ======================
-# 三联图（单张横向三幅）
+# 保存“任意帧”的静态图片
 # ======================
-def _draw_positions_panel(
-    ax,
-    positions,            # (N,2)
-    colors,
-    bbox_half=None,       # 备选：没半径时使用
+def save_snapshot_at_frame(
+    cfg,
+    traj,               # (N, T, D)
+    colors,             # (N, 3) or (N, 4)
+    save_path,          # 输出路径 *.png / *.jpg / *.pdf
     d_connect=None,
-    title="",
-    show_connectivity=True,
-    conn_color_mode="dist_alpha",
-    xlim=None, ylim=None,
-    disk_radius=None      # 优先：半径>0 画圆圈
+    conn_color_mode="dist_alpha",   # "const" | "dist_alpha" | "dist_gray"
+    disk_radius=None,
+    disks_at_agent_z=True,          # True: 圆盘画在各自 z；False: 画在 z=0
+    frame_idx=-1,                   # -1: 终点；0: 初始；也可传任意 0..T-1
+    show_trail=True,
+    trail_alpha=0.6,
+    trail_lw=2.0,
+    axis_mode="fit_all",            # 坐标轴模式
+    show_goals=True,                # 是否绘制目标点 X
 ):
-    N = positions.shape[0]
-    ax.set_aspect("equal")
-    ax.set_title(title)
-    # ax.axis("off")   # 删掉这句，保留坐标轴/刻度
-    ax.grid(True, alpha=0.25)  # 可选：更易比对
+    n_agent, total_frame, D = traj.shape
+    xyz = traj[:, :, :3] if D >= 3 else np.pad(traj[:, :, :2], ((0,0),(0,0),(0,1)))
+    frame_idx = int(frame_idx) % total_frame
+    cur_xyz = xyz[:, frame_idx, :]     # (N, 3)
 
+    # —— 坐标轴范围 ——
+    if axis_mode == "fit_all":
+        xlim, ylim, zlim = _compute_bounds(xyz, cfg, pad=1.0, include_so_sf=True, disk_radius=disk_radius)
+        fig = plt.figure(figsize=(8,8)); ax = fig.add_subplot(111, projection="3d")
+        ax.set_xlim(xlim); ax.set_ylim(ylim); ax.set_zlim(zlim)
+    elif axis_mode == "auto":
+        fig = plt.figure(figsize=(8,8)); ax = fig.add_subplot(111, projection="3d")
+        ax.set_autoscale_on(True)
+    else:  # fit_current
+        fig = plt.figure(figsize=(8,8)); ax = fig.add_subplot(111, projection="3d")
+        # 先给全局范围，随后再按当前帧对焦一次（见文末）
+        xlim, ylim, zlim = _compute_bounds(xyz, cfg, pad=1.0, include_so_sf=True, disk_radius=disk_radius)
+        ax.set_xlim(xlim); ax.set_ylim(ylim); ax.set_zlim(zlim)
 
-    # 统一坐标轴范围
-    if xlim is not None and ylim is not None:
-        ax.set_xlim(*xlim); ax.set_ylim(*ylim)
-    else:
-        pad = 3.0
-        ax.set_xlim(positions[:,0].min()-pad, positions[:,0].max()+pad)
-        ax.set_ylim(positions[:,1].min()-pad, positions[:,1].max()+pad)
+    ax.set_xlabel("x"); ax.set_ylabel("y"); ax.set_zlabel("z")
+    ax.grid(True, alpha=0.25)
 
-    # 位置点
-    for i in range(N):
-        ax.plot(positions[i,0], positions[i,1],
-        marker='o', ms=6, ls='None', c=colors[i], alpha=0.95, zorder=2)
+    # 1) 已运动轨迹
+    if show_trail and frame_idx > 0:
+        for i in range(n_agent):
+            xs = xyz[i, :frame_idx+1, 0]
+            ys = xyz[i, :frame_idx+1, 1]
+            zs = xyz[i, :frame_idx+1, 2]
+            ax.plot(xs, ys, zs, c=colors[i], lw=trail_lw, alpha=trail_alpha)
 
-
-    # 形状：优先圆圈，其次矩形
-    if disk_radius is not None and disk_radius > 0:
-        for i in range(N):
-            circ = Circle(
-                (positions[i,0], positions[i,1]),
-                radius=disk_radius,
-                ec=colors[i],           # 边线颜色：机器人专属色
-                fc=colors[i],           # 填充颜色：机器人专属色
-                lw=1.2,
-                linestyle="--",         # 虚线边框
-                alpha=0.25,             # 填充透明度（看得见连接线/轨迹）
-                zorder=1,               # 圆圈放底层
-            )
+    # 2) 圆盘（可选）
+    if (disk_radius is not None) and (disk_radius > 0):
+        for i in range(n_agent):
+            edge = tuple(colors[i][:3]) if len(colors[i]) >= 3 else (0.3, 0.3, 0.3)
+            face = edge + (0.55,)
+            circ = Circle((cur_xyz[i, 0], cur_xyz[i, 1]), radius=float(disk_radius))
+            circ.set_edgecolor(edge)
+            circ.set_facecolor(face)
+            circ.set_linewidth(1.8)
+            circ.set_linestyle("--")
             ax.add_patch(circ)
+            z_plane = float(cur_xyz[i, 2]) if disks_at_agent_z else 0.0
+            art3d.pathpatch_2d_to_3d(circ, z=z_plane, zdir="z")
 
-    elif bbox_half is not None:
-        for i in range(N):
-            rect = plt.Rectangle((positions[i,0]-bbox_half[0], positions[i,1]-bbox_half[1]),
-                                 2*bbox_half[0], 2*bbox_half[1],
-                                 lw=1.0, ec='blue', fc='none', alpha=0.85)
-            ax.add_patch(rect)
+    # 3) 当前帧散点（机器人当前位姿）
+    ax.scatter(cur_xyz[:, 0], cur_xyz[:, 1], cur_xyz[:, 2], s=40, c=colors, depthshade=True)
 
-    # 连通性
-    if show_connectivity and d_connect is not None:
-        segs, seg_colors = _build_connectivity_segments(positions, d_connect, color_mode=conn_color_mode)
-        if segs:
-            lc = LineCollection(segs,
-                    colors=seg_colors if seg_colors is not None else 'gray',
-                    lw=1.2, alpha=0.9, zorder=3)
+    # 4) 目标点（sf）标注（深一号颜色）
+    if show_goals:
+        try:
+            sf = np.array(cfg["tasks"]["sf"], dtype=float)  # 形状 (N, 3)
+            for i in range(min(n_agent, sf.shape[0])):
+                dark_c = _darker(colors[i], factor=0.7)
+                ax.scatter(
+                    [sf[i, 0]], [sf[i, 1]], [sf[i, 2]],
+                    s=180, marker="X", c=[dark_c],
+                    edgecolors="k", linewidths=0.8, alpha=0.95, depthshade=False
+                )
+        except Exception:
+            pass
 
-            ax.add_collection(lc)
+    # 5) 连通边
+    if (d_connect is not None):
+        d_connect = float(d_connect)
+        for i in range(n_agent):
+            pi = cur_xyz[i]
+            for j in range(i + 1, n_agent):
+                pj = cur_xyz[j]
+                dist = np.hypot(pj[0] - pi[0], pj[1] - pi[1])  # xy 距离；如需 3D：np.linalg.norm(pj-pi)
+                if dist <= d_connect:
+                    if conn_color_mode == "dist_alpha":
+                        a = max(0.2, 1.0 - dist / max(d_connect, 1e-9))
+                        color = (0.3, 0.3, 0.3, a)
+                    elif conn_color_mode == "dist_gray":
+                        g = 0.2 + 0.8 * (dist / max(d_connect, 1e-9))
+                        g = np.clip(g, 0.2, 1.0)
+                        color = (g, g, g, 0.9)
+                    else:
+                        color = "gray"
+                    ax.plot([pi[0], pj[0]], [pi[1], pj[1]], [pi[2], pj[2]], c=color, lw=1.2)
 
-def save_triptych(config, traj, colors, out_path, d_connect,
-                  conn_color_mode="dist_alpha"):
-    """
-    生成单张横向三联图：
-      左：初始 so
-      中：目标 sf
-      右：实际最终帧
-    三幅共享同一坐标轴范围（若 physical_limits 给出）。
-    机器人“范围”优先使用 config.collision_shape.radius 的圆圈，否则回退到 aligned_box 矩形。
-    """
-    so = np.array(config["tasks"]["so"], dtype=float)[:, :2]
-    sf = np.array(config["tasks"]["sf"], dtype=float)[:, :2]
-    final = traj[:, -1, :2]
+    # 若选择 fit_current：按当前帧再对焦一次，确保取景跟随
+    if axis_mode == "fit_current":
+        pad = 0.5
+        xmin = cur_xyz[:,0].min()-pad; xmax = cur_xyz[:,0].max()+pad
+        ymin = cur_xyz[:,1].min()-pad; ymax = cur_xyz[:,1].max()+pad
+        zmin = cur_xyz[:,2].min()-pad; zmax = cur_xyz[:,2].max()+pad
+        if disk_radius:
+            xmin -= disk_radius; xmax += disk_radius
+            ymin -= disk_radius; ymax += disk_radius
+        if zmin == zmax:
+            zmin -= 1.0; zmax += 1.0
+        ax.set_xlim([xmin, xmax]); ax.set_ylim([ymin, ymax]); ax.set_zlim([zmin, zmax])
 
-    # 半径（优先）
-    disk_radius = None
-    try:
-        disk_radius = float(config["robot_params"]["collision_shape"]["radius"])
-    except Exception:
-        disk_radius = None
-
-    # 矩形半尺寸（备选）
-    bbox_half = None
-    try:
-        bbox_half = np.array(config["robot_params"]["collision_shape"]["aligned_box"][:2], dtype=float)
-    except Exception:
-        bbox_half = None
-
-    # 三联图统一轴范围：若 physical_limits 存在则用它，否则用三帧联合的 min/max
-    xlim = ylim = None
-    if "physical_limits" in config and "p_min" in config["physical_limits"] and "p_max" in config["physical_limits"]:
-        p_min = np.array(config["physical_limits"]["p_min"], dtype=float)
-        p_max = np.array(config["physical_limits"]["p_max"], dtype=float)
-        xlim = (p_min[0], p_max[0]); ylim = (p_min[1], p_max[1])
-    else:
-        all_pts = np.vstack([so, sf, final])
-        pad = 3.0
-        xlim = (all_pts[:,0].min()-pad, all_pts[:,0].max()+pad)
-        ylim = (all_pts[:,1].min()-pad, all_pts[:,1].max()+pad)
-
-    fig, axs = plt.subplots(1, 3, figsize=(15, 5), sharex=True, sharey=True)
-
-    _draw_positions_panel(axs[0], so,    colors, bbox_half, d_connect,
-                          title="Initial (so)", show_connectivity=True,
-                          conn_color_mode=conn_color_mode,
-                          xlim=xlim, ylim=ylim, disk_radius=disk_radius)
-    _draw_positions_panel(axs[1], sf,    colors, bbox_half, d_connect,
-                          title="Desired (sf)", show_connectivity=True,
-                          conn_color_mode=conn_color_mode,
-                          xlim=xlim, ylim=ylim, disk_radius=disk_radius)
-    _draw_positions_panel(axs[2], final, colors, bbox_half, d_connect,
-                          title="Actual Final", show_connectivity=True,
-                          conn_color_mode=conn_color_mode,
-                          xlim=xlim, ylim=ylim, disk_radius=disk_radius)
-
-    fig.tight_layout()
-    os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
-    fig.savefig(out_path, bbox_inches="tight")
+    os.makedirs(os.path.dirname(save_path) or ".", exist_ok=True)
+    fig.savefig(save_path, dpi=600, bbox_inches="tight")
     plt.close(fig)
-    print(f"[viz] Triptych saved: {out_path}")
+    print(f"[viz] Snapshot saved: {save_path}")
 
 
 # ======================
-# 可选：动画（同样使用 radius 画圆圈，缺失时回退矩形）
+# 动画（方案 A：每帧重建圆盘）
 # ======================
-def animation2D_XYYaw(
+def animation3D_XYYaw(
+    cfg,
     traj,
     dt,
     Ts,
-    bbox_half,
     pred_curve=None,
     Trailing=True,
     PredCurve=True,
     colors="r",
-    save_name="./test.mp4",
+    save_name="./test3d.mp4",
     d_connect=None,
     show_connectivity=True,
     conn_color_mode="const",
-    disk_radius=None,   # ⬅️ 新增：圆圈半径（来自 config["robot_params"]["collision_shape"]["radius"]）
+    disk_radius=None,
+    disks_at_agent_z=True,   # True: 圆盘画在各自 z；False: 画在 z=0
+    axis_mode="fit_all",     # 坐标轴模式
+    show_goals=True,         # 是否绘制目标点 X
 ):
-    """
-    动画：彩色填充虚线圆圈 + 位置点 + 速度向量 + 尾迹 + 连通性连线（无 λ₂）。
-    """
-    n_agent, total_frame, _ = traj.shape
+    n_agent, total_frame, D = traj.shape
     trailing_buf_size = 1000000
     dir_len = 0.1
 
+    # 轨迹坐标
     x = traj[:, :, 0]
     y = traj[:, :, 1]
-    x_v = traj[:, :, 3]
-    y_v = traj[:, :, 4]
+    z = traj[:, :, 2] if D > 2 else np.zeros_like(x)
 
-    x_min = np.min(x) - 3
-    x_max = np.max(x) + 3
-    y_min = np.min(y) - 3
-    y_max = np.max(y) + 3
-    fig, ax = plt.subplots(figsize=(8, 8))
-    ax.set_xlim([x_min, x_max])
-    ax.set_ylim([y_min, y_max])
-    ax.set_aspect('equal')
-    ax.grid(True, alpha=0.25)  # 保留坐标轴和网格，便于对比
+    # 速度（若不存在则用 0）
+    x_v = traj[:, :, 3] if D > 3 else np.zeros_like(x)
+    y_v = traj[:, :, 4] if D > 4 else np.zeros_like(y)
 
-    # ====== 初始帧元素 ======
+    # —— 坐标轴范围 ——
+    if axis_mode == "fit_all":
+        xyz = traj[:, :, :3] if D >= 3 else np.pad(traj[:, :, :2], ((0,0),(0,0),(0,1)))
+        xlim, ylim, zlim = _compute_bounds(xyz, cfg, pad=1.0, include_so_sf=True, disk_radius=disk_radius)
+        fig = plt.figure(figsize=(8, 8))
+        ax = fig.add_subplot(111, projection='3d')
+        ax.set_xlim(xlim); ax.set_ylim(ylim); ax.set_zlim(zlim)
+    elif axis_mode == "auto":
+        fig = plt.figure(figsize=(8, 8))
+        ax = fig.add_subplot(111, projection='3d')
+        ax.set_autoscale_on(True)
+    else:  # fit_current
+        xyz = traj[:, :, :3] if D >= 3 else np.pad(traj[:, :, :2], ((0,0),(0,0),(0,1)))
+        xlim, ylim, zlim = _compute_bounds(xyz, cfg, pad=1.0, include_so_sf=True, disk_radius=disk_radius)
+        fig = plt.figure(figsize=(8, 8))
+        ax = fig.add_subplot(111, projection='3d')
+        ax.set_xlim(xlim); ax.set_ylim(ylim); ax.set_zlim(zlim)
 
-    # 圆圈（彩色填充 + 虚线边）
-    disks = []
-    if disk_radius is not None and disk_radius > 0:
-        for i in range(n_agent):
-            circ = Circle(
-                (x[i, 0], y[i, 0]),
-                radius=disk_radius,
-                ec=colors[i],
-                fc=colors[i],
-                lw=1.2,
-                linestyle="--",
-                alpha=0.25,   # 填充透明
-                zorder=1      # 圆圈在底层
-            )
-            ax.add_patch(circ)
-            disks.append(circ)
+    ax.set_xlabel("x"); ax.set_ylabel("y"); ax.set_zlabel("z")
+    ax.grid(True, alpha=0.25)
 
-    # 点（在圆圈之上）
-    p = [ax.plot([x[i, 0]], [y[i, 0]],
-                 c=colors[i], marker='o', ms=6, ls='None', alpha=0.95, zorder=2)
-         for i in range(n_agent)]
+    # 目标点（sf）—— 深一号颜色，动画中用稍小 s 以免遮挡
+    if show_goals:
+        try:
+            sf = np.array(cfg["tasks"]["sf"], dtype=float)
+            for i in range(min(n_agent, sf.shape[0])):
+                dark_c = _darker(colors[i], factor=0.7)
+                ax.scatter(
+                    [sf[i, 0]], [sf[i, 1]], [sf[i, 2]],
+                    s=90, marker="X", c=[dark_c],
+                    edgecolors="k", linewidths=0.8, alpha=0.95, depthshade=False
+                )
+        except Exception:
+            pass
 
-    # 速度线（点之上/连通性之下）
-    vel_line = []
+    # 连接线对象（每对 agent 预创建一条）
+    pairs = [(i, j) for i in range(n_agent) for j in range(i + 1, n_agent)]
+    conn_lines = []
+    if show_connectivity and d_connect is not None:
+        for _ in pairs:
+            (ln,) = ax.plot([], [], [], c='gray', lw=1.2, alpha=0.9)
+            ln.set_visible(False)
+            conn_lines.append(ln)
+
+    # 点（当前位姿）
+    points = []
+    for i in range(n_agent):
+        (ln,) = ax.plot([x[i, 0]], [y[i, 0]], [z[i, 0]], marker='o', ls='None',
+                        c=colors[i], alpha=0.95)
+        points.append(ln)
+
+    # 速度向量
+    vel_lines = []
     for i in range(n_agent):
         (ln,) = ax.plot([x[i, 0], x[i, 0] + dir_len * x_v[i, 0]],
                         [y[i, 0], y[i, 0] + dir_len * y_v[i, 0]],
-                        c='dodgerblue', alpha=0.7, zorder=2)
-        vel_line.append(ln)
+                        [z[i, 0], z[i, 0]],
+                        c='dodgerblue', alpha=0.7)
+        vel_lines.append(ln)
 
-    # 尾迹（放在线下/点上）
-    trail = []
+    # 尾迹
+    trails = []
     if Trailing:
         for i in range(n_agent):
-            (ln,) = ax.plot([x[i, 0]], [y[i, 0]], c=colors[i], lw=3, alpha=0.4, zorder=2)
-            trail.append(ln)
+            (ln,) = ax.plot([x[i, 0]], [y[i, 0]], [z[i, 0]], c=colors[i], lw=2, alpha=0.6)
+            trails.append(ln)
 
-    # 预测曲线（若有）
-    preds = None
-    # 预测曲线（若有）
-    preds = None
-    if PredCurve and pred_curve is not None:
-        impc_iters = pred_curve.shape[-3]
-        preds = [[None for _ in range(impc_iters)] for _ in range(n_agent)]
-        for i in range(n_agent):
-            for it in range(impc_iters):
-                (ln,) = ax.plot([], [], 
-                                c=colors[i],       # ⬅️ 改成跟该 agent 一致的颜色
-                                alpha=0.8,
-                                linestyle="-",     # 预测曲线保持实线
-                                zorder=2)
-                preds[i][it] = ln
+    # —— 方案 A：每帧重建圆盘 ——
+    live_disks = [None] * n_agent
 
-    # 连通性线（放在最上层）
-    conn_lc = None
-    if show_connectivity and d_connect is not None:
-        conn_lc = LineCollection([], colors='gray', lw=1.2, alpha=0.9, zorder=3)
-        ax.add_collection(conn_lc)
-
-    # ====== 帧更新函数 ======
     def animate(t):
         updated = []
 
-        # 圆圈中心更新
-        if disks:
+        # 每帧重建圆盘（先移除上一帧的，再新建这一帧）
+        if disk_radius is not None and disk_radius > 0:
             for i in range(n_agent):
-                disks[i].center = (x[i, t], y[i, t])
-            updated += disks
+                if live_disks[i] is not None:
+                    try:
+                        live_disks[i].remove()
+                    except Exception:
+                        pass
+                    live_disks[i] = None
 
-        # 点 & 速度
+                edge = tuple(colors[i][:3]) if len(colors[i]) >= 3 else (0.3, 0.3, 0.3)
+                face = edge + (0.55,)
+                circ = Circle((x[i, t], y[i, t]), radius=float(disk_radius))
+                circ.set_edgecolor(edge)
+                circ.set_facecolor(face)
+                circ.set_linewidth(1.8)
+                circ.set_linestyle("--")
+                ax.add_patch(circ)
+                z_plane = float(z[i, t]) if disks_at_agent_z else 0.0
+                art3d.pathpatch_2d_to_3d(circ, z=z_plane, zdir="z")
+                live_disks[i] = circ
+                updated.append(circ)
+
+        # 点 & 速度线
         for i in range(n_agent):
-            p[i][0].set_data([x[i, t]], [y[i, t]])
-            vel_line[i].set_data([x[i, t], x[i, t] + dir_len * x_v[i, t]],
-                                 [y[i, t], y[i, t] + dir_len * y_v[i, t]])
-        updated += [p[i][0] for i in range(n_agent)] + vel_line
+            points[i].set_data_3d([x[i, t]], [y[i, t]], [z[i, t]])
+            vel_lines[i].set_data_3d([x[i, t], x[i, t] + dir_len * x_v[i, t]],
+                                     [y[i, t], y[i, t] + dir_len * y_v[i, t]],
+                                     [z[i, t], z[i, t]])
+        updated += points + vel_lines
 
         # 尾迹
         if Trailing:
             tail = t if t < trailing_buf_size else trailing_buf_size
             for i in range(n_agent):
-                trail[i].set_data(x[i, t - tail:t + 1], y[i, t - tail:t + 1])
-            updated += trail
+                xs = x[i, max(0, t - tail):t + 1]
+                ys = y[i, max(0, t - tail):t + 1]
+                zs = z[i, max(0, t - tail):t + 1]
+                trails[i].set_data_3d(xs, ys, zs)
+            updated += trails
 
-        # 预测曲线
-        if PredCurve and pred_curve is not None:
-            impc_iters = pred_curve.shape[-3]
-            pred_idx = int(t // max(int(dt / Ts), 1))
-            for i in range(n_agent):
-                for it in range(impc_iters):
-                    curve = pred_curve[:, :, it, :, :]
-                    preds[i][it].set_data(curve[i, pred_idx, :, 0], curve[i, pred_idx, :, 1])
-            updated += [preds[i][it] for i in range(n_agent) for it in range(impc_iters)]
+        # 连通性（复用对象，不再新建）
+        if show_connectivity and d_connect is not None:
+            d_connect_f = float(d_connect)
+            for k, (i, j) in enumerate(pairs):
+                dx = x[j, t] - x[i, t]
+                dy = y[j, t] - y[i, t]
+                dist = np.hypot(dx, dy)  # 如需 3D 距离：np.linalg.norm([dx, dy, z[j,t]-z[i,t]])
+                ln = conn_lines[k]
+                if dist <= d_connect_f:
+                    ln.set_data_3d([x[i, t], x[j, t]],
+                                   [y[i, t], y[j, t]],
+                                   [z[i, t], z[j, t]])
+                    if conn_color_mode == "dist_alpha":
+                        a = max(0.2, 1.0 - dist / max(d_connect_f, 1e-9))
+                        ln.set_alpha(a); ln.set_color((0.3, 0.3, 0.3))
+                    elif conn_color_mode == "dist_gray":
+                        g = 0.2 + 0.8 * (dist / max(d_connect_f, 1e-9))
+                        g = np.clip(g, 0.2, 1.0)
+                        ln.set_alpha(0.9); ln.set_color((g, g, g))
+                    else:
+                        ln.set_alpha(0.9); ln.set_color("gray")
+                    ln.set_visible(True)
+                else:
+                    ln.set_visible(False)
+            updated += conn_lines
 
-        # 连通性
-        if conn_lc is not None:
-            pts = np.column_stack((x[:, t], y[:, t]))
-            segs, seg_colors = _build_connectivity_segments(pts, d_connect, color_mode=conn_color_mode)
-            conn_lc.set_segments(segs)
-            conn_lc.set_color(seg_colors if seg_colors is not None else 'gray')
-            updated.append(conn_lc)
+        # 若选择 fit_current：按当前帧对焦
+        if axis_mode == "fit_current":
+            pad = 0.5
+            xmin = x[:,t].min()-pad; xmax = x[:,t].max()+pad
+            ymin = y[:,t].min()-pad; ymax = y[:,t].max()+pad
+            zmin = z[:,t].min()-pad; zmax = z[:,t].max()+pad
+            if disk_radius:
+                xmin -= disk_radius; xmax += disk_radius
+                ymin -= disk_radius; ymax += disk_radius
+            if zmin == zmax:
+                zmin -= 1.0; zmax += 1.0
+            ax.set_xlim([xmin, xmax]); ax.set_ylim([ymin, ymax]); ax.set_zlim([zmin, zmax])
 
         return tuple(updated)
 
-    # 生成并保存
-    anim = animation.FuncAnimation(fig, animate, frames=total_frame, interval=Ts * 1e3, blit=True)
+    # 帧序列 & 动画
+    frames = np.arange(total_frame)
+    anim = animation.FuncAnimation(fig, animate, frames=frames, interval=Ts * 1e3, blit=False)
+
+    # 控制 fps，避免过高导致压制后看不清细节
+    target_fps = min(30, max(5, int(1.0 / Ts)))
+    writer = animation.FFMpegWriter(fps=target_fps)
+
     os.makedirs(os.path.dirname(save_name) or ".", exist_ok=True)
     try:
-        anim.save(save_name, writer=animation.FFMpegWriter(fps=1 / Ts))
-        print(f"[viz] Animation saved: {save_name}")
+        anim.save(save_name, writer=writer)
+        print(f"[viz] 3D animation saved: {save_name}")
     except Exception as e:
-        print(f"[viz] Failed to create/save animation: {e}")
+        print(f"[viz] Failed to create/save 3D animation: {e}")
     return anim
 
 
@@ -342,24 +404,22 @@ def animation2D_XYYaw(
 # ======================
 def main():
     print(">>> entered main")
-    parser = argparse.ArgumentParser(description="Triptych visualization (radius circles) + optional animation")
+    parser = argparse.ArgumentParser(description="Triptych visualization (true-3D) + optional animation")
     parser.add_argument("--config", type=str, required=True, help="path to config json file")
     parser.add_argument("--states", type=str, required=True, help="path to simulation state json file")
     parser.add_argument("--output_dir", type=str, required=True, help="directory to save figures/animations")
     parser.add_argument("--create_anim", action="store_true", help="create animation (mp4)")
     parser.add_argument("--anim_format", type=str, choices=["mp4", "gif"], default="gif",
                         help="Kept for compatibility; mp4 will be used.")
+    parser.add_argument("--axis_mode", type=str, choices=["fit_all","fit_current","auto"], default="fit_all",
+                        help="3D轴缩放模式：fit_all(全局固定)/fit_current(逐帧跟随)/auto(由Matplotlib自动)")
+    parser.add_argument("--no_goals", action="store_true", help="不绘制终点 X 标记")  # 新增开关
     args = parser.parse_args()
 
     cfg = load_json(args.config)
     if not os.path.exists(args.states):
         raise FileNotFoundError(f"States file not found: {args.states}")
     st = load_json(args.states)
-    disk_radius = None
-    try:
-        disk_radius = float(cfg["robot_params"]["collision_shape"]["radius"])
-    except Exception:
-        disk_radius = None
 
     # 输出路径
     out_dir = args.output_dir
@@ -373,58 +433,74 @@ def main():
     num_robots = len(st["robots"])
     colors = generate_rgb_colors(num_robots)
 
-    # 轨迹 (N, T, D)
+    # 轨迹 (N, T, D) —— 按 robots 的 key 排序，保证与 so/sf 映射一致
     keys = sorted(st["robots"].keys(), key=int)
-    traj = np.array([st["robots"][k]["states"] for k in keys], dtype=float)
+    traj = np.array([np.array(st["robots"][k]["states"], dtype=float) for k in keys])
 
     # 时间参数
     dt = st["dt"]
     Ts = st["Ts"]
 
-    # 备选的矩形半尺寸（动画中若无半径使用）
-    bbox_half = None
+    # 半径（从 config 读取）
     try:
-        bbox_half = np.array(cfg["robot_params"]["collision_shape"]["aligned_box"][:2], dtype=float)
+        disk_radius = float(cfg["robot_params"]["collision_shape"]["radius"])
     except Exception:
-        bbox_half = None
+        disk_radius = None
 
     # 连通性阈值
     d_connect = cfg.get("cbf_params", {}).get("d_max", None)
 
-    # === 三联图（圆圈范围优先） ===
-    save_triptych(cfg, traj, colors, triptych_path, d_connect,
-                  conn_color_mode="dist_alpha")
+    # 终点显示与否
+    show_goals = (not args.no_goals)
 
-    # === 动画（可选，同样优先圆圈） ===
+    # === 静态快照：多帧采样 ===
+    total_frame = traj.shape[1]
+    sample_frames = np.linspace(0, total_frame - 1, 6, dtype=int)  # 6个采样点
+
+    for idx in sample_frames:
+        img_path = os.path.join(
+            out_dir_expanded,
+            os.path.basename(args.config).replace(".json", f"_frame{idx}.pdf")
+        )
+        save_snapshot_at_frame(
+            cfg=cfg,
+            traj=traj,
+            colors=colors,
+            save_path=img_path,
+            d_connect=d_connect,
+            conn_color_mode="dist_alpha",
+            disk_radius=disk_radius,
+            disks_at_agent_z=True,
+            frame_idx=idx,
+            axis_mode=args.axis_mode,
+            show_goals=show_goals,
+        )
+
+    # === 动画（可选） ===
     if args.create_anim:
-        pred_curve = None
-        if "pred_curve" in st["robots"]["0"]:
-            pred_curve = np.array([st["robots"][str(_)]["pred_curve"] for _ in range(num_robots)])
-
-        # 读取半径（动画也用）
-        disk_radius = None
-        try:
-            disk_radius = float(cfg["robot_params"]["collision_shape"]["radius"])
-        except Exception:
-            disk_radius = None
-
-        animation2D_XYYaw(
+        animation3D_XYYaw(
+            cfg=cfg,
             traj=traj,
             dt=dt,
             Ts=Ts,
-            bbox_half=bbox_half,
-            pred_curve=pred_curve,
+            pred_curve=None,
             Trailing=True,
-            PredCurve=(pred_curve is not None),
+            PredCurve=False,
             colors=colors,
             save_name=anim_path,
             d_connect=d_connect,
             show_connectivity=(d_connect is not None),
             conn_color_mode="dist_alpha",
-            disk_radius=disk_radius,  # ⬅️ 新增
+            disk_radius=disk_radius,       # 半径来自 config
+            disks_at_agent_z=True,         # 圆盘跟随各自 z 高度
+            axis_mode=args.axis_mode,
+            show_goals=show_goals,
         )
     else:
         print("[viz] Animation creation skipped.")
+
+    print("All configurations processed successfully!")
+
 
 if __name__ == "__main__":
     main()

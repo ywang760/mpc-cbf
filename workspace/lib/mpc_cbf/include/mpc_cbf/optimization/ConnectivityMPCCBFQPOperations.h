@@ -25,6 +25,11 @@ class ConnectivityMPCCBFQPOperations : public MPCCBFQPOperationsBase<T, DIM> {
     using typename Base::Vector;
     using typename Base::VectorDIM;
     using Row = math::Row<T>;
+    const Vector& debugLastConn_ac() const { return last_conn_ac_; }
+    T              debugLastConn_bc() const { return last_conn_bc_; }
+    const Vector& debugLastCLF_a()   const { return last_clf_a_;   }
+    T              debugLastCLF_b()   const { return last_clf_b_;   }
+
 
     struct Params {
         mpc::PiecewiseBezierParams<T, DIM>& piecewise_bezier_params;
@@ -54,9 +59,25 @@ class ConnectivityMPCCBFQPOperations : public MPCCBFQPOperationsBase<T, DIM> {
     // Accessors
     std::unique_ptr<PiecewiseBezierMPCQPOperations> piecewise_mpc_operations_ptr();
     std::shared_ptr<ConnectivityCBF> connectivityCBF() const;
+    const Vector& debugLastSafety_a() const { return last_safety_a_; }
+    T             debugLastSafety_b() const { return last_safety_b_; }
+
+    // 预测版（可选）
+    const std::vector<Vector>& debugLastPredSafety_Ak() const { return last_pred_safety_Ak_; }
+    const std::vector<T>&      debugLastPredSafety_bk() const { return last_pred_safety_bk_; }
 
   private:
     std::shared_ptr<ConnectivityCBF> connectivity_cbf_ptr_;
+    Vector last_conn_ac_;  // 最近一次 connectivity 的 Ac
+    T      last_conn_bc_{0};
+    Vector last_clf_a_;    // 最近一次 CLF 的 a
+    T      last_clf_b_{0};
+    Vector last_safety_a_;
+    T      last_safety_b_{};
+
+    // 预测版（逐步）可选
+    std::vector<Vector> last_pred_safety_Ak_; // 每个 k 的 Ak（维度 DIM*k_hor）
+    std::vector<T>      last_pred_safety_bk_; // 每个 k 的 bk
 };
 
 } // namespace mpc_cbf

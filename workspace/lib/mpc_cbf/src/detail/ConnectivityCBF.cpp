@@ -19,7 +19,7 @@ GiNaC::ex defaultAlpha(GiNaC::ex b, double gamma = 1.0)
 //   mygamma: Scaling factor to control convergence rate
 GiNaC::ex myAlpha(GiNaC::ex myh, double mygamma)
 {
-    return mygamma * GiNaC::pow(myh, 3);
+    return mygamma * GiNaC::pow(myh, 1);
 }
 
 // Fifth-order alpha function for Control Barrier Functions
@@ -53,7 +53,7 @@ namespace mpc_cbf
         // Define dimensions of the state and control spaces
         STATE_VARS = 6;
         CONTROL_VARS = 3;
-        gamma = 5.0;   // More aggressive convergence rate (increased from 1.0)
+        gamma = 1;   // More aggressive convergence rate (increased from 1.0)
         epsilon = 0.1; // lambda2_min for connectivity CBF
 
         // System dynamics matrix (state transition matrix)
@@ -248,8 +248,8 @@ namespace mpc_cbf
         Ac(0, 2) = dLfV_dvz;
 
         // Bc
-        double beta1 = 5;
-        double beta2 = 2;
+        double beta1 = 0.5;
+        double beta2 = 0.1;
         GiNaC::ex Bc = Lf2_V + beta1 * Lf_V + beta2 * V;
 
         // 替换 d_desired -> 3.0

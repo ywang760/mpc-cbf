@@ -1,5 +1,5 @@
 INPUT=(
-    "/usr/src/mpc-cbf/workspace/experiments/config/baseline/2r/circle.json"
+    #"/usr/src/mpc-cbf/workspace/experiments/config/baseline/2r/circle.json"
     # "/usr/src/mpc-cbf/workspace/experiments/config/baseline/2r/line.json"
     # "/usr/src/mpc-cbf/workspace/experiments/config/baseline/3r/bend.json"
     # "/usr/src/mpc-cbf/workspace/experiments/config/baseline/3r/circle.json"
@@ -8,7 +8,7 @@ INPUT=(
     # "/usr/src/mpc-cbf/workspace/experiments/config/baseline/3r/line2.json"
     # "/usr/src/mpc-cbf/workspace/experiments/config/baseline/3r/line3.json"
     # "/usr/src/mpc-cbf/workspace/experiments/config/baseline/3r/triangle.json"
-    # "/usr/src/mpc-cbf/workspace/experiments/config/baseline/5r/circle.json"
+    "/usr/src/mpc-cbf/workspace/experiments/config/baseline/5r/circle.json"
     # "/usr/src/mpc-cbf/workspace/experiments/config/baseline/5r/expand.json"
     # "/usr/src/mpc-cbf/workspace/experiments/config/baseline/6r/circle.json"
     # "/usr/src/mpc-cbf/workspace/experiments/config/baseline/6r/upward.json"
@@ -19,7 +19,7 @@ INPUT=(
 DEFAULT_STATES_PATH="/usr/src/mpc-cbf/workspace/experiments/results/states.json"
 BASE_CONFIG_FILE="/usr/src/mpc-cbf/workspace/experiments/config/base_config.json"
 VIZ_OUTPUT_DIR="/usr/src/mpc-cbf/workspace/experiments/results/mpccbf_viz"
-SIM_RUNTIME=20.0
+SIM_RUNTIME=10.0
 
 # Build the MPC CBF examples once before running experiments
 echo "Building MPC CBF Formation Control example (Make)"

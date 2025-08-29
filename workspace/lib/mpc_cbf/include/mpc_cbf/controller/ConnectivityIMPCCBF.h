@@ -60,6 +60,17 @@ class ConnectivityIMPCCBF {
                   const Vector& ref_positions);
 
     void resetProblem();
+    // ===[ 统计结果 Getter ]===
+    size_t failTotal() const        { return fail_cnt_total_; }
+    size_t failConn()  const        { return fail_cnt_connectivity_; }
+    size_t failCLF()   const        { return fail_cnt_clf_; }
+    T      lastLambda2() const      { return last_lambda2_; }
+    const std::vector<std::pair<Vector, T>>& samples_conn() const { return samples_conn_; }
+    const std::vector<std::pair<Vector, T>>& samples_clf()  const { return samples_clf_;  }
+    std::size_t failSafety() const { return fail_cnt_safety_; }
+
+    // 和 samples_conn()/samples_clf() 相同风格，返回 (a, b)
+    const std::vector<std::pair<Vector, T>>& samples_safety() const { return samples_safety_; }
 
   private:
     TuningParams mpc_tuning_;
@@ -83,6 +94,29 @@ class ConnectivityIMPCCBF {
     T slack_cost_;
     T slack_decay_rate_;
     bool slack_mode_;
+
+    // ===[ A 法：失败归因统计 ]=========================================
+    enum class ConstraintMode {
+        None = 0,
+        Safety,
+        Connectivity,
+        CLF
+    };
+
+    ConstraintMode current_mode_ = ConstraintMode::None;
+
+    // 累计统计
+    size_t fail_cnt_total_        = 0;
+    size_t fail_cnt_connectivity_ = 0;
+    size_t fail_cnt_clf_          = 0;
+    std::size_t fail_cnt_safety_{0};
+    std::vector<std::pair<Vector, T>> samples_safety_;
+    T last_lambda2_ = T(0);
+    static constexpr size_t kMaxSamples = 5;
+
+    // 简单容器：只存 ac/bc；如需同时存 robot_idx/sim_t/loop_idx，可扩展结构体
+    std::vector<std::pair<Vector, T>> samples_conn_; // 前 5 条 connectivity 失败的 (ac, bc)
+    std::vector<std::pair<Vector, T>> samples_clf_;  // 前 5 条 CLF 失败的 (a,  b)
 };
 
 } // namespace mpc_cbf

@@ -3,7 +3,7 @@
 //
 
 #include <mpc_cbf/controller/ConnectivityIMPCCBF.h>
-
+#include <spdlog/spdlog.h>
 namespace mpc_cbf {
 template <typename T, unsigned int DIM>
 ConnectivityIMPCCBF<T, DIM>::ConnectivityIMPCCBF(
@@ -53,21 +53,6 @@ bool ConnectivityIMPCCBF<T, DIM>::optimize(
     const State& current_state = current_states.at(self_idx);
     const VectorDIM& current_pos = current_state.pos_;
     const VectorDIM& current_vel = current_state.vel_;
-
-    // // Create robot_states matrix with all robot states (including self)
-    // Eigen::MatrixXd robot_states(current_states.size(), 2 * DIM);
-    // std::vector<Vector> other_robot_states; // Full state vectors for CBF (excluding self)
-    // for (size_t i = 0; i < current_states.size(); ++i) {
-    //     Vector robot_state(2 * DIM);
-    //     robot_state << current_states[i].pos_, current_states[i].vel_;
-    //     robot_states.row(i) = robot_state.transpose();
-
-    //     if (i != self_idx) {
-    //         other_robot_states.push_back(robot_state);
-    //     }
-    // }
-    // Vector state(2 * DIM);
-    // state << current_pos, current_vel;
 
     // Create robot_states matrix with all robot states (including self)
     Eigen::MatrixXd robot_states(current_states.size(), 2 * DIM);
@@ -153,23 +138,27 @@ bool ConnectivityIMPCCBF<T, DIM>::optimize(
 
         // connectivity cbf constraints
         if (iter == 0) {
-            // TODO: currently all slack_value are set as 0
+            // TODO: currently all slack_value are set as 0a
             // Set to different values for priority scheduling
             T slack_value = 0;
-            // for (size_t i = 0; i < num_neighbors; ++i) {
-            //     qp_generator_.addSafetyCBFConstraint(state, other_robot_states[i], i, slack_value);
-            // }
+            for (size_t i = 0; i < num_neighbors; ++i) {
+                qp_generator_.addSafetyCBFConstraint(state, other_robot_states[i], i, slack_value);
+            }
 
             //Evaluate lambda2 and conditionally add connectivity or CLF constraints
             const auto robot_positions = robot_states.leftCols(DIM); // Extract only position columns (x, y)
             const double Rs = qp_generator_.connectivityCBF()->getDmax();            
             const double sigma = std::pow(Rs, 4) / std::log(2.0);                    
             auto [lambda2, eigenvec] = mpc_cbf::getLambda2FromL(robot_positions, Rs, sigma);
+            last_lambda2_ = static_cast<T>(lambda2); // 记录最近一次 λ2
             // TODO: this 0.1 threshold is arbitrary - should be configurable
             if (lambda2 > 0.1) {
-                // Use single connectivity constraint when graph is well-connected
-            qp_generator_.addConnectivityConstraint(state, other_positions, 0);
+            //     // Use single connectivity constraint when graph is well-connected
+                qp_generator_.addConnectivityConstraint(state, other_positions, 0);
+                current_mode_ = ConstraintMode::Connectivity;
             } else {
+                spdlog::info("enter CLF");
+                current_mode_ = ConstraintMode::CLF;
                 // Use pairwise CLF constraints when graph connectivity is poor
                 for (size_t i = 0; i < num_neighbors; ++i) {
                     qp_generator_.addCLFConstraint(state, other_robot_states[i], i, slack_value);
@@ -189,21 +178,25 @@ bool ConnectivityIMPCCBF<T, DIM>::optimize(
             // Create slack values once per neighbor (not growing with horizon)
             // TODO: currently all slack_values are set as 0
             // Set to different values for priority scheduling
-            // const std::vector<T> slack_values(cbf_horizon_, 0);
-            // for (size_t i = 0; i < num_neighbors; ++i) {
-            //     qp_generator_.addPredSafetyCBFConstraints(pred_states, other_robot_states[i], i);
-            // }
+            const std::vector<T> slack_values(cbf_horizon_, 0);
+            for (size_t i = 0; i < num_neighbors; ++i) {
+                qp_generator_.addPredSafetyCBFConstraints(pred_states, other_robot_states[i], i);
+            }
 
             // Evaluate lambda2 and conditionally add predicted connectivity or CLF constraints
-            const auto robot_positions = robot_states.leftCols(2); // Extract only position columns (x, y)
+            const auto robot_positions = robot_states.leftCols(3); // Extract only position columns (x, y)
             const double Rs = qp_generator_.connectivityCBF()->getDmax();            
             const double sigma = std::pow(Rs, 4) / std::log(2.0);                    
             auto [lambda2, eigenvec] = mpc_cbf::getLambda2FromL(robot_positions, Rs, sigma);
+            last_lambda2_ = static_cast<T>(lambda2); // 记录最近一次 λ2
             // TODO: this 0.1 threshold is arbitrary - should be configurable
             if (lambda2 > 0.1) {
+                current_mode_ = ConstraintMode::Connectivity;
                 // Use single connectivity constraint when graph is well-connected
                 qp_generator_.addPredConnectivityConstraints(pred_states, other_positions, 0);
             } else {
+                spdlog::info("enter CLF");
+                current_mode_ = ConstraintMode::CLF;
                 // Use pairwise CLF constraints when graph connectivity is poor
                 for (size_t i = 0; i < num_neighbors; ++i) {
                     qp_generator_.addPredCLFConstraints(pred_states, other_robot_states[i], i);
@@ -226,6 +219,53 @@ bool ConnectivityIMPCCBF<T, DIM>::optimize(
                 qp_generator_.piecewise_mpc_qp_generator_ptr()->generateCurveFromSolution());
         } else {
             success = false;
+            // === 统计失败归因 ===
+            ++fail_cnt_total_;
+            switch (current_mode_) {
+                case ConstraintMode::Connectivity: {
+                    ++fail_cnt_connectivity_;
+                    spdlog::warn("[QP FAIL] mode=Connectivity, lambda2={:.6f}",
+                        static_cast<double>(last_lambda2_));
+           // 仅收集，不打印
+                    if (samples_conn_.size() < kMaxSamples) {
+                        samples_conn_.emplace_back(
+                            qp_generator_.debugLastConn_ac(),
+                            qp_generator_.debugLastConn_bc()
+                        );
+                    }
+                        break;
+                }
+                case ConstraintMode::CLF: {
+                    ++fail_cnt_clf_;
+                    spdlog::warn("[QP FAIL] mode=CLF, lambda2={:.6f}",
+                        static_cast<double>(last_lambda2_));
+                    // 仅收集，不打印
+                    if (samples_clf_.size() < kMaxSamples) {
+                        samples_clf_.emplace_back(
+                            qp_generator_.debugLastCLF_a(),
+                            qp_generator_.debugLastCLF_b()
+                        );
+                    }
+                    break;
+                }
+                case ConstraintMode::Safety: {
+                    ++fail_cnt_safety_;
+                    spdlog::warn("[QP FAIL] mode=Safety, lambda2={:.6f}", static_cast<double>(last_lambda2_));
+
+                    if (samples_safety_.size() < kMaxSamples) {
+                        samples_safety_.emplace_back(
+                            qp_generator_.debugLastSafety_a(),   // 就是我们刚加的接口
+                            qp_generator_.debugLastSafety_b()
+                        );
+                    }
+                    break;
+                }
+                default:
+                    spdlog::warn("[QP FAIL] mode=None (not set), lambda2={:.6f}",
+                                 static_cast<double>(last_lambda2_));
+                    break;
+            }
+            
             break;
         }
     }
@@ -236,6 +276,7 @@ bool ConnectivityIMPCCBF<T, DIM>::optimize(
 template <typename T, unsigned int DIM>
 void ConnectivityIMPCCBF<T, DIM>::resetProblem() {
     qp_generator_.problem().resetProblem();
+    current_mode_ = ConstraintMode::Safety; 
 }
 
 template class ConnectivityIMPCCBF<double, 3U>;

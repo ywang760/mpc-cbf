@@ -35,10 +35,27 @@ ConnectivityMPCCBFQPOperations<T, DIM>::safetyCBFConstraint(const Vector& curren
     // Use connectivity_cbf_ptr_ for proper constraint generation
     Vector a = connectivity_cbf_ptr_->getSafetyConstraints(current_state, neighbor_state);
     T b = connectivity_cbf_ptr_->getSafetyBound(current_state, neighbor_state);
+    // === 调试缓存 ===
+    last_safety_a_ = a;
+    last_safety_b_ = b;
 
+    // === 可选：调试输出（建议只在 debug 级别打印） ===
+    {
+        const Eigen::IOFormat oneLine(Eigen::StreamPrecision, Eigen::DontAlignCols,
+                                    " ", " ", "", "", "", "");
+        std::ostringstream oss;
+        oss << a.transpose().format(oneLine);
+        logger->debug("[safetyCBFConstraint] a = [{}], b = {}", oss.str(), b);
+    }                                                            
     Vector A0 = Vector::Zero(DIM * this->k_hor_); // [3K, 1]
     A0.segment(0, DIM) = a;
     Row A_control_pts = -1.0 * A0.transpose() * this->U_basis_;
+    // logger->info("this->U_basis_: {}x{}", this->U_basis_.rows(), this->U_basis_.cols());
+    // for (int r = 0; r < std::min(6, (int)this->U_basis_.rows()); ++r) {
+    //     std::ostringstream oss;
+    //     for (int c = 0; c < std::min(10, (int)this->U_basis_.cols()); ++c) oss << this->U_basis_(r, c) << " ";
+    //     logger->info("[U] row{}: {}", r, oss.str());
+    // }
 
     return LinearConstraint(A_control_pts, std::numeric_limits<T>::lowest(), b + slack_value);
 }
@@ -64,6 +81,8 @@ ConnectivityMPCCBFQPOperations<T, DIM>::connectivityConstraint(const Vector& x_s
 
     // === 2) 一次性从 CBF 拿回 Ac, Bc（内部已依据 robot_states/self_idx 计算 λ2、eigenvec、h 等）===
     auto [Ac, Bc] = connectivity_cbf_ptr_->initConnCBF(robot_states, x_self, 0);
+    last_conn_ac_ = Ac;
+    last_conn_bc_ = Bc;
 
     Vector A0 = Vector::Zero(DIM * this->k_hor_);
     A0.segment(0, DIM) = Ac;                          // 注意 CONTROL_VARS == DIM 时直接放
@@ -78,6 +97,8 @@ ConnectivityMPCCBFQPOperations<T, DIM>::clfConstraint(const Vector& current_stat
                                                       const Vector& neighbor_state, T slack_value) {
     Vector a = connectivity_cbf_ptr_->getCLFConstraints(current_state, neighbor_state);
     T b = -1.0 * connectivity_cbf_ptr_->getCLFBound(current_state, neighbor_state);
+    last_clf_a_ = a;
+    last_clf_b_ = b;
 
     Vector A0 = Vector::Zero(DIM * this->k_hor_);
     A0.segment(0, DIM) = a;
@@ -100,6 +121,8 @@ std::vector<typename ConnectivityMPCCBFQPOperations<T, DIM>::LinearConstraint>
 ConnectivityMPCCBFQPOperations<T, DIM>::predSafetyCBFConstraints(
     const std::vector<State>& pred_states, const Vector& neighbor_state) {
     std::vector<LinearConstraint> linear_constraints;
+    last_pred_safety_Ak_.clear();
+    last_pred_safety_bk_.clear();
     for (size_t k = 0; k < pred_states.size(); ++k) {
         const State& pred_state = pred_states.at(k);
         Vector state(2 * DIM);
@@ -112,6 +135,18 @@ ConnectivityMPCCBFQPOperations<T, DIM>::predSafetyCBFConstraints(
         Vector Ak = Vector::Zero(DIM * this->k_hor_);
         Ak.segment(k * DIM, DIM) = ak;
         Row Ak_control_pts = -1.0 * Ak.transpose() * this->U_basis_;
+         // === 调试缓存 ===
+        last_pred_safety_Ak_.push_back(Ak);
+        last_pred_safety_bk_.push_back(bk);
+
+        // === 可选：调试输出 ===
+        {
+            const Eigen::IOFormat oneLine(Eigen::StreamPrecision, Eigen::DontAlignCols,
+                                        " ", " ", "", "", "", "");
+            std::ostringstream oss;
+            oss << ak.transpose().format(oneLine);
+            logger->debug("[predSafetyCBFConstraints] k={} ak=[{}], bk={}", k, oss.str(), bk);
+        }
         linear_constraints.push_back(
             LinearConstraint(Ak_control_pts, std::numeric_limits<T>::lowest(), bk));
     }
@@ -151,6 +186,8 @@ ConnectivityMPCCBFQPOperations<T, DIM>::predConnectivityConstraints(
 
         // 2) 一次性拿 (Ac, Bc)
         auto [Ac, Bc] = connectivity_cbf_ptr_->initConnCBF(robot_states, x_self_k, 0 /* self_idx */);
+        last_conn_ac_ = Ac;
+        last_conn_bc_ = Bc;
 
         Vector Ak = Vector::Zero(DIM * this->k_hor_);
         Ak.segment(k * DIM, DIM) = Ac;
@@ -173,6 +210,8 @@ ConnectivityMPCCBFQPOperations<T, DIM>::predCLFConstraints(const std::vector<Sta
 
         Vector ak = connectivity_cbf_ptr_->getCLFConstraints(state, neighbor_state);
         T bk = -1.0 * connectivity_cbf_ptr_->getCLFBound(state, neighbor_state);
+        last_clf_a_ = ak;
+        last_clf_b_ = bk;
 
         Vector Ak = Vector::Zero(DIM * this->k_hor_);
         Ak.segment(k * DIM, DIM) = ak;
