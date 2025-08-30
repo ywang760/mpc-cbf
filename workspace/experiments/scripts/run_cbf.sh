@@ -19,7 +19,7 @@ INPUT=(
 
 DEFAULT_STATES_PATH="/usr/src/mpc-cbf/workspace/experiments/results/states.json"
 BASE_CONFIG_FILE="/usr/src/mpc-cbf/workspace/experiments/config/base_config.json"
-VIZ_OUTPUT_DIR="/usr/src/mpc-cbf/workspace/experiments/results/viz"
+VIZ_OUTPUT_DIR="/usr/src/mpc-cbf/workspace/experiments/results/cbf_viz"
 MAX_STEPS=300
 
 # Build the CBF examples once before running experiments

@@ -15,13 +15,11 @@ ConnectivityIMPCCBF<T, DIM>::ConnectivityIMPCCBF(
       collision_shape_ptr_(collision_shape_ptr),
       qp_generator_(std::make_unique<ConnectivityMPCCBFQPOperations>(p.mpc_cbf_params, model_ptr,
                                                                      connectivity_cbf_ptr),
-                    num_neighbors, p.impc_params.slack_mode_) {
+                    num_neighbors, p.impc_params.slack_config_) {
     // impc params
     impc_iter_ = p.impc_params.impc_iter_;
     cbf_horizon_ = p.impc_params.cbf_horizon_;
-    slack_cost_ = p.impc_params.slack_cost_;
-    slack_decay_rate_ = p.impc_params.slack_decay_rate_;
-    slack_mode_ = p.impc_params.slack_mode_;
+    slack_config_ = p.impc_params.slack_config_;
 
     // load mpc tuning params
     mpc_tuning_ = p.mpc_cbf_params.mpc_params.tuning_;
@@ -75,12 +73,10 @@ bool ConnectivityIMPCCBF<T, DIM>::optimize(
     Vector state(2 * DIM);
     state << current_pos, current_vel;
 
-    // if slack_mode, compute the slack weights
+    // Compute slack weights for different constraint types based on distance
     const size_t num_neighbors = other_robot_states.size();
-    std::vector<double> slack_weights(num_neighbors);
-    if (slack_mode_) {
-        std::vector<size_t> idx(num_neighbors);
-        std::iota(idx.begin(), idx.end(), 0);
+    std::vector<size_t> idx(num_neighbors);
+    std::iota(idx.begin(), idx.end(), 0);
 
         // Pre-compute distances to avoid repeated calculations
         std::vector<T> distances(num_neighbors);
@@ -92,16 +88,21 @@ bool ConnectivityIMPCCBF<T, DIM>::optimize(
                 (other_robot_pos.head(spatial_dims) - current_pos.head(spatial_dims)).norm();
         }
 
-        // Sort by pre-computed distances (closer robots get priority)
-        std::sort(idx.begin(), idx.end(),
-                  [&distances](size_t a, size_t b) { return distances[a] < distances[b]; });
+    // Sort by pre-computed distances (closer robots get priority)
+    std::sort(idx.begin(), idx.end(),
+              [&distances](size_t a, size_t b) { return distances[a] < distances[b]; });
 
-        // Define slack weights with decay (closer robots get higher slack cost)
-        const T w_init = slack_cost_;
-        const T decay_factor = slack_decay_rate_;
-        for (size_t i = 0; i < num_neighbors; ++i) {
-            slack_weights[idx[i]] = w_init * std::pow(decay_factor, static_cast<T>(i));
-        }
+    // Prepare separate slack weights for each constraint type
+    std::vector<double> safety_weights(num_neighbors);
+    std::vector<double> clf_weights(num_neighbors);
+    std::vector<double> connectivity_weights = {slack_config_.connectivity_slack_cost};
+
+    // Apply distance-based weights with decay for safety and CLF constraints
+    for (size_t i = 0; i < num_neighbors; ++i) {
+        safety_weights[idx[i]] = slack_config_.safety_slack_cost *
+                                 std::pow(slack_config_.slack_decay_rate, static_cast<T>(i));
+        clf_weights[idx[i]] = slack_config_.clf_slack_cost *
+                              std::pow(slack_config_.slack_decay_rate, static_cast<T>(i));
     }
 
     for (size_t iter = 0; iter < impc_iter_; ++iter) {
@@ -119,9 +120,19 @@ bool ConnectivityIMPCCBF<T, DIM>::optimize(
                 d, mpc_tuning_.w_u_eff_);
         }
 
-        // add the slack cost, to give priority to neighbors
-        if (slack_mode_) {
-            qp_generator_.addSlackCost(slack_weights);
+        // Add separate slack costs based on configuration
+        if (slack_config_.safety_slack && !qp_generator_.safety_slack_variables_.empty()) {
+            qp_generator_.addSlackCost(safety_weights, qp_generator_.safety_slack_variables_);
+        }
+
+        if (slack_config_.clf_slack && !qp_generator_.clf_slack_variables_.empty()) {
+            qp_generator_.addSlackCost(clf_weights, qp_generator_.clf_slack_variables_);
+        }
+
+        if (slack_config_.connectivity_slack &&
+            !qp_generator_.connectivity_slack_variables_.empty()) {
+            qp_generator_.addSlackCost(connectivity_weights,
+                                       qp_generator_.connectivity_slack_variables_);
         }
 
         // add the current state constraints

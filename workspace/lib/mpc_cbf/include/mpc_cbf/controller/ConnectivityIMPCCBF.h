@@ -5,6 +5,7 @@
 #ifndef MPC_CBF_CONNECTIVITYIMPCCBF_H
 #define MPC_CBF_CONNECTIVITYIMPCCBF_H
 
+#include <cbf/detail/ConnectivityCBF.h>
 #include <math/Helpers.h>
 #include <math/collision_shapes/CollisionShape.h>
 #include <mpc_cbf/optimization/ConnectivityMPCCBFQPGenerator.h>
@@ -39,9 +40,7 @@ class ConnectivityIMPCCBF {
     struct IMPCParams {
         int cbf_horizon_;
         int impc_iter_;
-        T slack_cost_;
-        T slack_decay_rate_;
-        bool slack_mode_;
+        cbf::SlackConfig slack_config_;
     };
 
     struct Params {
@@ -117,6 +116,7 @@ class ConnectivityIMPCCBF {
     // 简单容器：只存 ac/bc；如需同时存 robot_idx/sim_t/loop_idx，可扩展结构体
     std::vector<std::pair<Vector, T>> samples_conn_; // 前 5 条 connectivity 失败的 (ac, bc)
     std::vector<std::pair<Vector, T>> samples_clf_;  // 前 5 条 CLF 失败的 (a,  b)
+    cbf::SlackConfig slack_config_;
 };
 
 } // namespace mpc_cbf

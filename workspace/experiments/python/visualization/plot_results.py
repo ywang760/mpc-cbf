@@ -437,9 +437,16 @@ def main():
     keys = sorted(st["robots"].keys(), key=int)
     traj = np.array([np.array(st["robots"][k]["states"], dtype=float) for k in keys])
 
-    # 时间参数
-    dt = st["dt"]
-    Ts = st["Ts"]
+    # robots 数据结构：假设 st['robots'][key]['states'] 是一个帧序列
+    T = 0  # Initialize T to avoid unbound variable issues
+    if HAS_RESULT:
+        robots = st["robots"]
+        keys = sorted(robots.keys(), key=int)  # 假设机器人 ID 是字符串数字，用 int 排序
+        # 将每个机器人各帧状态组织成 (N, T, 3) 的数组
+        traj = np.array(
+            [robots[k]["states"] for k in keys], dtype=float
+        )  # 例如形状 (N, T, 3)
+        _, T, _ = traj.shape
 
     # 半径（从 config 读取）
     try:
@@ -457,24 +464,117 @@ def main():
     total_frame = traj.shape[1]
     sample_frames = np.linspace(0, total_frame - 1, 6, dtype=int)  # 6个采样点
 
-    for idx in sample_frames:
-        img_path = os.path.join(
-            out_dir_expanded,
-            os.path.basename(args.config).replace(".json", f"_frame{idx}.pdf")
-        )
-        save_snapshot_at_frame(
-            cfg=cfg,
-            traj=traj,
-            colors=colors,
-            save_path=img_path,
-            d_connect=d_connect,
-            conn_color_mode="dist_alpha",
-            disk_radius=disk_radius,
-            disks_at_agent_z=True,
-            frame_idx=idx,
-            axis_mode=args.axis_mode,
-            show_goals=show_goals,
-        )
+    # --- 3.3 轨迹（仅当有结果时） ---
+    if HAS_RESULT:
+        axes[2].set_title("Trajectories & Connectivity Over Time")
+        plot_trajectory(axes[2], traj, colors)
+        axes[2].grid(True)
+
+    # 保存静态图
+    # Set x and y limits based on physical limits
+    x_min, y_min = cfg["physical_limits"]["p_min"]
+    x_max, y_max = cfg["physical_limits"]["p_max"]
+    x_padding = (x_max - x_min) * 0.1
+    y_padding = (y_max - y_min) * 0.1
+    for ax in axes:
+        ax.set_xlim(x_min - x_padding, x_max + x_padding)
+        ax.set_ylim(y_min - y_padding, y_max + y_padding)
+    os.makedirs(os.path.dirname(output_static) or '.', exist_ok=True)
+    fig.tight_layout()
+    fig.savefig(output_static)
+    print(f"Static plot saved to {output_static}")
+
+    if args.create_anim and HAS_RESULT:
+        
+        ax_anim = axes[2]
+        artists = []
+        
+        def init_frame():
+            nonlocal artists
+            for art in artists:
+                try:
+                    art.remove()
+                except Exception:
+                    pass
+            artists = []
+            return []
+
+        def update_frame(frame_idx):
+            nonlocal artists
+            for art in artists:
+                try:
+                    art.remove()
+                except Exception:
+                    pass
+            artists = []
+
+            # 取出当前帧每辆车的 (x, y)
+            curr_positions = traj[:, frame_idx, :2]  # 形状 (N, 2)
+
+            # 1. scatter画出当前位置
+            scat = ax_anim.scatter(
+                curr_positions[:, 0],
+                curr_positions[:, 1],
+                c=colors,
+                s=50,
+                edgecolors='k',
+                zorder=3
+            )
+            artists.append(scat)
+
+            # 2. 每个机器人画圆
+            for i in range(N):
+                x_i, y_i = curr_positions[i]
+                circle = plt.Circle((x_i, y_i), robot_radius, color=colors[i], alpha=0.2, zorder=1)
+                ax_anim.add_patch(circle)
+                artists.append(circle)
+
+            # 3. 两两之间画连线
+            for i in range(N):
+                x_i, y_i = curr_positions[i]
+                for j in range(i + 1, N):
+                    x_j, y_j = curr_positions[j]
+                    if np.hypot(x_j - x_i, y_j - y_i) <= max_dist:
+                        ln, = ax_anim.plot([x_i, x_j], [y_i, y_j], '-', color='gray', lw=1, zorder=2)
+                        artists.append(ln)
+
+            return artists
+
+
+        # Downsample frames if T is too large for smooth animation
+        MAX_FRAMES = 200  # Maximum frames for reasonable animation
+        if T > MAX_FRAMES:
+            # Calculate downsampling factor
+            downsample_factor = max(1, T // MAX_FRAMES)
+            frame_indices = np.arange(0, T, downsample_factor)
+            actual_frames = len(frame_indices)
+            actual_interval = 1000 * ts * downsample_factor  # Adjust interval for downsampling
+            print(f"Downsampling animation: {T} frames -> {actual_frames} frames (factor: {downsample_factor})")
+            
+            def update_frame_downsampled(frame_idx):
+                # Use the downsampled frame index
+                actual_frame_idx = frame_indices[frame_idx]
+                return update_frame(actual_frame_idx)
+            
+            anim = animation.FuncAnimation(
+                fig,
+                update_frame_downsampled,
+                frames=actual_frames,
+                init_func=init_frame,
+                blit=False,
+                interval=actual_interval,
+                repeat=False,
+            )
+        else:
+            anim = animation.FuncAnimation(
+                fig,
+                update_frame,
+                frames=T,
+                init_func=init_frame,
+                blit=False,
+                interval=1000 * ts,
+                repeat=False,
+            )
 
     # === 动画（可选） ===
     if args.create_anim:

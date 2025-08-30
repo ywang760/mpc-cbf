@@ -10,9 +10,24 @@
 #include <vector>
 
 namespace cbf {
+
+/**
+ * @brief Configuration structure for slack variables in connectivity CBF constraints
+ */
+struct SlackConfig {
+    bool safety_slack = false;              // Enable slack for safety constraints
+    bool clf_slack = false;                 // Enable slack for CLF constraints  
+    bool connectivity_slack = false;        // Enable slack for connectivity constraints
+    double safety_slack_cost = 100000.0;    // Cost penalty for safety constraint violations
+    double clf_slack_cost = 50000.0;        // Cost penalty for CLF constraint violations
+    double connectivity_slack_cost = 25000.0; // Cost penalty for connectivity constraint violations
+    double slack_decay_rate = 0.1;            // Slack decay rate over prediction horizon
+};
+
 template <typename T>
 struct ConnectivityCBFParams {
     T dmin_, dmax_;
+    SlackConfig slack_config_;
 };
 
 class ConnectivityCBF {

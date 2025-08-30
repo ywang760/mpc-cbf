@@ -5,6 +5,7 @@
 #ifndef MPC_CBF_CONNECTIVITYMPCQPGENERATOR_H
 #define MPC_CBF_CONNECTIVITYMPCQPGENERATOR_H
 
+#include <cbf/detail/ConnectivityCBF.h>
 #include <mpc/optimization/PiecewiseBezierMPCQPGenerator.h>
 #include <mpc_cbf/optimization/ConnectivityMPCCBFQPOperations.h>
 #include <mpc_cbf/optimization/MPCCBFQPGeneratorBase.h>
@@ -27,7 +28,7 @@ class ConnectivityMPCCBFQPGenerator : public MPCCBFQPGeneratorBase<T, DIM> {
     // Constructor
     ConnectivityMPCCBFQPGenerator(
         std::unique_ptr<ConnectivityMPCCBFQPOperations>&& piecewise_mpc_cbf_operations_ptr,
-        int num_neighbors, bool slack_mode);
+        int num_neighbors, const cbf::SlackConfig& slack_config);
 
     // Connectivity-specific constraint methods
     void addSafetyCBFConstraint(const Vector& current_state, const Vector& neighbor_state,
@@ -61,6 +62,13 @@ class ConnectivityMPCCBFQPGenerator : public MPCCBFQPGeneratorBase<T, DIM> {
         return piecewise_mpc_cbf_operations_ptr_->debugLastSafety_b();
     }
                                     
+
+  public:
+    // Public slack variable pools for derived class access
+    cbf::SlackConfig slack_config_;
+    std::vector<qpcpp::Variable<T>*> safety_slack_variables_;    // n-1 variables
+    std::vector<qpcpp::Variable<T>*> clf_slack_variables_;       // n-1 variables  
+    std::vector<qpcpp::Variable<T>*> connectivity_slack_variables_; // 1 variable
 
   private:
     std::unique_ptr<ConnectivityMPCCBFQPOperations> piecewise_mpc_cbf_operations_ptr_;

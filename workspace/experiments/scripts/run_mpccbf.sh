@@ -13,6 +13,7 @@ INPUT=(
     # "/usr/src/mpc-cbf/workspace/experiments/config/baseline/6r/circle.json"
     # "/usr/src/mpc-cbf/workspace/experiments/config/baseline/6r/upward.json"
     # "/usr/src/mpc-cbf/workspace/experiments/config/baseline/8r/circle.json"
+    # "/usr/src/mpc-cbf/workspace/experiments/config/baseline/8r/circle2.json"
     # "/usr/src/mpc-cbf/workspace/experiments/config/baseline/8r/diverge.json"
 )
 

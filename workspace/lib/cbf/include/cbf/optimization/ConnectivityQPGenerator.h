@@ -26,12 +26,13 @@ class ConnectivityQPGenerator : public CBFQPGeneratorBase<T, DIM> {
     /**
          * @brief Constructor that takes a pointer to the ConnectivityCBF instance
          *
-         * @param cbf Shared pointer to the Connectivity CBF implementation
-         * @param num_robots Number of robots (used for slack variables)
-         * @param slack_mode If true, add slack variables to allow constraint relaxation
+         * @param cbf Shared pointer to the Connectivity CBF implementation  
+         * @param slack_config Configuration for different types of slack variables
+         * @param num_neighbors Number of neighboring robots (for slack variable sizing)
          */
-    explicit ConnectivityQPGenerator(std::shared_ptr<ConnectivityCBF> cbf, int num_robots = 0,
-                                     bool slack_mode = false);
+    explicit ConnectivityQPGenerator(std::shared_ptr<ConnectivityCBF> cbf,
+                                     const SlackConfig& slack_config = SlackConfig{},
+                                     size_t num_neighbors = 0);
 
     /**
          * @brief Adds connectivity constraint between agents to maintain network connectivity
@@ -74,6 +75,14 @@ class ConnectivityQPGenerator : public CBFQPGeneratorBase<T, DIM> {
          * @param state Current state of the robot
          */
     void addMaxVelConstraints(const Vector& state) override;
+
+    // Slack configuration and variables
+    SlackConfig slack_config_; ///< Configuration for different slack variable types
+    std::vector<qpcpp::Variable<T>*>
+        safety_slack_variables_; ///< Slack variables for safety constraints
+    std::vector<qpcpp::Variable<T>*> clf_slack_variables_; ///< Slack variables for CLF constraints
+    std::vector<qpcpp::Variable<T>*>
+        connectivity_slack_variables_; ///< Slack variables for connectivity constraints
 
   private:
     std::shared_ptr<ConnectivityCBF> cbf_; ///< Pointer to the Connectivity CBF implementation

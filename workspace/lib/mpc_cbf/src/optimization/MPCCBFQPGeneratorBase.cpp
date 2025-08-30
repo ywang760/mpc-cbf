@@ -39,9 +39,14 @@ void MPCCBFQPGeneratorBase<T, DIM>::addSlackVariables(int num_neighbors) {
 
 template <typename T, unsigned int DIM>
 void MPCCBFQPGeneratorBase<T, DIM>::addCostAdditionForSlackVariables(
-    const CostAddition& cost_addition) {
+    const CostAddition& cost_addition, const std::vector<qpcpp::Variable<T>*>& specific_slack_variables) {
     constexpr T epsilon = std::numeric_limits<T>::epsilon() * T(100.0);
-    size_t num_slack_variables = slack_variables_.size();
+    
+    // Use specific slack variables if provided, otherwise use member slack variables
+    const std::vector<qpcpp::Variable<T>*>& slack_vars = 
+        specific_slack_variables.empty() ? slack_variables_ : specific_slack_variables;
+    
+    size_t num_slack_variables = slack_vars.size();
 
     // number decision variable number error
     if (num_slack_variables != cost_addition.linear_term().rows() ||
@@ -58,14 +63,14 @@ void MPCCBFQPGeneratorBase<T, DIM>::addCostAdditionForSlackVariables(
     }
 
     for (size_t i = 0; i < num_slack_variables; ++i) {
-        const qpcpp::Variable<T>* var1_ptr = slack_variables_.at(i);
+        const qpcpp::Variable<T>* var1_ptr = slack_vars.at(i);
         // add the linear term
         if (!math::isApproximatelyEqual<T>(cost_addition.linear_term()(i), T(0.0), epsilon)) {
             problem().cost_function()->addLinearTerm(var1_ptr, cost_addition.linear_term()(i));
         }
         // add quadratic term
         for (std::size_t j = 0; j < num_slack_variables; ++j) {
-            const qpcpp::Variable<T>* var2_ptr = slack_variables_.at(j);
+            const qpcpp::Variable<T>* var2_ptr = slack_vars.at(j);
             // add quadratic term
             if (!math::isApproximatelyEqual<T>(cost_addition.quadratic_term()(i, j), T(0.0),
                                                epsilon)) {
@@ -78,10 +83,16 @@ void MPCCBFQPGeneratorBase<T, DIM>::addCostAdditionForSlackVariables(
 
 template <typename T, unsigned int DIM>
 void MPCCBFQPGeneratorBase<T, DIM>::addLinearConstraintForPiecewiseWithSlackVariables(
-    const LinearConstraint& linear_constraint, const Row& slack_coefficients) {
+    const LinearConstraint& linear_constraint, const Row& slack_coefficients,
+    const std::vector<qpcpp::Variable<T>*>& specific_slack_variables) {
 
     size_t num_decision_variables = piecewise_mpc_qp_generator_ptr_->variables().size();
-    size_t num_slack_variables = slack_variables_.size();
+    
+    // Use specific slack variables if provided, otherwise use member slack variables
+    const std::vector<qpcpp::Variable<T>*>& slack_vars = 
+        specific_slack_variables.empty() ? slack_variables_ : specific_slack_variables;
+    
+    size_t num_slack_variables = slack_vars.size();
 
     // linear constraint structure error.
     if (num_decision_variables != linear_constraint.coefficients().cols()) {
@@ -112,14 +123,19 @@ void MPCCBFQPGeneratorBase<T, DIM>::addLinearConstraintForPiecewiseWithSlackVari
     // set coefficients for this linear constraint (slack variables part)
     for (std::size_t slack_variable_idx = 0; slack_variable_idx < num_slack_variables;
          ++slack_variable_idx) {
-        const qpcpp::Variable<T>* var_ptr = slack_variables_.at(slack_variable_idx);
+        const qpcpp::Variable<T>* var_ptr = slack_vars.at(slack_variable_idx);
         qpcpp_linear_constraint->setCoefficient(var_ptr, slack_coefficients(slack_variable_idx));
     }
 }
 
 template <typename T, unsigned int DIM>
-void MPCCBFQPGeneratorBase<T, DIM>::addSlackCost(const std::vector<double>& slack_weights) {
-    size_t num_slack_variables = slack_variables_.size();
+void MPCCBFQPGeneratorBase<T, DIM>::addSlackCost(const std::vector<double>& slack_weights,
+                                                  const std::vector<qpcpp::Variable<T>*>& specific_slack_variables) {
+    // Use specific slack variables if provided, otherwise use member slack variables
+    const std::vector<qpcpp::Variable<T>*>& slack_vars = 
+        specific_slack_variables.empty() ? slack_variables_ : specific_slack_variables;
+    
+    size_t num_slack_variables = slack_vars.size();
 
     if (slack_weights.size() != num_slack_variables) {
         throw std::runtime_error(
@@ -129,7 +145,7 @@ void MPCCBFQPGeneratorBase<T, DIM>::addSlackCost(const std::vector<double>& slac
 
     // Add linear cost terms for slack variables
     for (size_t i = 0; i < num_slack_variables; ++i) {
-        const qpcpp::Variable<T>* var_ptr = slack_variables_.at(i);
+        const qpcpp::Variable<T>* var_ptr = slack_vars.at(i);
         problem().cost_function()->addLinearTerm(var_ptr, static_cast<T>(slack_weights[i]));
     }
 }

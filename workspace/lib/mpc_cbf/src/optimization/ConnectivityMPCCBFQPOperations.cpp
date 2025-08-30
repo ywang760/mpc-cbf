@@ -117,6 +117,20 @@ ConnectivityMPCCBFQPOperations<T, DIM>::clfConstraint(const Vector& current_stat
 }
 
 template <typename T, unsigned int DIM>
+typename ConnectivityMPCCBFQPOperations<T, DIM>::LinearConstraint
+ConnectivityMPCCBFQPOperations<T, DIM>::clfConstraint(const Vector& current_state,
+                                                      const Vector& neighbor_state, T slack_value) {
+    Vector a = connectivity_cbf_ptr_->getCLFConstraints(current_state, neighbor_state);
+    T b = -1.0 * connectivity_cbf_ptr_->getCLFBound(current_state, neighbor_state);
+
+    Vector A0 = Vector::Zero(DIM * this->k_hor_);
+    A0.segment(0, DIM) = a;
+    Row A_control_pts = -1.0 * A0.transpose() * this->U_basis_;
+
+    return LinearConstraint(A_control_pts, std::numeric_limits<T>::lowest(), b + slack_value);
+}
+
+template <typename T, unsigned int DIM>
 std::vector<typename ConnectivityMPCCBFQPOperations<T, DIM>::LinearConstraint>
 ConnectivityMPCCBFQPOperations<T, DIM>::predSafetyCBFConstraints(
     const std::vector<State>& pred_states, const Vector& neighbor_state) {
@@ -226,6 +240,28 @@ ConnectivityMPCCBFQPOperations<T, DIM>::predCLFConstraints(const std::vector<Sta
         }    
         logger->debug("[predCLFConstraints] k={} bk={}", k, bk);
         
+        linear_constraints.push_back(
+            LinearConstraint(Ak_control_pts, std::numeric_limits<T>::lowest(), bk));
+    }
+    return linear_constraints;
+}
+
+template <typename T, unsigned int DIM>
+std::vector<typename ConnectivityMPCCBFQPOperations<T, DIM>::LinearConstraint>
+ConnectivityMPCCBFQPOperations<T, DIM>::predCLFConstraints(const std::vector<State>& pred_states,
+                                                           const Vector& neighbor_state) {
+    std::vector<LinearConstraint> linear_constraints;
+    for (size_t k = 0; k < pred_states.size(); ++k) {
+        const State& pred_state = pred_states.at(k);
+        Vector state(2 * DIM);
+        state << pred_state.pos_, pred_state.vel_;
+
+        Vector ak = connectivity_cbf_ptr_->getCLFConstraints(state, neighbor_state);
+        T bk = -1.0 * connectivity_cbf_ptr_->getCLFBound(state, neighbor_state);
+
+        Vector Ak = Vector::Zero(DIM * this->k_hor_);
+        Ak.segment(k * DIM, DIM) = ak;
+        Row Ak_control_pts = -1.0 * Ak.transpose() * this->U_basis_;
         linear_constraints.push_back(
             LinearConstraint(Ak_control_pts, std::numeric_limits<T>::lowest(), bk));
     }

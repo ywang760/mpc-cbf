@@ -11,12 +11,12 @@
     },
     "physical_limits": {
         "p_min": [
-            -10,
-            -10
+            -5,
+            -5
         ],
         "p_max": [
-            10,
-            10
+            5,
+            5
         ],
         "v_min": [
             -2,
@@ -57,18 +57,24 @@
         }
     },
     "cbf_params": {
-        "d_min": 3,
-        "d_max": 8.0,
+        "d_min": 2.0,
+        "d_max": 4.0,
         "cbf_horizon": 2,
         "impc_iter": 2,
-        "slack_mode": true,
-        "slack_cost": 10000,
-        "slack_decay_rate": 0.3
+        "slack_config": {
+            "safety_slack": true,
+            "clf_slack": true,
+            "connectivity_slack": false,
+            "safety_slack_cost": 100000,
+            "clf_slack_cost": 50,
+            "connectivity_slack_cost": 25000,
+            "slack_decay_rate": 0.1
+        }
     },
     "bezier_params": {
         "num_pieces": 3,
         "num_control_points": 4,
         "piece_max_parameter": 0.5,
-        "bezier_continuity_upto_degree": 0
+        "bezier_continuity_upto_degree": 3
     }
 }
